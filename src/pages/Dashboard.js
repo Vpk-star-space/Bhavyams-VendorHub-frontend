@@ -96,7 +96,7 @@ const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [adminView, setAdminView] = useState('stats'); 
     const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')));
-    const [ordersList, setOrdersList] = useState([]);
+    const [ordersList] = useState([]);
     const [vendorStats, setVendorStats] = useState({ revenue: 0, orders: 0, products: 0 });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
     const navigate = useNavigate();
@@ -106,30 +106,33 @@ const Dashboard = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+useEffect(() => {
+    const fetchData = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return navigate('/login');
+        
+        const headers = { Authorization: `Bearer ${token}` };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) return navigate('/login');
-            try {
-                const userRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
-                setCurrentUser(userRes.data);
+        try {
+            // 1. Sync User Info
+            const userRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', { headers });
+            setCurrentUser(userRes.data);
 
-                if (activeTab === 'overview' && userRes.data.role === 'vendor') {
-                    const statsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/stats', { headers: { Authorization: `Bearer ${token}` } });
-                    setVendorStats(statsRes.data);
-                }
-
-                if (activeTab === 'orders') {
-                    let url = userRes.data.role === 'customer' ? '/api/orders/my-orders' : 
-                              userRes.data.role === 'vendor' ? '/api/orders/my-sales' : '/api/orders/admin-all';
-                    const res = await axios.get(`https://bhavyams-vendorhub-backend.onrender.com${url}`, { headers: { Authorization: `Bearer ${token}` } });
-                    setOrdersList(res.data);
-                }
-            } catch (err) { console.error(err); }
-        };
-        fetchData();
-    }, [activeTab, navigate]);
+            // 2. Fetch Vendor Stats only if role is vendor
+            if (userRes.data.role === 'vendor') {
+                const statsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/stats', { headers });
+                setVendorStats(statsRes.data);
+            }
+        } catch (err) { 
+            console.error("Dashboard error:", err);
+            if (err.response?.status === 401) {
+                localStorage.clear();
+                navigate('/login');
+            }
+        }
+    };
+    fetchData();
+}, [activeTab, navigate]);
 
     const handleLogout = () => { localStorage.clear(); navigate('/login'); };
 
