@@ -15,8 +15,8 @@ const AddProduct = () => {
         price: '',
         description: '',
         stock_count: '',
-        category: 'Electronics',
-        delivery_minutes: '30' 
+        category: '',
+        delivery_minutes: '', 
     });
 
     const [images, setImages] = useState([]);

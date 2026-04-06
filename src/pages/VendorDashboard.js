@@ -17,7 +17,7 @@ const VendorDashboard = () => {
                 // 🛡️ FIX: Map backend names (total_revenue) to frontend names (revenue)
                 const data = res.data;
                 setStats({
-                    revenue: data.revenue || data.total_revenue || 0,
+                    revenue: data.revenue || data.revenue_count|| 0,
                     orders: data.orders || data.total_orders || 0,
                     products: data.products || data.product_count || 0
                 });

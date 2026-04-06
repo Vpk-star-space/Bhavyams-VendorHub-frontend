@@ -152,13 +152,18 @@ useEffect(() => {
                                 <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><ShoppingBag size={20}/> Sales</div>
                             </>
                         )}
-                        {currentUser?.role === 'admin' && (
-                            <>
-                                <div style={styles.navSectionHeader}>ADMIN</div>
-                                <div onClick={() => setActiveTab('admin')} style={activeTab === 'admin' ? styles.activeNavItem : styles.navItem}><Shield size={20}/> Control</div>
-                                <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><ListOrdered size={20}/> Master</div>
-                            </>
-                        )}
+                       {/* 🚀 Change this line */}
+{currentUser?.role?.toLowerCase() === 'admin' && (
+    <>
+        <div style={styles.navSectionHeader}>ADMIN</div>
+        <div onClick={() => setActiveTab('admin')} style={activeTab === 'admin' ? styles.activeNavItem : styles.navItem}>
+            <Shield size={20}/> Control
+        </div>
+        <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}>
+            <ListOrdered size={20}/> Master
+        </div>
+    </>
+)}
                     </nav>
                     <button onClick={handleLogout} style={styles.logoutBtn}><LogOut size={18}/> LOGOUT</button>
                 </aside>
