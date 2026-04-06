@@ -4,14 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { 
-    ShoppingBag, PlusCircle, History, Store, LogOut, 
-    Shield, User, Users, ArrowLeft,  
-     Star, Sparkles, Package, Home, ListOrdered, 
+    ShoppingBag, PlusCircle, History, Store,
+    Shield, User, Users, ArrowLeft, 
+    Star, Sparkles, Package, Home, ListOrdered, BarChart3, IndianRupee
 } from 'lucide-react';
 
 import ProductList from '../components/ProductList';
 import AdminUserList from '../components/AdminUserList';
 import AdminProductList from '../components/AdminProductList';
+import AdminPaymentList from '../components/AdminPaymentList'; 
 import Profile from './Profile'; 
 
 const OrderStatus = ({ order, role }) => {
@@ -57,15 +58,11 @@ const OrderStatus = ({ order, role }) => {
                     {order.status?.toUpperCase() || 'CONFIRMED'}
                 </span>
             </div>
-
             <div style={styles.progressBar}>
-                <motion.div 
-                    initial={{ width: 0 }} animate={{ width: isDelivered ? '100%' : '50%' }}
-                    transition={{ duration: 1.2 }}
-                    style={{ background: isDelivered ? '#10b981' : '#2874f0', height: '100%', borderRadius: '8px' }}
+                <motion.div initial={{ width: 0 }} animate={{ width: isDelivered ? '100%' : '50%' }}
+                    transition={{ duration: 1.2 }} style={{ background: isDelivered ? '#10b981' : '#2874f0', height: '100%', borderRadius: '8px' }}
                 />
             </div>
-
             {isDelivered && role === 'customer' && (
                 <div style={{marginTop: '15px'}}>
                     <AnimatePresence mode="wait">
@@ -79,13 +76,9 @@ const OrderStatus = ({ order, role }) => {
                         ) : (
                             <motion.div layout style={styles.reviewForm}>
                                 <select value={rating} onChange={(e) => setRating(e.target.value)} style={styles.select}>
-                                    <option value="5">⭐⭐⭐⭐⭐ 5 Stars</option>
-                                    <option value="4">⭐⭐⭐⭐ 4 Stars</option>
-                                    <option value="3">⭐⭐⭐ 3 Stars</option>
-                                    <option value="2">⭐⭐ 2 Stars</option>
-                                    <option value="1">⭐ 1 Star</option>
+                                    {[5,4,3,2,1].map(num => <option key={num} value={num}>{num} Stars</option>)}
                                 </select>
-                                <textarea placeholder="Share feedback..." value={comment} onChange={(e) => setComment(e.target.value)} style={styles.textarea} />
+                                <textarea placeholder="Feedback..." value={comment} onChange={(e) => setComment(e.target.value)} style={styles.textarea} />
                                 <div style={{display:'flex', gap:'10px'}}>
                                     <button onClick={submitReview} style={styles.submitReviewBtn}>SUBMIT</button>
                                     <button onClick={() => setShowReviewForm(false)} style={styles.cancelBtn}>CANCEL</button>
@@ -104,6 +97,7 @@ const Dashboard = () => {
     const [adminView, setAdminView] = useState('stats'); 
     const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')));
     const [ordersList, setOrdersList] = useState([]);
+    const [vendorStats, setVendorStats] = useState({ revenue: 0, orders: 0, products: 0 });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
     const navigate = useNavigate();
 
@@ -117,19 +111,18 @@ const Dashboard = () => {
         const fetchData = async () => {
             const token = localStorage.getItem('token');
             if (!token) return navigate('/login');
-            
             try {
-                // Refresh User Data
                 const userRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
                 setCurrentUser(userRes.data);
 
-                // Fetch Tab Specific Data
+                if (activeTab === 'overview' && userRes.data.role === 'vendor') {
+                    const statsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/stats', { headers: { Authorization: `Bearer ${token}` } });
+                    setVendorStats(statsRes.data);
+                }
+
                 if (activeTab === 'orders') {
-                    let url = '';
-                    if (userRes.data.role === 'customer') url = '/api/orders/my-orders';
-                    else if (userRes.data.role === 'vendor') url = '/api/orders/my-sales';
-                    else if (userRes.data.role === 'admin') url = '/api/orders/admin-all';
-                    
+                    let url = userRes.data.role === 'customer' ? '/api/orders/my-orders' : 
+                              userRes.data.role === 'vendor' ? '/api/orders/my-sales' : '/api/orders/admin-all';
                     const res = await axios.get(`https://bhavyams-vendorhub-backend.onrender.com${url}`, { headers: { Authorization: `Bearer ${token}` } });
                     setOrdersList(res.data);
                 }
@@ -142,7 +135,6 @@ const Dashboard = () => {
 
     return (
         <div style={styles.dashboard}>
-            {/* 💻 DESKTOP SIDEBAR */}
             {!isMobile && (
                 <aside style={styles.sidebar}>
                     <div style={styles.logoSection}><h2 style={styles.logo}>Bhavyams</h2><h2 style={styles.logo}>Hub</h2></div>
@@ -152,9 +144,9 @@ const Dashboard = () => {
                         {currentUser?.role === 'customer' && <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><History size={20}/> Orders</div>}
                         {currentUser?.role === 'vendor' && (
                             <>
-                                <div style={styles.navSectionHeader}>SELLER HUB</div>
-                                <div onClick={() => navigate('/add-product')} style={styles.navItem}><PlusCircle size={20}/> List Item</div>
-                                <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><ShoppingBag size={20}/> My Sales</div>
+                                <div style={styles.navSectionHeader}>VENDOR</div>
+                                <div onClick={() => navigate('/add-product')} style={styles.navItem}><PlusCircle size={20}/> Add Item</div>
+                                <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><ShoppingBag size={20}/> Sales</div>
                             </>
                         )}
                         {currentUser?.role === 'admin' && (
@@ -164,21 +156,16 @@ const Dashboard = () => {
                                 <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><ListOrdered size={20}/> Master</div>
                             </>
                         )}
-                        <div style={styles.navSectionHeader}>RETAIL</div>
-                        <div onClick={() => navigate('/')} style={styles.navItem}><Store size={20}/> Shop</div>
                     </nav>
-                    <button onClick={handleLogout} style={styles.logoutBtn}><LogOut size={18}/> LOGOUT</button>
+                    <button onClick={handleLogout} style={styles.logoutBtn}>LOGOUT</button>
                 </aside>
             )}
 
-            {/* 📱 MOBILE BOTTOM NAV */}
             {isMobile && (
                 <div style={styles.mobileBottomNav}>
                     <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.mobileActiveTab : styles.mobileTab}><Home size={22}/></div>
                     <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.mobileActiveTab : styles.mobileTab}><ShoppingBag size={22}/></div>
-                    {currentUser?.role === 'vendor' && <div onClick={() => navigate('/add-product')} style={styles.mobileTab}><PlusCircle size={22} color="#fb641b"/></div>}
                     <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.mobileActiveTab : styles.mobileTab}><User size={22}/></div>
-                    <div onClick={handleLogout} style={styles.mobileTab}><LogOut size={22} color="#e11d48"/></div>
                 </div>
             )}
 
@@ -195,10 +182,22 @@ const Dashboard = () => {
                     <AnimatePresence mode="wait">
                         <motion.div key={activeTab + adminView} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                             {activeTab === 'overview' && (
-                                currentUser?.role === 'vendor' ? <ProductList /> : (
+                                currentUser?.role === 'vendor' ? (
+                                    <div style={styles.vendorStatsGrid}>
+                                        <div style={styles.statCard}><IndianRupee size={20}/><div style={styles.statLabel}>Revenue</div><div style={styles.statValue}>₹{vendorStats.revenue}</div></div>
+                                        <div style={styles.statCard}><ShoppingBag size={20}/><div style={styles.statLabel}>Orders</div><div style={styles.statValue}>{vendorStats.orders}</div></div>
+                                        <div style={styles.statCard}><Package size={20}/><div style={styles.statLabel}>Items</div><div style={styles.statValue}>{vendorStats.products}</div></div>
+                                        <div style={{gridColumn: isMobile ? 'span 1' : 'span 3'}}><ProductList /></div>
+                                    </div>
+                                ) : currentUser?.role === 'admin' ? (
+                                    <div style={styles.adminStatsGrid}>
+                                        <div style={styles.statCard} onClick={() => {setActiveTab('admin'); setAdminView('users')}}><Users size={32}/> USERS</div>
+                                        <div style={styles.statCard} onClick={() => {setActiveTab('admin'); setAdminView('products')}}><Package size={32}/> PRODUCTS</div>
+                                        <div style={styles.statCard} onClick={() => {setActiveTab('admin'); setAdminView('payments')}}><BarChart3 size={32}/> PAYMENTS</div>
+                                    </div>
+                                ) : (
                                     <div style={styles.premiumBanner}>
-                                        <Sparkles size={32} color="#fff" />
-                                        <h3 style={{fontSize: isMobile ? '22px' : '30px', margin: '15px 0'}}>Premium Goods</h3>
+                                        <Sparkles size={32} /><h3 style={{margin: '15px 0'}}>Premium Goods</h3>
                                         <button onClick={() => navigate('/')} style={styles.premiumShopBtn}>GO TO STORE</button>
                                     </div>
                                 )
@@ -208,25 +207,17 @@ const Dashboard = () => {
                             
                             {activeTab === 'orders' && (
                                 <div style={styles.ordersGrid}>
-                                    <h3 style={styles.sectionTitle}>{currentUser?.role === 'vendor' ? 'Sales' : 'Your Orders'}</h3>
-                                    {ordersList.length === 0 ? <div style={styles.noData}>No orders yet.</div> : ordersList.map(o => <OrderStatus key={o.id} order={o} role={currentUser?.role} />)}
+                                    <h3 style={styles.sectionTitle}>History</h3>
+                                    {ordersList.length === 0 ? <div style={styles.noData}>Empty</div> : ordersList.map(o => <OrderStatus key={o.id} order={o} role={currentUser?.role} />)}
                                 </div>
                             )}
 
                             {activeTab === 'admin' && (
-                                <div style={styles.adminContainer}>
-                                    {adminView === 'stats' ? (
-                                        <div style={styles.adminStatsGrid}>
-                                            <div style={styles.statCard} onClick={() => setAdminView('users')}><Users size={32} color="#2874f0"/><p>USERS</p></div>
-                                            <div style={styles.statCard} onClick={() => setAdminView('products')}><Package size={32} color="#10b981"/><p>PRODUCTS</p></div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <button onClick={() => setAdminView('stats')} style={styles.backBtn}><ArrowLeft size={16}/> Back to Control</button>
-                                            {adminView === 'users' && <AdminUserList />}
-                                            {adminView === 'products' && <AdminProductList />}
-                                        </>
-                                    )}
+                                <div>
+                                    {adminView !== 'stats' && <button onClick={() => setAdminView('stats')} style={styles.backBtn}><ArrowLeft size={16}/> Back</button>}
+                                    {adminView === 'users' && <AdminUserList />}
+                                    {adminView === 'products' && <AdminProductList />}
+                                    {adminView === 'payments' && <AdminPaymentList />}
                                 </div>
                             )}
                         </motion.div>
@@ -243,45 +234,46 @@ const styles = {
     logoSection: { marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px' },
     logo: { fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' },
     nav: { display: 'flex', flexDirection: 'column', gap: '8px' },
-    navItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', color: '#94a3b8', fontSize: '14px', transition: '0.2s' },
-    activeNavItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', background: '#2874f0', color: '#fff', fontWeight: '700', fontSize: '14px' },
-    navSectionHeader: { marginTop: '20px', marginBottom: '10px', fontSize: '10px', fontWeight: '800', color: '#475569', letterSpacing: '1.5px' },
-    logoutBtn: { marginTop: 'auto', background: '#e11d48', border: 'none', color: '#fff', padding: '12px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', width: '100%' },
-    
+    navItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', color: '#94a3b8', fontSize: '14px' },
+    activeNavItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', background: '#2874f0', color: '#fff', fontWeight: '700' },
+    navSectionHeader: { marginTop: '20px', fontSize: '10px', color: '#475569', letterSpacing: '1.5px' },
+    logoutBtn: { marginTop: 'auto', background: '#e11d48', border: 'none', color: '#fff', padding: '12px', borderRadius: '8px', cursor: 'pointer' },
     mobileBottomNav: { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', height: '65px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)', zIndex: 1000 },
-    mobileTab: { color: '#64748b', padding: '10px' },
-    mobileActiveTab: { color: '#2874f0', padding: '10px' },
-
+    mobileTab: { color: '#64748b' },
+    mobileActiveTab: { color: '#2874f0' },
     main: { flex: 1, background: '#f8fafc' },
     header: { padding: '15px 25px', background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
     welcomeHeading: { margin: 0, fontSize: '18px', fontWeight: '900' },
     roleBadge: { background: '#f1f5f9', color: '#2874f0', padding: '3px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '900', marginTop: '4px', display: 'inline-block' },
-    
     body: { padding: '20px' },
     premiumBanner: { background: 'linear-gradient(135deg, #2874f0 0%, #7c3aed 100%)', padding: '40px 20px', borderRadius: '16px', color: '#fff', textAlign: 'center' },
-    premiumShopBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '10px 25px', borderRadius: '6px', fontWeight: '900', cursor: 'pointer' },
-    
-    statusBox: { background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '15px', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' },
+    premiumShopBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '10px 25px', borderRadius: '6px', fontWeight: '900' },
+    vendorStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px' },
+    statCard: { background: '#fff', padding: '20px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e2e8f0', cursor: 'pointer' },
+    statLabel: { fontSize: '11px', color: '#64748b', fontWeight: '700', marginTop: '10px' },
+    statValue: { fontSize: '18px', fontWeight: '900', color: '#0f172a' },
+    statusBox: { background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '15px' },
     orderHeader: { display: 'flex', gap: '12px', alignItems: 'center' },
     orderImg: { width: '50px', height: '50px', borderRadius: '6px', objectFit: 'cover' },
     orderTitle: { margin: 0, fontSize: '14px', fontWeight: '800' },
-    orderSub: { fontSize: '11px', color: '#64748b', marginTop: '2px' },
+    orderSub: { fontSize: '11px', color: '#64748b' },
     progressBar: { background: '#f1f5f9', height: '6px', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' },
     badgeSuccess: { background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: '10px', fontSize: '9px', fontWeight: '800' },
     badgeInfo: { background: '#e0e7ff', color: '#2874f0', padding: '3px 10px', borderRadius: '10px', fontSize: '9px', fontWeight: '800' },
-    
-    reviewBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800', fontSize: '10px', cursor: 'pointer' },
+    reviewBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800', fontSize: '10px' },
     reviewForm: { background: '#eff6ff', padding: '15px', borderRadius: '8px', marginTop: '10px' },
-    select: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', marginBottom: '10px', fontSize: '12px' },
-    textarea: { width: '100%', height: '80px', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', marginBottom: '10px', fontSize: '12px' },
-    submitReviewBtn: { background: '#26a541', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800', fontSize: '11px' },
-    cancelBtn: { background: '#94a3b8', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800', fontSize: '11px' },
-    
-    sectionTitle: { fontSize: '20px', fontWeight: '900', marginBottom: '15px' },
+    select: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', marginBottom: '10px' },
+    textarea: { width: '100%', height: '80px', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', marginBottom: '10px' },
+    submitReviewBtn: { background: '#26a541', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800' },
+    cancelBtn: { background: '#94a3b8', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px' },
+    sectionTitle: { fontSize: '18px', fontWeight: '900', margin: '20px 0 15px 0' },
     adminStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' },
-    statCard: { background: '#fff', padding: '30px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e2e8f0', cursor: 'pointer' },
     backBtn: { background: 'none', border: 'none', color: '#2874f0', fontWeight: '800', cursor: 'pointer', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' },
-    noData: { textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '13px' }
+    noData: { textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '13px' },
+    ordersGrid: { display: 'flex', flexDirection: 'column' },
+    reviewedBox: { marginTop: '10px', padding: '10px', background: '#f8fafc', borderRadius: '8px' },
+    reviewLabelRow: { fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' },
+    reviewText: { fontSize: '12px', color: '#475569', marginTop: '5px', fontStyle: 'italic' }
 };
 
 export default Dashboard;

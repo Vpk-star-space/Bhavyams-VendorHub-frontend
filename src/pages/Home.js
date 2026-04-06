@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { 
     Search, ShoppingCart, Zap, Menu, X, User, 
-    ShoppingBag, Heart, LogOut, Filter, Layers, Mail, ExternalLink, 
+    ShoppingBag, LogOut, Mail, ExternalLink, Filter 
 } from 'lucide-react'; 
 import { useCart } from '../context/CartContext';
 import { toast } from 'react-toastify';
@@ -17,17 +17,18 @@ const Home = () => {
     const [maxPrice, setMaxPrice] = useState(100000); 
     const [activeCategory, setActiveCategory] = useState('All');
     const [isDrawerOpen, setIsDrawerOpen] = useState(false); 
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     
     const categories = ['All', 'Electronics', 'Food', 'Fashion', 'Home', 'Others'];
     const navigate = useNavigate();
-    
-    // 🛒 Cart Context and TOTAL ITEM COUNT FIX
     const { cart, addToCart } = useCart();
     const totalCartItems = cart.reduce((total, item) => total + (item.quantity || 1), 0);
-    
     const user = JSON.parse(localStorage.getItem('user'));
 
     useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        
         const fetchAll = async () => {
             try {
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/all');
@@ -41,19 +42,21 @@ const Home = () => {
             }
         };
         fetchAll();
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // 🛡️ Fixed Filter Logic (Ensures Price is treated as a Number)
     useEffect(() => {
         const results = products.filter(product => {
             const name = (product.name || "").toLowerCase();
             const desc = (product.description || "").toLowerCase();
             const category = product.category || "Others";
-            const matchesSearch = name.includes(searchTerm.toLowerCase()) || desc.includes(searchTerm.toLowerCase());
-            
             const pPrice = Number(product.price) || 0;
+
+            const matchesSearch = name.includes(searchTerm.toLowerCase()) || desc.includes(searchTerm.toLowerCase());
             const matchesPrice = pPrice <= maxPrice;
-            
             const matchesCategory = activeCategory === 'All' || category === activeCategory;
+            
             return matchesSearch && matchesPrice && matchesCategory;
         });
         setFilteredProducts(results);
@@ -66,22 +69,18 @@ const Home = () => {
 
     const handleAddToCart = (e, item) => {
         e.stopPropagation();
-        toast.dismiss();
         addToCart(item);
-        setTimeout(() => {
-            toast.dismiss(); 
-            toast.success(`🛒 Added ${item.name} to Cart!`, { position: "bottom-center", autoClose: 1500 });
-            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, zIndex: 9999 });
-        }, 10);
+        toast.success(`🛒 Added ${item.name}!`, { position: "bottom-center", autoClose: 1000 });
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.8 } });
     };
 
     return (
         <div style={styles.page}>
-            {/* ☰ SLIDING SIDEBAR (DRAWER) */}
-            <div style={{...styles.drawerOverlay, display: isDrawerOpen ? 'block' : 'none'}} onClick={() => setIsDrawerOpen(false)} />
+            {/* ☰ SLIDING SIDEBAR */}
+            {isDrawerOpen && <div style={styles.drawerOverlay} onClick={() => setIsDrawerOpen(false)} />}
             <div style={{...styles.drawer, left: isDrawerOpen ? '0' : '-300px'}}>
                 <div style={styles.drawerHeader}>
-                    <User size={20} color="#fff" />
+                    <User size={20} />
                     <span>Hello, {user ? user.username.split(' ')[0] : 'Guest'}</span>
                     <X size={24} style={styles.closeIcon} onClick={() => setIsDrawerOpen(false)} />
                 </div>
@@ -90,7 +89,6 @@ const Home = () => {
                         <>
                             <div style={styles.drawerItem} onClick={() => navigate('/profile')}><User size={18}/> My Profile</div>
                             <div style={styles.drawerItem} onClick={() => navigate('/dashboard')}><ShoppingBag size={18}/> My Orders</div>
-                            <div style={styles.drawerItem} onClick={() => toast.info("Wishlist coming soon")}><Heart size={18}/> My Wishlist</div>
                             <div style={{...styles.drawerItem, color: '#ef4444'}} onClick={handleLogout}><LogOut size={18}/> Logout</div>
                         </>
                     ) : (
@@ -99,9 +97,7 @@ const Home = () => {
                     <div style={styles.drawerDivider} />
                     <div style={styles.drawerLabel}>CATEGORIES</div>
                     {categories.map(cat => (
-                        <div key={cat} style={styles.drawerItem} onClick={() => { setActiveCategory(cat); setIsDrawerOpen(false); }}>
-                            {cat}
-                        </div>
+                        <div key={cat} style={styles.drawerItem} onClick={() => { setActiveCategory(cat); setIsDrawerOpen(false); }}>{cat}</div>
                     ))}
                 </div>
             </div>
@@ -109,35 +105,34 @@ const Home = () => {
             {/* 🟦 NAVBAR */}
             <nav style={styles.navbar}>
                 <div style={styles.navContent}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                        <Menu size={24} color="#fff" style={{cursor: 'pointer'}} onClick={() => setIsDrawerOpen(true)} />
-                        <h1 style={styles.brand} onClick={() => navigate('/')}>
-                            Bhavyams <span style={{color: '#ffe500'}}>VendorHub</span>
-                        </h1>
+                    <div style={styles.navTopRow}>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                            <Menu size={24} color="#fff" onClick={() => setIsDrawerOpen(true)} />
+                            <h1 style={styles.brand} onClick={() => navigate('/')}>Bhavyams</h1>
+                        </div>
+                        <div style={styles.navIcons}>
+                            {!isMobile && (
+                                <button onClick={() => navigate(user ? '/dashboard' : '/login')} style={styles.loginBtn}>
+                                    {user ? 'Dashboard' : 'Login'}
+                                </button>
+                            )}
+                            <div style={styles.cartBtn} onClick={() => navigate('/cart')}>
+                                <ShoppingCart size={24} color="#fff" />
+                                {totalCartItems > 0 && <span style={styles.cartBadge}>{totalCartItems}</span>}
+                            </div>
+                        </div>
                     </div>
-                    
                     <div style={styles.searchBar}>
                         <input 
-                            type="text" placeholder="Search products..." style={styles.searchInput} 
+                            type="text" placeholder="Search for products..." style={styles.searchInput} 
                             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                         />
-                        <Search size={20} color="#2874f0" />
-                    </div>
-
-                    <div style={styles.navLinks}>
-                        <button onClick={() => navigate(user ? '/dashboard' : '/login')} style={styles.loginBtn}>
-                            {user ? 'Dashboard' : 'Login'}
-                        </button>
-                        <div style={styles.cartBtn} onClick={() => navigate('/cart')}>
-                            <ShoppingCart size={22} color="#fff" />
-                            {/* 🛡️ CART FIX: Using totalCartItems instead of cart.length */}
-                            {totalCartItems > 0 && <span style={styles.cartBadge}>{totalCartItems}</span>}
-                        </div>
+                        <Search size={18} color="#2874f0" />
                     </div>
                 </div>
             </nav>
 
-            {/* ⚪ CATEGORY & FILTER STRIP */}
+            {/* ⚪ CATEGORY & PRICE STRIP */}
             <div style={styles.categoryHeader}>
                 <div style={styles.categoryList}>
                     {categories.map(cat => (
@@ -146,12 +141,14 @@ const Home = () => {
                             {cat}
                         </div>
                     ))}
+                    {/* 💰 PRICE FILTER UI */}
                     <div style={styles.priceFilterUI}>
-                        <Filter size={14} />
-                        <span>Under: ₹{maxPrice}</span>
+                        <Filter size={14} color="#2874f0" />
+                        <span style={{fontSize: '11px', fontWeight: 'bold'}}>Under: ₹{maxPrice.toLocaleString('en-IN')}</span>
                         <input 
                             type="range" min="500" max="100000" step="500"
                             value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))}
+                            style={{width: '80px', accentColor: '#2874f0'}}
                         />
                     </div>
                 </div>
@@ -160,33 +157,28 @@ const Home = () => {
             {/* 📦 MAIN CONTENT */}
             <div style={styles.container}>
                 {loading ? (
-                    <div style={styles.loader}>Updating Marketplace...</div>
+                    <div style={styles.loader}>Loading Shop...</div>
                 ) : (
                     <div style={styles.grid}>
-                        {filteredProducts.map((item) => {
+                        {filteredProducts.length === 0 ? (
+                            <div style={{gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: '#878787'}}>No products match your filters.</div>
+                        ) : filteredProducts.map((item) => {
                             const isAvailable = Number(item.stock_count) > 0;
                             const imageSrc = item.image_url?.startsWith('http') 
                                 ? item.image_url 
-                                // 🚀 FIX: Point to the live Render Backend!
                                 : `https://bhavyams-vendorhub-backend.onrender.com${item.image_url}`;
-
-                            let picCount = 1;
-                            try { if(item.gallery) picCount = JSON.parse(item.gallery).length; } catch(e){}
 
                             return (
                                 <div key={item.id} style={styles.card} onClick={() => navigate(`/product/${item.id}`)}>
                                     <div style={styles.imageBox}>
                                         <img src={imageSrc} alt={item.name} style={styles.image} />
                                         {!isAvailable && <div style={styles.soldOut}>OUT OF STOCK</div>}
-                                        {picCount > 1 && (
-                                            <div style={styles.picBadge}><Layers size={10}/> {picCount} Pics</div>
-                                        )}
                                     </div>
                                     <div style={styles.info}>
                                         <div style={styles.productName}>{item.name}</div>
                                         <div style={styles.ratingRow}>
                                             <div style={styles.ratingBadge}>4.2 ★</div>
-                                            <Zap size={14} fill="#2874f0" color="#2874f0" style={{marginLeft: 'auto'}} />
+                                            <Zap size={14} fill="#2874f0" color="#2874f0" />
                                         </div>
                                         <div style={styles.priceRow}>
                                             <span style={styles.currPrice}>₹{item.price}</span>
@@ -203,71 +195,63 @@ const Home = () => {
                 )}
             </div>
 
-            {/* 👨‍💻 DEVELOPER INFO ADDED BELOW MAIN CONTAINER */}
-            <div style={{ textAlign: 'center', padding: '40px 20px 20px', background: '#f1f3f6', color: '#64748b', fontSize: '13px', borderTop: '1px solid #e2e8f0', marginTop: '40px' }}>
-                <p style={{ margin: '0 0 10px 0' }}>
-                    
-                    <strong style={{ color: '#0f172a' }}>System Engineer</strong> 
-                </p>
-                <p style={{ margin: '0 0 10px 0' }}>
-                    
-                     <strong style={{ color: '#0f172a' }}>Venkata Pavan Kumar</strong>  
-                </p>
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px' }}>
-                    <a href="mailto:pavanvenkat63@gmail.com" style={{ color: '#2874f0', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <Mail size={14} /> pavanvenkat63@gmail.com
-                    </a>
-                    <span>|</span>
-                    <a href="https://subhams-vpk.vercel.app/" target="_blank" rel="noopener noreferrer" style={{ color: '#2874f0', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <ExternalLink size={14} /> Subhams 
-                    </a>
+            {/* 👨‍💻 DEVELOPER FOOTER */}
+            <footer style={styles.footer}>
+                <p><strong>System Engineer:</strong> Venkata Pavan Kumar</p>
+                <div style={styles.footerLinks}>
+                    <a href="mailto:pavanvenkat63@gmail.com"><Mail size={14} /> Email</a>
+                    <a href="https://subhams-vpk.vercel.app/" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Subhams</a>
                 </div>
-            </div>
-
+            </footer>
         </div>
     );
 };
 
 const styles = {
-    page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: 'Roboto, Arial, sans-serif' },
-    drawerOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', zIndex: 2000 },
-    drawer: { position: 'fixed', top: 0, width: '280px', height: '100%', background: '#fff', zIndex: 2001, transition: '0.3s ease', boxShadow: '2px 0 10px rgba(0,0,0,0.2)' },
+    page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: 'Roboto, sans-serif' },
+    drawerOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000 },
+    drawer: { position: 'fixed', top: 0, width: '280px', height: '100%', background: '#fff', zIndex: 2001, transition: '0.3s ease' },
     drawerHeader: { background: '#2874f0', padding: '20px', color: '#fff', display: 'flex', alignItems: 'center', gap: '15px', fontWeight: 'bold' },
-    closeIcon: { marginLeft: 'auto', cursor: 'pointer' },
+    closeIcon: { marginLeft: 'auto' },
     drawerContent: { padding: '10px 0' },
-    drawerItem: { padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer', fontSize: '14px', color: '#212121', borderBottom: '1px solid #f0f0f0' },
-    drawerLabel: { padding: '15px 20px 5px', fontSize: '12px', fontWeight: 'bold', color: '#878787' },
-    drawerDivider: { height: '8px', background: '#f1f3f6', margin: '10px 0' },
-    navbar: { background: '#2874f0', padding: '12px 0', position: 'sticky', top: 0, zIndex: 1000 },
-    navContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', alignItems: 'center', padding: '0 20px', gap: '20px' },
-    brand: { color: '#fff', fontSize: '18px', fontWeight: 'bold', fontStyle: 'italic', cursor: 'pointer', margin: 0 },
-    searchBar: { background: '#fff', flex: 1, display: 'flex', alignItems: 'center', padding: '0 15px', borderRadius: '2px', height: '36px' },
+    drawerItem: { padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px', borderBottom: '1px solid #f0f0f0' },
+    drawerLabel: { padding: '15px 20px 5px', fontSize: '12px', color: '#878787', fontWeight: 'bold' },
+    drawerDivider: { height: '8px', background: '#f1f3f6' },
+    
+    navbar: { background: '#2874f0', padding: '10px 0', position: 'sticky', top: 0, zIndex: 1000 },
+    navContent: { maxWidth: '1240px', margin: '0 auto', padding: '0 15px' },
+    navTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
+    brand: { color: '#fff', fontSize: '20px', fontWeight: 'bold', fontStyle: 'italic' },
+    navIcons: { display: 'flex', alignItems: 'center', gap: '20px' },
+    searchBar: { background: '#fff', display: 'flex', alignItems: 'center', padding: '0 12px', borderRadius: '4px', height: '40px' },
     searchInput: { border: 'none', width: '100%', outline: 'none', fontSize: '14px' },
-    navLinks: { display: 'flex', alignItems: 'center', gap: '30px' },
-    loginBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '6px 30px', fontWeight: 'bold', borderRadius: '2px', cursor: 'pointer' },
-    cartBtn: { position: 'relative', cursor: 'pointer' },
-    cartBadge: { position: 'absolute', top: '-10px', right: '-12px', background: '#ff6161', border: '1px solid #fff', borderRadius: '50%', padding: '2px 5px', fontSize: '10px', color: '#fff' },
-    categoryHeader: { background: '#fff', boxShadow: '0 1px 1px 0 rgba(0,0,0,.16)', padding: '10px 0', marginBottom: '15px' },
-    categoryList: { maxWidth: '1240px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '30px' },
-    catItem: { fontSize: '14px', fontWeight: 'bold', color: '#212121', cursor: 'pointer' },
-    activeCatItem: { fontSize: '14px', fontWeight: 'bold', color: '#2874f0', cursor: 'pointer' },
-    priceFilterUI: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', borderLeft: '1px solid #ddd', paddingLeft: '20px' },
-    container: { maxWidth: '1240px', margin: '0 auto', padding: '0 10px' },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '10px' },
-    card: { background: '#fff', borderRadius: '2px', overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column', border: '1px solid transparent' },
-    imageBox: { height: '200px', padding: '15px', textAlign: 'center', position: 'relative' },
+    loginBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '5px 15px', fontWeight: 'bold', borderRadius: '2px' },
+    cartBtn: { position: 'relative' },
+    cartBadge: { position: 'absolute', top: '-8px', right: '-10px', background: '#ff6161', color: '#fff', fontSize: '10px', padding: '2px 5px', borderRadius: '50%', border: '1px solid #fff' },
+
+    categoryHeader: { background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', overflowX: 'auto', whiteSpace: 'nowrap' },
+    categoryList: { display: 'flex', padding: '12px 15px', gap: '25px', alignItems: 'center' },
+    catItem: { fontSize: '13px', fontWeight: 'bold', color: '#212121' },
+    activeCatItem: { fontSize: '13px', fontWeight: 'bold', color: '#2874f0' },
+    priceFilterUI: { display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '15px', borderLeft: '1px solid #e0e0e0' },
+
+    container: { maxWidth: '1240px', margin: '0 auto', padding: '15px 10px' },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' },
+    card: { background: '#fff', borderRadius: '4px', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+    imageBox: { height: '160px', padding: '10px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     image: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
-    soldOut: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontWeight: 'bold' },
-    picBadge: { position: 'absolute', bottom: '10px', left: '10px', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' },
-    info: { padding: '15px', flex: 1, display: 'flex', flexDirection: 'column' },
-    productName: { fontSize: '14px', color: '#212121', marginBottom: '8px' },
-    ratingRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' },
-    ratingBadge: { background: '#388e3c', color: '#fff', padding: '2px 6px', borderRadius: '3px', fontSize: '12px', fontWeight: 'bold' },
-    priceRow: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' },
-    currPrice: { fontSize: '16px', fontWeight: 'bold', color: '#212121' },
-    offText: { fontSize: '12px', color: '#2874f0', fontWeight: 'bold', border: '1px solid #2874f0', padding: '1px 4px', borderRadius: '2px' },
-    addBtn: { background: '#ff9f00', color: '#fff', border: 'none', padding: '10px', fontWeight: 'bold', borderRadius: '2px', cursor: 'pointer' },
-    loader: { textAlign: 'center', padding: '100px', fontWeight: 'bold', color: '#2874f0' }
+    soldOut: { position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontWeight: 'bold', fontSize: '12px' },
+    info: { padding: '10px', flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' },
+    productName: { fontSize: '13px', color: '#212121', height: '32px', overflow: 'hidden' },
+    ratingRow: { display: 'flex', alignItems: 'center', gap: '5px' },
+    ratingBadge: { background: '#388e3c', color: '#fff', padding: '2px 6px', borderRadius: '3px', fontSize: '11px', fontWeight: 'bold' },
+    priceRow: { display: 'flex', alignItems: 'center', gap: '5px' },
+    currPrice: { fontSize: '15px', fontWeight: 'bold' },
+    offText: { fontSize: '10px', color: '#2874f0', fontWeight: 'bold', border: '1px solid #2874f0', padding: '0 4px' },
+    addBtn: { background: '#ff9f00', color: '#fff', border: 'none', padding: '8px', fontWeight: 'bold', borderRadius: '2px', marginTop: '5px', fontSize: '12px' },
+    loader: { textAlign: 'center', padding: '50px', color: '#2874f0', fontWeight: 'bold' },
+    footer: { textAlign: 'center', padding: '30px 20px', background: '#fff', marginTop: '20px', fontSize: '13px', borderTop: '1px solid #e2e8f0' },
+    footerLinks: { display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '10px', color: '#2874f0' }
 };
 
 export default Home;
