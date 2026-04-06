@@ -20,21 +20,34 @@ const Login = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const res = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/auth/login', { email, password });
-            localStorage.setItem('token', res.data.accessToken);
-            localStorage.setItem('user', JSON.stringify(res.data.user));
+const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+        // 🚀 FIX: Send the selectedRole so the backend can verify it
+        const res = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/auth/login', { 
+            email, 
+            password,
+            role: selectedRole 
+        });
+        
+        localStorage.setItem('token', res.data.accessToken);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        
+        // 🛡️ Extra Check: If the backend returns a different role than selected
+        if (res.data.user.role !== selectedRole) {
+            toast.warning(`Note: Logged in as ${res.data.user.role}`);
+        } else {
             toast.success("Welcome back to Bhavyams!");
-            navigate('/dashboard');
-        } catch (err) {
-            toast.error(err.response?.data?.message || "Login failed");
-        } finally {
-            setLoading(false);
         }
-    };
+        
+        navigate('/dashboard');
+    } catch (err) {
+        toast.error(err.response?.data?.message || "Login failed");
+    } finally {
+        setLoading(false);
+    }
+};
 
     const handleGoogleSuccess = async (credentialResponse) => {
         try {

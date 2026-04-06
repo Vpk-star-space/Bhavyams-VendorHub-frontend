@@ -98,19 +98,19 @@ const Register = () => {
                                     <input type="password" placeholder="Set Password" style={styles.input} onChange={(e)=>setFormData({...formData, password: e.target.value})} required />
                                 </div>
                                 
-                                {/* ROLE SELECTION BOX */}
-                                <div style={{...styles.inputBox, border: '1px solid #2874f0', borderRadius: '4px', padding: '10px'}}>
-                                    <ShieldCheck size={18} color="#2874f0"/>
-                                    <select 
-                                        style={styles.select} 
-                                        value={formData.role}
-                                        onChange={(e)=>setFormData({...formData, role: e.target.value})}
-                                    >
-                                        <option value="customer">Register as Customer</option>
-                                        <option value="vendor">Register as Vendor (Seller)</option>
-                                    </select>
-                                </div>
-                                
+                              {/* ROLE SELECTION BOX */}
+<div style={{...styles.inputBox, border: '1px solid #2874f0', borderRadius: '4px', padding: '10px'}}>
+    <ShieldCheck size={18} color="#2874f0"/>
+    <select 
+        style={styles.select} 
+        value={formData.role} // 🚀 Ensure this matches state
+        name="role"
+        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+    >
+        <option value="customer">Register as Customer</option>
+        <option value="vendor">Register as Vendor (Seller)</option>
+    </select>
+</div>
                                 <div style={styles.termsText}>
                                     By continuing, you agree to Bhavyams's <span>Terms of Use</span> and <span>Privacy Policy</span>.
                                 </div>
