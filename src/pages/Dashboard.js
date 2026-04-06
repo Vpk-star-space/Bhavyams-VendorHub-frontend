@@ -160,16 +160,34 @@ const Dashboard = () => {
                     <button onClick={handleLogout} style={styles.logoutBtn}><LogOut size={18}/> LOGOUT</button>
                 </aside>
             )}
+{/* 📱 MOBILE BOTTOM NAV */}
+{isMobile && (
+    <div style={styles.mobileBottomNav}>
+        <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.mobileActiveTab : styles.mobileTab}>
+            <Home size={22}/>
+        </div>
+        
+        {/* 🚀 FIX: Show "Orders" for everyone, but "Add Product" only for Vendors */}
+        <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.mobileActiveTab : styles.mobileTab}>
+            <ShoppingBag size={22}/>
+        </div>
 
-            {isMobile && (
-                <div style={styles.mobileBottomNav}>
-                    <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.mobileActiveTab : styles.mobileTab}><Home size={22}/></div>
-                    <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.mobileActiveTab : styles.mobileTab}><ShoppingBag size={22}/></div>
-                    <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.mobileActiveTab : styles.mobileTab}><User size={22}/></div>
-                    <div onClick={handleLogout} style={styles.mobileTab}><LogOut size={22} color="#ef4444"/></div>
-                </div>
-            )}
+        {/* ➕ ADD THIS SECTION SPECIFICALLY FOR VENDORS */}
+        {currentUser?.role?.toLowerCase() === 'vendor' && (
+            <div onClick={() => navigate('/add-product')} style={styles.mobileTab}>
+                <PlusCircle size={28} color="#fb641b" strokeWidth={3} />
+            </div>
+        )}
 
+        <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.mobileActiveTab : styles.mobileTab}>
+            <User size={22}/>
+        </div>
+        
+        <div onClick={handleLogout} style={styles.mobileTab}>
+            <LogOut size={22} color="#e11d48"/>
+        </div>
+    </div>
+)}
             <main style={{...styles.main, marginLeft: isMobile ? 0 : '260px', paddingBottom: isMobile ? '80px' : '40px'}}>
                 <header style={styles.header}>
                     <div>
