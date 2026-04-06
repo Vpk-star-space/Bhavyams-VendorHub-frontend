@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { 
     ShoppingBag, PlusCircle, History, Store, LogOut, 
-    Shield, User, Users, ArrowLeft, CheckCircle, 
-    Clock, Star, Sparkles, Package, Home, ListOrdered
+    Shield, User, Users, ArrowLeft,  
+     Star, Sparkles, Package, Home, ListOrdered, 
 } from 'lucide-react';
 
 import ProductList from '../components/ProductList';
@@ -14,7 +14,6 @@ import AdminUserList from '../components/AdminUserList';
 import AdminProductList from '../components/AdminProductList';
 import Profile from './Profile'; 
 
-// 🕒 TRACKING & REVIEW COMPONENT (Used by Customer, Vendor, & Admin)
 const OrderStatus = ({ order, role }) => {
     const [showReviewForm, setShowReviewForm] = useState(false);
     const [rating, setRating] = useState(order.existing_rating || 5);
@@ -22,9 +21,8 @@ const OrderStatus = ({ order, role }) => {
     const [isReviewed, setIsReviewed] = useState(!!order.existing_rating); 
     const isDelivered = order.status === 'Delivered';
 
-   const getProductImg = (url) => {
+    const getProductImg = (url) => {
         if (!url) return 'https://via.placeholder.com/150?text=No+Image';
-        // 🚀 FIX: Point to the live Render Backend!
         return url.startsWith('http') ? url : `https://bhavyams-vendorhub-backend.onrender.com${url}`;
     };
 
@@ -45,11 +43,11 @@ const OrderStatus = ({ order, role }) => {
     
     return (
         <motion.div layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={styles.statusBox}>
-            <div style={{display:'flex', gap: '15px', alignItems: 'center', marginBottom: '15px'}}>
-                <img src={getProductImg(order.image_url)} alt="product" style={{width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover'}} />
+            <div style={styles.orderHeader}>
+                <img src={getProductImg(order.image_url)} alt="product" style={styles.orderImg} />
                 <div style={{flex: 1}}>
-                    <h4 style={{margin:0, fontSize: '16px', color: '#0f172a', fontWeight: '900'}}>Order #{order.order_id || order.id}</h4>
-                    <div style={{fontSize: '12px', color: '#64748b'}}>
+                    <h4 style={styles.orderTitle}>Order #{order.order_id || order.id}</h4>
+                    <div style={styles.orderSub}>
                         {order.product_name || "Bhavyams Product"}
                         {role === 'admin' && ` | Customer: ${order.customer_name}`}
                         {role === 'vendor' && ` | Revenue: ₹${order.total_price}`}
@@ -63,60 +61,38 @@ const OrderStatus = ({ order, role }) => {
             <div style={styles.progressBar}>
                 <motion.div 
                     initial={{ width: 0 }} animate={{ width: isDelivered ? '100%' : '50%' }}
-                    transition={{ duration: 1.2, ease: "easeOut" }}
+                    transition={{ duration: 1.2 }}
                     style={{ background: isDelivered ? '#10b981' : '#2874f0', height: '100%', borderRadius: '8px' }}
                 />
             </div>
 
-            {!isDelivered ? (
-                <div style={{fontSize: '13px', color: '#64748b', marginTop: '15px', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                    <Clock size={16} color="#2874f0"/> Order is On the Way ...
-                </div>
-            ) : (
+            {isDelivered && role === 'customer' && (
                 <div style={{marginTop: '15px'}}>
-                    <div style={{fontSize: '14px', color: '#10b981', fontWeight: '700', marginBottom: '10px', display:'flex', alignItems:'center'}}>
-                        <CheckCircle size={16} style={{marginRight: '8px'}}/> 
-                        {role === 'customer' ? `Delivered to: ${order.delivery_address}` : 'Delivery Completed'}
-                    </div>
-                    
-                    {/* Only show reviews to customers */}
-                    {role === 'customer' && (
-                        <AnimatePresence mode="wait">
-                            {isReviewed ? (
-                                <motion.div layout initial={{ opacity: 0 }} style={styles.reviewedBox}>
-                                    <div style={{color: '#2874f0', fontSize: '15px', fontWeight: '800', display: 'flex', alignItems: 'center'}}>
-                                        <Star size={18} fill="#2874f0" style={{marginRight: '6px'}}/> Your Feedback: {rating}/5
-                                    </div>
-                                    {comment && <div style={{ fontSize: '14px', color: '#1e293b', marginTop: '8px', fontWeight: '500' }}>"{comment}"</div>}
-                                </motion.div>
-                            ) : !showReviewForm ? (
-                                <button onClick={() => setShowReviewForm(true)} style={styles.reviewBtn}>
-                                    <Star size={14} style={{marginRight: '8px'}}/> RATE PRODUCT
-                                </button>
-                            ) : (
-                                <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={styles.reviewForm}>
-                                    <div style={{marginBottom: '15px'}}>
-                                        <label style={styles.reviewLabel}>Choose Rating</label>
-                                        <select value={rating} onChange={(e) => setRating(e.target.value)} style={styles.select}>
-                                            <option value="5">⭐⭐⭐⭐⭐ 5 Stars</option>
-                                            <option value="4">⭐⭐⭐⭐ 4 Stars</option>
-                                            <option value="3">⭐⭐⭐ 3 Stars</option>
-                                            <option value="2">⭐⭐ 2 Stars</option>
-                                            <option value="1">⭐ 1 Star</option>
-                                        </select>
-                                    </div>
-                                    <div style={{marginBottom: '20px'}}>
-                                        <label style={styles.reviewLabel}>Share your feedback</label>
-                                        <textarea placeholder="What did you like or dislike?" value={comment} onChange={(e) => setComment(e.target.value)} style={styles.textarea} />
-                                    </div>
-                                    <div style={{display:'flex', gap:'12px'}}>
-                                        <button onClick={submitReview} style={styles.submitReviewBtn}>SUBMIT REVIEW</button>
-                                        <button onClick={() => setShowReviewForm(false)} style={styles.cancelBtn}>CANCEL</button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    )}
+                    <AnimatePresence mode="wait">
+                        {isReviewed ? (
+                            <motion.div layout style={styles.reviewedBox}>
+                                <div style={styles.reviewLabelRow}><Star size={16} fill="#2874f0"/> Rating: {rating}/5</div>
+                                {comment && <div style={styles.reviewText}>"{comment}"</div>}
+                            </motion.div>
+                        ) : !showReviewForm ? (
+                            <button onClick={() => setShowReviewForm(true)} style={styles.reviewBtn}>RATE PRODUCT</button>
+                        ) : (
+                            <motion.div layout style={styles.reviewForm}>
+                                <select value={rating} onChange={(e) => setRating(e.target.value)} style={styles.select}>
+                                    <option value="5">⭐⭐⭐⭐⭐ 5 Stars</option>
+                                    <option value="4">⭐⭐⭐⭐ 4 Stars</option>
+                                    <option value="3">⭐⭐⭐ 3 Stars</option>
+                                    <option value="2">⭐⭐ 2 Stars</option>
+                                    <option value="1">⭐ 1 Star</option>
+                                </select>
+                                <textarea placeholder="Share feedback..." value={comment} onChange={(e) => setComment(e.target.value)} style={styles.textarea} />
+                                <div style={{display:'flex', gap:'10px'}}>
+                                    <button onClick={submitReview} style={styles.submitReviewBtn}>SUBMIT</button>
+                                    <button onClick={() => setShowReviewForm(false)} style={styles.cancelBtn}>CANCEL</button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             )}
         </motion.div>
@@ -127,133 +103,129 @@ const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [adminView, setAdminView] = useState('stats'); 
     const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')));
-    
-    // Unified state for orders
     const [ordersList, setOrdersList] = useState([]);
-    
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
     const navigate = useNavigate();
 
     useEffect(() => {
-        const syncData = async () => {
+        const handleResize = () => setIsMobile(window.innerWidth < 1024);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) return navigate('/login');
+            
             try {
-                const token = localStorage.getItem('token');
-                if (!token) return navigate('/login');
+                // Refresh User Data
                 const userRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
-                localStorage.setItem('user', JSON.stringify(userRes.data));
                 setCurrentUser(userRes.data);
-                
-                // Fetch Logic Based on Role & Tab
-                if (activeTab === 'orders' && userRes.data.role === 'customer') {
-                    const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/orders/my-orders', { headers: { Authorization: `Bearer ${token}` } });
+
+                // Fetch Tab Specific Data
+                if (activeTab === 'orders') {
+                    let url = '';
+                    if (userRes.data.role === 'customer') url = '/api/orders/my-orders';
+                    else if (userRes.data.role === 'vendor') url = '/api/orders/my-sales';
+                    else if (userRes.data.role === 'admin') url = '/api/orders/admin-all';
+                    
+                    const res = await axios.get(`https://bhavyams-vendorhub-backend.onrender.com${url}`, { headers: { Authorization: `Bearer ${token}` } });
                     setOrdersList(res.data);
                 }
-                if (activeTab === 'orders' && userRes.data.role === 'vendor') {
-                    const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/orders/my-sales', { headers: { Authorization: `Bearer ${token}` } });
-                    setOrdersList(res.data);
-                }
-                if (activeTab === 'orders' && userRes.data.role === 'admin') {
-                    const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/orders/admin-all', { headers: { Authorization: `Bearer ${token}` } });
-                    setOrdersList(res.data);
-                }
-            } catch (err) { console.error("Sync error:", err); }
+            } catch (err) { console.error(err); }
         };
-        syncData();
+        fetchData();
     }, [activeTab, navigate]);
 
     const handleLogout = () => { localStorage.clear(); navigate('/login'); };
 
-    const renderNavItem = (id, icon, label, adminAction = null) => {
-        const isActive = activeTab === id;
-        return (
-            <div onClick={() => { setActiveTab(id); if(adminAction) setAdminView(adminAction); }} style={isActive ? styles.activeNavItem : styles.navItem}>
-                {icon} <span>{label}</span>
-            </div>
-        );
-    };
-
     return (
         <div style={styles.dashboard}>
-            <aside style={styles.sidebar}>
-                <div style={styles.logoSection}>
-                    <h2 style={styles.logo}>Bhavyams</h2> <h2 style={styles.logo}>VendorHub</h2>
+            {/* 💻 DESKTOP SIDEBAR */}
+            {!isMobile && (
+                <aside style={styles.sidebar}>
+                    <div style={styles.logoSection}><h2 style={styles.logo}>Bhavyams</h2><h2 style={styles.logo}>Hub</h2></div>
+                    <nav style={styles.nav}>
+                        <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.activeNavItem : styles.navItem}><Home size={20}/> Home</div>
+                        <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.activeNavItem : styles.navItem}><User size={20}/> Profile</div>
+                        {currentUser?.role === 'customer' && <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><History size={20}/> Orders</div>}
+                        {currentUser?.role === 'vendor' && (
+                            <>
+                                <div style={styles.navSectionHeader}>SELLER HUB</div>
+                                <div onClick={() => navigate('/add-product')} style={styles.navItem}><PlusCircle size={20}/> List Item</div>
+                                <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><ShoppingBag size={20}/> My Sales</div>
+                            </>
+                        )}
+                        {currentUser?.role === 'admin' && (
+                            <>
+                                <div style={styles.navSectionHeader}>ADMIN</div>
+                                <div onClick={() => setActiveTab('admin')} style={activeTab === 'admin' ? styles.activeNavItem : styles.navItem}><Shield size={20}/> Control</div>
+                                <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><ListOrdered size={20}/> Master</div>
+                            </>
+                        )}
+                        <div style={styles.navSectionHeader}>RETAIL</div>
+                        <div onClick={() => navigate('/')} style={styles.navItem}><Store size={20}/> Shop</div>
+                    </nav>
+                    <button onClick={handleLogout} style={styles.logoutBtn}><LogOut size={18}/> LOGOUT</button>
+                </aside>
+            )}
+
+            {/* 📱 MOBILE BOTTOM NAV */}
+            {isMobile && (
+                <div style={styles.mobileBottomNav}>
+                    <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.mobileActiveTab : styles.mobileTab}><Home size={22}/></div>
+                    <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.mobileActiveTab : styles.mobileTab}><ShoppingBag size={22}/></div>
+                    {currentUser?.role === 'vendor' && <div onClick={() => navigate('/add-product')} style={styles.mobileTab}><PlusCircle size={22} color="#fb641b"/></div>}
+                    <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.mobileActiveTab : styles.mobileTab}><User size={22}/></div>
+                    <div onClick={handleLogout} style={styles.mobileTab}><LogOut size={22} color="#e11d48"/></div>
                 </div>
-                
-                <nav style={styles.nav}>
-                    {renderNavItem('overview', <Home size={20} />, 'Home', 'stats')}
-                    {renderNavItem('profile', <User size={20} />, 'My Profile')}
+            )}
 
-                    {currentUser?.role?.toLowerCase() === 'customer' && renderNavItem('orders', <History size={20} />, 'My Orders')}
-
-                    {currentUser?.role?.toLowerCase() === 'vendor' && (
-                        <>
-                            <div style={styles.navSectionHeader}>MANAGEMENT</div>
-                            <div onClick={() => navigate('/add-product')} style={styles.navItem}><PlusCircle size={20} /> <span>List Product</span></div>
-                            {renderNavItem('orders', <ShoppingBag size={20} />, 'My Sales')}
-                        </>
-                    )}
-
-                    {currentUser?.role?.toLowerCase() === 'admin' && (
-                        <>
-                            <div style={styles.navSectionHeader}>SYSTEM</div>
-                            {renderNavItem('admin', <Shield size={20} />, 'Control Panel')}
-                            {renderNavItem('orders', <ListOrdered size={20} />, 'Master Orders')}
-                        </>
-                    )}
-
-                    <div style={styles.navSectionHeader}>RETAIL</div>
-                    <div onClick={() => navigate('/')} style={styles.navItem}><Store size={20} /> <span>Storefront</span></div>
-                </nav>
-                <button onClick={handleLogout} style={styles.logoutBtn}><LogOut size={18} /> <span>LOGOUT</span></button>
-            </aside>
-
-            <main style={styles.main}>
+            <main style={{...styles.main, marginLeft: isMobile ? 0 : '260px', paddingBottom: isMobile ? '80px' : '40px'}}>
                 <header style={styles.header}>
                     <div>
-                        <h2 style={styles.welcomeHeading}>Welcome, {currentUser?.username}</h2>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px'}}>
-                            <div style={styles.roleBadge}>{currentUser?.role?.toUpperCase()}</div>
-                            {currentUser?.is_verified && <CheckCircle size={16} color="#10b981" />}
-                        </div>
+                        <h2 style={styles.welcomeHeading}>Hi, {currentUser?.username.split(' ')[0]}</h2>
+                        <div style={styles.roleBadge}>{currentUser?.role?.toUpperCase()}</div>
                     </div>
-                    <div style={styles.userInfo}><User size={16} /> <span>{currentUser?.email}</span></div>
+                    <Store onClick={() => navigate('/')} size={24} color="#2874f0" style={{cursor: 'pointer'}}/>
                 </header>
 
                 <div style={styles.body}>
                     <AnimatePresence mode="wait">
-                        <motion.div key={activeTab + adminView} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <motion.div key={activeTab + adminView} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                             {activeTab === 'overview' && (
-                                currentUser?.role?.toLowerCase() === 'vendor' ? <ProductList /> : (
+                                currentUser?.role === 'vendor' ? <ProductList /> : (
                                     <div style={styles.premiumBanner}>
-                                        <Sparkles size={40} color="#fff" style={{marginBottom: '15px'}} />
-                                        <h3 style={{fontSize: '32px', margin: '0 0 10px 0'}}>Premium Marketplace</h3>
-                                        <button onClick={() => navigate('/')} style={styles.premiumShopBtn}>EXPLORE STORE</button>
+                                        <Sparkles size={32} color="#fff" />
+                                        <h3 style={{fontSize: isMobile ? '22px' : '30px', margin: '15px 0'}}>Premium Goods</h3>
+                                        <button onClick={() => navigate('/')} style={styles.premiumShopBtn}>GO TO STORE</button>
                                     </div>
                                 )
                             )}
+
                             {activeTab === 'profile' && <Profile />}
                             
                             {activeTab === 'orders' && (
                                 <div style={styles.ordersGrid}>
-                                    <h3 style={{fontSize: '24px', fontWeight: '900', marginBottom: '20px'}}>
-                                        {currentUser?.role === 'vendor' ? 'Sales History' : currentUser?.role === 'admin' ? 'System Master Orders' : 'Orders & Tracking'}
-                                    </h3>
-                                    {ordersList.length === 0 ? <div style={styles.noData}>No data available.</div> : ordersList.map(o => <OrderStatus key={o.id || o.order_id} order={o} role={currentUser?.role} />)}
+                                    <h3 style={styles.sectionTitle}>{currentUser?.role === 'vendor' ? 'Sales' : 'Your Orders'}</h3>
+                                    {ordersList.length === 0 ? <div style={styles.noData}>No orders yet.</div> : ordersList.map(o => <OrderStatus key={o.id} order={o} role={currentUser?.role} />)}
                                 </div>
                             )}
 
                             {activeTab === 'admin' && (
-                                <div style={styles.adminGrid}>
+                                <div style={styles.adminContainer}>
                                     {adminView === 'stats' ? (
-                                        <>
-                                            <div style={styles.statCard} onClick={() => setAdminView('users')}><Users size={40} color="#4f46e5"/><div style={{marginTop: '10px', fontWeight: '800'}}>USERS</div></div>
-                                            <div style={styles.statCard} onClick={() => setAdminView('products')}><Package size={40} color="#10b981"/><div style={{marginTop: '10px', fontWeight: '800'}}>PRODUCTS</div></div>
-                                        </>
+                                        <div style={styles.adminStatsGrid}>
+                                            <div style={styles.statCard} onClick={() => setAdminView('users')}><Users size={32} color="#2874f0"/><p>USERS</p></div>
+                                            <div style={styles.statCard} onClick={() => setAdminView('products')}><Package size={32} color="#10b981"/><p>PRODUCTS</p></div>
+                                        </div>
                                     ) : (
-                                        <div style={{width: '100%'}}>
-                                            <button onClick={() => setAdminView('stats')} style={styles.backBtn}><ArrowLeft size={16}/> BACK</button>
+                                        <>
+                                            <button onClick={() => setAdminView('stats')} style={styles.backBtn}><ArrowLeft size={16}/> Back to Control</button>
                                             {adminView === 'users' && <AdminUserList />}
                                             {adminView === 'products' && <AdminProductList />}
-                                        </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -265,42 +237,51 @@ const Dashboard = () => {
     );
 };
 
-// ... ALL STYLES REMAIN EXACTLY THE SAME AS YOUR PREVIOUS FILE ...
 const styles = {
-    dashboard: { display: 'flex', minHeight: '100vh', background: '#f1f5f9', fontFamily: "'Inter', sans-serif" },
-    sidebar: { width: '260px', background: '#0f172a', padding: '30px 20px', position: 'fixed', height: '100vh', display: 'flex', flexDirection: 'column', color: '#fff', boxSizing: 'border-box' },
-    logoSection: { marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '20px' },
-    logo: { fontSize: '24px', fontWeight: '900', margin: 0 },
-    nav: { display: 'flex', flexDirection: 'column', gap: '5px' },
-    navItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', color: '#94a3b8', transition: '0.2s' },
-    activeNavItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', background: '#2874f0', color: '#fff', fontWeight: '700' },
-    navSectionHeader: { marginTop: '20px', marginBottom: '10px', fontSize: '10px', fontWeight: '800', color: '#475569', letterSpacing: '1px' },
-    logoutBtn: { marginTop: 'auto', background: '#e11d48', border: 'none', color: '#fff', padding: '12px', borderRadius: '8px', fontWeight: '800', cursor: 'pointer', fontSize: '12px' },
-    main: { flex: 1, marginLeft: '260px', background: '#f8fafc' },
-    header: { padding: '20px 40px', background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    welcomeHeading: { margin: 0, fontSize: '22px', fontWeight: '900', color: '#0f172a' },
-    roleBadge: { background: '#f1f5f9', color: '#2874f0', padding: '4px 10px', borderRadius: '4px', fontSize: '10px', fontWeight: '900', border: '1px solid #e2e8f0', display: 'inline-block' },
-    userInfo: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#64748b', fontWeight: '600' },
-    body: { padding: '40px' },
-    premiumBanner: { background: 'linear-gradient(135deg, #2874f0 0%, #7c3aed 100%)', padding: '60px 40px', borderRadius: '16px', color: '#fff', textAlign: 'center' },
-    premiumShopBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '12px 30px', borderRadius: '8px', fontWeight: '900', cursor: 'pointer', fontSize: '14px' },
-    statusBox: { background: '#fff', padding: '25px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
-    progressBar: { background: '#f1f5f9', height: '10px', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
-    badgeSuccess: { background: '#dcfce7', color: '#166534', padding: '4px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: '800' },
-    badgeInfo: { background: '#e0e7ff', color: '#2874f0', padding: '4px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: '800' },
-    reviewBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', fontWeight: '800', cursor: 'pointer', fontSize: '11px', marginTop: '10px' },
-    reviewedBox: { marginTop: '15px', padding: '15px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' },
-    reviewForm: { marginTop: '20px', background: '#eff6ff', padding: '25px', borderRadius: '12px', border: '2px solid #bfdbfe' },
-    reviewLabel: { fontSize: '13px', fontWeight: '800', color: '#1e3a8a', marginBottom: '10px', display: 'block' },
-    select: { width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #93c5fd', marginBottom: '20px', color: '#1e293b', background: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' },
-    textarea: { width: '100%', height: '100px', padding: '12px', borderRadius: '8px', border: '2px solid #93c5fd', marginBottom: '20px', resize: 'none', color: '#1e293b', background: '#ffffff', fontSize: '14px', fontWeight: '500', outline: 'none' },
-    submitReviewBtn: { background: '#26a541', color: '#fff', border: 'none', padding: '12px 25px', borderRadius: '8px', fontWeight: '900', cursor: 'pointer', fontSize: '13px' },
-    cancelBtn: { background: '#94a3b8', color: '#fff', border: 'none', padding: '12px 25px', borderRadius: '8px', fontWeight: '800', cursor: 'pointer', marginLeft: '10px', fontSize: '13px' },
-    adminGrid: { display: 'flex', gap: '20px' },
-    statCard: { flex: 1, background: '#fff', padding: '40px', borderRadius: '16px', textAlign: 'center', cursor: 'pointer', border: '1px solid #e2e8f0' },
-    backBtn: { background: 'none', border: 'none', color: '#2874f0', fontWeight: '900', cursor: 'pointer', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '5px' },
-    noData: { textAlign: 'center', padding: '40px', color: '#64748b', fontWeight: 'bold' },
-    ordersGrid: { display: 'flex', flexDirection: 'column', gap: '10px' }
+    dashboard: { display: 'flex', minHeight: '100vh', background: '#f8fafc' },
+    sidebar: { width: '260px', background: '#0f172a', padding: '30px 20px', position: 'fixed', height: '100vh', color: '#fff', zIndex: 100 },
+    logoSection: { marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px' },
+    logo: { fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' },
+    nav: { display: 'flex', flexDirection: 'column', gap: '8px' },
+    navItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', color: '#94a3b8', fontSize: '14px', transition: '0.2s' },
+    activeNavItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', background: '#2874f0', color: '#fff', fontWeight: '700', fontSize: '14px' },
+    navSectionHeader: { marginTop: '20px', marginBottom: '10px', fontSize: '10px', fontWeight: '800', color: '#475569', letterSpacing: '1.5px' },
+    logoutBtn: { marginTop: 'auto', background: '#e11d48', border: 'none', color: '#fff', padding: '12px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', width: '100%' },
+    
+    mobileBottomNav: { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', height: '65px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)', zIndex: 1000 },
+    mobileTab: { color: '#64748b', padding: '10px' },
+    mobileActiveTab: { color: '#2874f0', padding: '10px' },
+
+    main: { flex: 1, background: '#f8fafc' },
+    header: { padding: '15px 25px', background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    welcomeHeading: { margin: 0, fontSize: '18px', fontWeight: '900' },
+    roleBadge: { background: '#f1f5f9', color: '#2874f0', padding: '3px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '900', marginTop: '4px', display: 'inline-block' },
+    
+    body: { padding: '20px' },
+    premiumBanner: { background: 'linear-gradient(135deg, #2874f0 0%, #7c3aed 100%)', padding: '40px 20px', borderRadius: '16px', color: '#fff', textAlign: 'center' },
+    premiumShopBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '10px 25px', borderRadius: '6px', fontWeight: '900', cursor: 'pointer' },
+    
+    statusBox: { background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '15px', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' },
+    orderHeader: { display: 'flex', gap: '12px', alignItems: 'center' },
+    orderImg: { width: '50px', height: '50px', borderRadius: '6px', objectFit: 'cover' },
+    orderTitle: { margin: 0, fontSize: '14px', fontWeight: '800' },
+    orderSub: { fontSize: '11px', color: '#64748b', marginTop: '2px' },
+    progressBar: { background: '#f1f5f9', height: '6px', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' },
+    badgeSuccess: { background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: '10px', fontSize: '9px', fontWeight: '800' },
+    badgeInfo: { background: '#e0e7ff', color: '#2874f0', padding: '3px 10px', borderRadius: '10px', fontSize: '9px', fontWeight: '800' },
+    
+    reviewBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800', fontSize: '10px', cursor: 'pointer' },
+    reviewForm: { background: '#eff6ff', padding: '15px', borderRadius: '8px', marginTop: '10px' },
+    select: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', marginBottom: '10px', fontSize: '12px' },
+    textarea: { width: '100%', height: '80px', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', marginBottom: '10px', fontSize: '12px' },
+    submitReviewBtn: { background: '#26a541', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800', fontSize: '11px' },
+    cancelBtn: { background: '#94a3b8', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800', fontSize: '11px' },
+    
+    sectionTitle: { fontSize: '20px', fontWeight: '900', marginBottom: '15px' },
+    adminStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' },
+    statCard: { background: '#fff', padding: '30px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e2e8f0', cursor: 'pointer' },
+    backBtn: { background: 'none', border: 'none', color: '#2874f0', fontWeight: '800', cursor: 'pointer', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' },
+    noData: { textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '13px' }
 };
 
 export default Dashboard;

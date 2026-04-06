@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -10,13 +10,21 @@ const Register = () => {
     const [otp, setOtp] = useState('');
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const navigate = useNavigate();
+
+    // Responsive listener
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const handleGoogleSuccess = async (credentialResponse) => {
         try {
             const res = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-login', {
                 idToken: credentialResponse.credential,
-                role: formData.role 
+                role: formData.role // Pass the selected role to Google login
             });
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('user', JSON.stringify(res.data.user));
@@ -57,19 +65,22 @@ const Register = () => {
 
     return (
         <div style={styles.page}>
-            <div style={styles.splitCard}>
-                {/* 🟦 LEFT SIDE: BRANDING */}
-                <div style={styles.sidebar}>
-                    <div style={styles.sidebarContent}>
-                        <h2 style={styles.sideTitle}>Looks like you're new here!</h2>
-                        <div style={styles.sideSub}>Sign up with your details to get started with Bhavyams VendorHub</div>
+            <div style={{...styles.splitCard, width: isMobile ? '95%' : '850px', flexDirection: isMobile ? 'column' : 'row'}}>
+                
+                {/* 🟦 LEFT SIDE: BRANDING (Hidden on very small mobile if needed, or shrunk) */}
+                {!isMobile && (
+                    <div style={styles.sidebar}>
+                        <div style={styles.sidebarContent}>
+                            <h2 style={styles.sideTitle}>Looks like you're new here!</h2>
+                            <div style={styles.sideSub}>Sign up with your details to get started with Bhavyams VendorHub</div>
+                        </div>
+                        <ShoppingBag size={100} style={styles.sideIcon} />
                     </div>
-                    <ShoppingBag size={120} style={styles.sideIcon} />
-                </div>
+                )}
 
                 {/* ⚪ RIGHT SIDE: FORM */}
-                <div style={styles.formContainer}>
-                    <h2 style={styles.formTitle}>{step === 1 ? "Create Account" : "Verify Email"}</h2>
+                <div style={{...styles.formContainer, width: isMobile ? '100%' : '65%', padding: isMobile ? '30px 20px' : '40px 60px'}}>
+                    <h2 style={{...styles.formTitle, display: 'block'}}>{step === 1 ? "Create Account" : "Verify Email"}</h2>
                     
                     {step === 1 ? (
                         <>
@@ -86,11 +97,17 @@ const Register = () => {
                                     <Lock size={18} color="#878787"/>
                                     <input type="password" placeholder="Set Password" style={styles.input} onChange={(e)=>setFormData({...formData, password: e.target.value})} required />
                                 </div>
-                                <div style={styles.inputBox}>
-                                    <ShieldCheck size={18} color="#878787"/>
-                                    <select style={styles.select} onChange={(e)=>setFormData({...formData, role: e.target.value})}>
-                                        <option value="customer">I am a Customer</option>
-                                        <option value="vendor">I am a Vendor</option>
+                                
+                                {/* ROLE SELECTION BOX */}
+                                <div style={{...styles.inputBox, border: '1px solid #2874f0', borderRadius: '4px', padding: '10px'}}>
+                                    <ShieldCheck size={18} color="#2874f0"/>
+                                    <select 
+                                        style={styles.select} 
+                                        value={formData.role}
+                                        onChange={(e)=>setFormData({...formData, role: e.target.value})}
+                                    >
+                                        <option value="customer">Register as Customer</option>
+                                        <option value="vendor">Register as Vendor (Seller)</option>
                                     </select>
                                 </div>
                                 
@@ -99,14 +116,19 @@ const Register = () => {
                                 </div>
 
                                 <button type="submit" style={styles.primaryBtn} disabled={loading}>
-                                    {loading ? "SENDING..." : "CONTINUE"}
+                                    {loading ? "SENDING CODE..." : "CONTINUE"}
                                 </button>
                             </form>
 
                             <div style={styles.divider}><span>OR</span></div>
                             
                             <div style={styles.googleWrapper}>
-                                <GoogleLogin onSuccess={handleGoogleSuccess} text="signup_with" shape="rectangular" />
+                                <GoogleLogin 
+                                    onSuccess={handleGoogleSuccess} 
+                                    text="signup_with" 
+                                    shape="rectangular" 
+                                    width={isMobile ? "280px" : "300px"}
+                                />
                             </div>
                         </>
                     ) : (
@@ -117,7 +139,7 @@ const Register = () => {
                                 placeholder="0 0 0 0 0 0" 
                                 value={otp} 
                                 onChange={(e)=>setOtp(e.target.value)} 
-                                style={styles.otpInput} 
+                                style={{...styles.otpInput, fontSize: isMobile ? '18px' : '24px'}} 
                                 maxLength="6" 
                                 required 
                             />
@@ -131,7 +153,7 @@ const Register = () => {
                             </div>
                             
                             <button type="button" onClick={()=>setStep(1)} style={styles.backLink}>
-                                <ArrowLeft size={14}/> Change Registration Details
+                                <ArrowLeft size={14}/> Change Details
                             </button>
                         </form>
                     )}
@@ -145,41 +167,37 @@ const Register = () => {
     );
 };
 
-// 🎨 PROFESSIONAL FLIPKART DESIGN STYLES
 const styles = {
-    page: { background: '#f1f3f6', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Roboto, Arial, sans-serif' },
-    splitCard: { background: '#fff', width: '850px', display: 'flex', borderRadius: '4px', overflow: 'hidden', boxShadow: '0 2px 4px 0 rgba(0,0,0,.2)' },
+    page: { background: '#f1f3f6', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' },
+    splitCard: { background: '#fff', display: 'flex', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', minHeight: '550px' },
     
-    // LEFT SIDE
-    sidebar: { width: '35%', background: '#2874f0', padding: '40px 33px', color: '#fff', display: 'flex', flexDirection: 'column', position: 'relative' },
-    sidebarContent: { flex: 1 },
-    sideTitle: { fontSize: '28px', fontWeight: 'bold', margin: '0 0 15px 0' },
-    sideSub: { fontSize: '18px', lineHeight: '1.5', color: '#dbdbdb' },
-    sideIcon: { position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)', opacity: 0.2 },
+    sidebar: { width: '35%', background: '#2874f0', padding: '40px 30px', color: '#fff', display: 'flex', flexDirection: 'column', position: 'relative' },
+    sidebarContent: { zIndex: 2 },
+    sideTitle: { fontSize: '24px', fontWeight: 'bold', marginBottom: '15px' },
+    sideSub: { fontSize: '16px', lineHeight: '1.5', color: '#dbdbdb' },
+    sideIcon: { position: 'absolute', bottom: '20px', right: '10px', opacity: 0.15 },
 
-    // RIGHT SIDE
-    formContainer: { width: '65%', padding: '40px 60px', position: 'relative' },
-    formTitle: { fontSize: '20px', fontWeight: 'bold', color: '#212121', marginBottom: '30px', display: 'none' }, // Title handled by steps
-    form: { display: 'flex', flexDirection: 'column', gap: '20px' },
+    formContainer: { position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+    formTitle: { fontSize: '22px', fontWeight: 'bold', color: '#212121', marginBottom: '25px' },
+    form: { display: 'flex', flexDirection: 'column', gap: '18px' },
     
-    inputBox: { display: 'flex', alignItems: 'center', gap: '15px', borderBottom: '1px solid #e0e0e0', padding: '10px 0' },
-    input: { border: 'none', width: '100%', outline: 'none', fontSize: '16px', color: '#212121' },
-    select: { border: 'none', width: '100%', outline: 'none', fontSize: '16px', color: '#2874f0', fontWeight: 'bold', cursor: 'pointer', background: '#fff' },
+    inputBox: { display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #e0e0e0', padding: '8px 0' },
+    input: { border: 'none', width: '100%', outline: 'none', fontSize: '15px', background: 'transparent' },
+    select: { border: 'none', width: '100%', outline: 'none', fontSize: '14px', color: '#2874f0', fontWeight: 'bold', background: 'transparent' },
     
-    termsText: { fontSize: '12px', color: '#878787', lineHeight: '1.4' },
-    primaryBtn: { background: '#fb641b', color: '#fff', border: 'none', padding: '15px', fontWeight: 'bold', borderRadius: '2px', cursor: 'pointer', fontSize: '15px', boxShadow: '0 1px 2px 0 rgba(0,0,0,.2)' },
-    successBtn: { background: '#26a541', color: '#fff', border: 'none', padding: '15px', fontWeight: 'bold', borderRadius: '2px', cursor: 'pointer', fontSize: '15px' },
+    termsText: { fontSize: '11px', color: '#878787' },
+    primaryBtn: { background: '#fb641b', color: '#fff', border: 'none', padding: '14px', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' },
+    successBtn: { background: '#26a541', color: '#fff', border: 'none', padding: '14px', fontWeight: 'bold', borderRadius: '4px', cursor: 'pointer' },
 
-    divider: { margin: '20px 0', textAlign: 'center', position: 'relative', borderBottom: '1px solid #f0f0f0', lineHeight: '0.1em' },
+    divider: { margin: '15px 0', textAlign: 'center', borderBottom: '1px solid #f0f0f0', lineHeight: '0.1em' },
     googleWrapper: { display: 'flex', justifyContent: 'center' },
 
-    otpInfo: { fontSize: '14px', color: '#212121', textAlign: 'center', marginBottom: '10px' },
-    otpInput: { border: '1px solid #2874f0', padding: '15px', borderRadius: '4px', textAlign: 'center', fontSize: '24px', letterSpacing: '8px', fontWeight: 'bold', outline: 'none' },
-    resendBtn: { textAlign: 'center', color: '#2874f0', fontSize: '14px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' },
-    backLink: { background: 'none', border: 'none', color: '#878787', cursor: 'pointer', fontSize: '12px', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' },
+    otpInput: { border: '1px solid #2874f0', padding: '12px', borderRadius: '4px', textAlign: 'center', letterSpacing: '6px', fontWeight: 'bold', outline: 'none' },
+    resendBtn: { textAlign: 'center', color: '#2874f0', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' },
+    backLink: { background: 'none', border: 'none', color: '#878787', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', marginTop: '10px' },
 
-    footerLink: { marginTop: '40px', textAlign: 'center', fontSize: '14px', color: '#2874f0' },
-    linkBold: { fontWeight: 'bold', textDecoration: 'none', color: '#2874f0' }
+    footerLink: { marginTop: '30px', textAlign: 'center', fontSize: '14px' },
+    linkBold: { color: '#2874f0', fontWeight: 'bold', textDecoration: 'none' }
 };
 
 export default Register;
