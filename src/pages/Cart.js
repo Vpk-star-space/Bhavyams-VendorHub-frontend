@@ -22,7 +22,7 @@ const Cart = () => {
     const totalCartItems = cart.reduce((total, item) => total + (item.quantity || 1), 0);
     const subtotal = cart.reduce((total, item) => total + (Number(item.price) * (item.quantity || 1)), 0);
     const discount = Math.round(subtotal * 0.1); 
-    const delivery = subtotal > 0
+    const delivery = (subtotal *0);
     const total = subtotal - discount + delivery;
 
     const handleCheckout = async () => {
