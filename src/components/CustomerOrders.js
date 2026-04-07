@@ -1,23 +1,19 @@
 import React from 'react';
-import { Clock, MapPin, Package } from 'lucide-react';
+import { Clock, MapPin, Package, CheckCircle } from 'lucide-react';
 
 const CustomerOrders = ({ orders }) => {
-    // 🛡️ Debugging: Check if image_url exists in the data
-    console.log("Customer Orders Data:", orders);
-
     if (!orders || orders.length === 0) return <p style={{textAlign: 'center', color: '#64748b', padding: '20px'}}>No orders yet.</p>;
 
-// 🌐 SMART IMAGE LOGIC
+    // 🌐 SMART IMAGE LOGIC (Fixed Slashes)
     const getProductImg = (item) => {
-        const url = item.image_url || item.product_image; 
+        const rawUrl = item.image_url || item.product_image || ''; 
+        if (!rawUrl) return 'https://via.placeholder.com/150?text=No+Image';
         
-        if (!url) return 'https://via.placeholder.com/150?text=No+Image';
-        
-        if (url.startsWith('http')) return url;
-        
-        // 🚀 FIX: Point to the live Render Backend!
-        return `https://bhavyams-vendorhub-backend.onrender.com${url}`;
+        const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
+        if (cleanUrl.startsWith('http')) return cleanUrl;
+        return `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
     };
+
     return (
         <div style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
             {orders.map((order) => {
@@ -63,6 +59,12 @@ const CustomerOrders = ({ orders }) => {
                         {order.status === 'Confirmed' && (
                             <p style={styles.msg}>🚚 Live Status: Your order is confirmed and moving toward Konanki.</p>
                         )}
+                        {isDelivered && (
+                            <p style={{...styles.msg, color: '#10b981'}}>
+                                <CheckCircle size={14} style={{display: 'inline', marginRight: '5px', verticalAlign: 'middle'}}/> 
+                                Delivered Successfully.
+                            </p>
+                        )}
                     </div>
                 );
             })}
@@ -73,7 +75,7 @@ const CustomerOrders = ({ orders }) => {
 const styles = {
     card: { background: '#fff', padding: '20px', borderRadius: '15px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' },
     productHeader: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' },
-    orderImg: { width: '70px', height: '70px', borderRadius: '12px', objectFit: 'cover', background: '#f1f5f9', border: '1px solid #f0f0f0' },
+    orderImg: { width: '70px', height: '70px', borderRadius: '12px', objectFit: 'contain', background: '#f1f5f9', border: '1px solid #f0f0f0', padding: '5px' },
     pName: { margin: 0, fontSize: '16px', fontWeight: '800', color: '#1e293b' },
     orderIdText: { fontSize: '12px', color: '#64748b', marginTop: '2px' },
     trackingArea: { background: '#f8fafc', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #3b82f6' },
