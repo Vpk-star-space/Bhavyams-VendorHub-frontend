@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, ShoppingBag, ArrowLeft, } from 'lucide-react';
+import { CheckCircle, ShoppingBag, ArrowLeft } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { toast } from 'react-toastify';
 import axios from 'axios';
@@ -22,13 +22,24 @@ const Cart = () => {
     const totalCartItems = cart.reduce((total, item) => total + (item.quantity || 1), 0);
     const subtotal = cart.reduce((total, item) => total + (Number(item.price) * (item.quantity || 1)), 0);
     const discount = Math.round(subtotal * 0.1); 
-    const delivery = (subtotal *0);
+    const delivery = (subtotal * 0); // 🚀 Kept your custom logic!
     const total = subtotal - discount + delivery;
+
+    // 🚀 FIX: Prevent checkout if an item exceeds stock
+    const hasOutofStock = cart.some(item => {
+        const stock = item.stock_count ?? item.stock ?? 0;
+        return item.quantity > stock;
+    });
 
     const handleCheckout = async () => {
         const token = localStorage.getItem('token');
         if (!token) return navigate('/login');
         
+        if (hasOutofStock) {
+            toast.error("Please remove Out of Stock items before checking out!");
+            return;
+        }
+
         setIsCheckingOut(true);
         try {
             const { data: freshUser } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', {
@@ -116,27 +127,40 @@ const Cart = () => {
                 ) : (
                     <div style={isMobile ? styles.mobileCartGrid : styles.cartGrid}>
                         <div style={styles.itemColumn}>
-                            {/* 🚚 RESTORED: Address Bar */}
                             <div style={styles.addressBar}>
                                 <div>Deliver to: <b>{JSON.parse(localStorage.getItem('user'))?.username || 'Customer'}</b></div>
                                 <button onClick={() => navigate('/dashboard')} style={styles.changeBtn}>Change</button>
                             </div>
 
                             {cart.map(item => {
-                                // 🖼️ FIXED: Indestructible Image Logic
+                                // 🚀 FIX: Bulletproof Image Loading
                                 const rawUrl = item.image_url || '';
                                 const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
-                                const imageSrc = cleanUrl.startsWith('http') 
-                                    ? cleanUrl 
-                                    : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
+                                const imageSrc = cleanUrl 
+                                    ? (cleanUrl.startsWith('http') ? cleanUrl : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`)
+                                    : 'https://via.placeholder.com/80?text=No+Image';
+
+                                // 🚀 FIX: Calculate Stock Count
+                                const currentStock = item.stock_count ?? item.stock ?? 0;
+                                const isItemOutOfStock = item.quantity > currentStock;
 
                                 return (
                                     <div key={item.id} style={styles.itemCard}>
-                                        <img src={imageSrc} alt={item.name} style={styles.img} />
+                                        <img 
+                                            src={imageSrc} 
+                                            alt={item.name} 
+                                            style={styles.img} 
+                                            onError={(e) => { e.target.src = 'https://via.placeholder.com/80?text=No+Image'; }}
+                                        />
                                         <div style={styles.details}>
                                             <div style={styles.itemName}>{item.name}</div>
                                             <div style={styles.itemPrice}>₹{item.price} <span style={{fontSize:'12px', color:'#878787'}}>x {item.quantity}</span></div>
-                                            {/* 🏷️ RESTORED: Seller Text */}
+                                            
+                                            {/* 🚀 FIX: SHOW STOCK IN CART */}
+                                            <div style={{fontSize: '12px', fontWeight: 'bold', color: isItemOutOfStock ? '#ef4444' : '#26a541', marginTop: '4px'}}>
+                                                {currentStock > 0 ? `In Stock: ${currentStock}` : 'Out of Stock!'}
+                                            </div>
+                                            
                                             <div style={styles.sellerText}>Seller: Bhavyams Vendor</div>
                                             <button onClick={() => removeFromCart(item.id)} style={styles.removeBtn}>REMOVE</button>
                                         </div>
@@ -164,14 +188,13 @@ const Cart = () => {
                                     <div>Total Amount</div>
                                     <div>₹{total}</div>
                                 </div>
-                                {/* 💰 RESTORED: Savings Text */}
                                 <div style={styles.savingsText}>You will save ₹{discount} on this order</div>
                             </div>
                             
                             {!isMobile && (
                                 <div style={styles.placeOrderRow}>
-                                    <button onClick={handleCheckout} disabled={isCheckingOut} style={styles.checkoutBtn}>
-                                        {isCheckingOut ? "PROCESSING..." : "PLACE ORDER"}
+                                    <button onClick={handleCheckout} disabled={isCheckingOut || hasOutofStock} style={styles.checkoutBtn}>
+                                        {isCheckingOut ? "PROCESSING..." : (hasOutofStock ? "ITEM OUT OF STOCK" : "PLACE ORDER")}
                                     </button>
                                 </div>
                             )}
@@ -180,15 +203,14 @@ const Cart = () => {
                 )}
             </div>
 
-            {/* 📱 RESTORED: Mobile Sticky Footer */}
             {isMobile && cart.length > 0 && (
                 <div style={styles.mobileStickyFooter}>
                     <div style={styles.mobilePriceTotal}>
                         <div style={{fontSize:'12px', color:'#878787', textDecoration:'line-through'}}>₹{subtotal + delivery}</div>
                         <div style={{fontSize:'18px', fontWeight:'bold'}}>₹{total}</div>
                     </div>
-                    <button onClick={handleCheckout} disabled={isCheckingOut} style={styles.mobileCheckoutBtn}>
-                        {isCheckingOut ? "WAIT..." : "PLACE ORDER"}
+                    <button onClick={handleCheckout} disabled={isCheckingOut || hasOutofStock} style={styles.mobileCheckoutBtn}>
+                        {isCheckingOut ? "WAIT..." : (hasOutofStock ? "OUT OF STOCK" : "PLACE ORDER")}
                     </button>
                 </div>
             )}
