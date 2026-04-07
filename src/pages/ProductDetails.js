@@ -12,41 +12,35 @@ const ProductDetails = () => {
     const { addToCart } = useCart();
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
-    
-    // 📸 GALLERY STATES
     const [mainImage, setMainImage] = useState('');
     const [gallery, setGallery] = useState([]);
-useEffect(() => {
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+
         const fetchProduct = async () => {
             try {
                 const res = await axios.get(`https://bhavyams-vendorhub-backend.onrender.com/api/products/${id}`);
                 const data = res.data;
                 setProduct(data);
 
-                // 🚀 FIX 1: Clean the URL (Remove quotes and backslashes)
                 const rawUrl = data.image_url || '';
                 const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
-
-                // 🚀 FIX 2: Set the correct full path
                 const initialImg = cleanUrl.startsWith('http') 
                     ? cleanUrl 
                     : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl}`;
 
-                // 🚀 FIX 3: CRITICAL - Update the state so the big image shows immediately!
                 setMainImage(initialImg);
 
-                // ☁️ Parse Gallery JSON from Database
                 if (data.gallery) {
                     try {
-                        // Clean the gallery string before parsing
                         const cleanGalleryStr = data.gallery.replace(/\\"/g, '"');
                         const parsed = JSON.parse(cleanGalleryStr);
-                        
-                        // Clean each individual URL in the gallery array
                         const cleanGallery = Array.isArray(parsed) 
                             ? parsed.map(url => url.replace(/["\\]/g, ''))
                             : [initialImg];
-                            
                         setGallery(cleanGallery);
                     } catch (e) {
                         setGallery([initialImg]);
@@ -62,6 +56,7 @@ useEffect(() => {
             }
         };
         fetchProduct();
+        return () => window.removeEventListener('resize', handleResize);
     }, [id, navigate]);
 
     const fireCelebration = () => {
@@ -79,24 +74,17 @@ useEffect(() => {
 
     const handleAction = (type) => {
         if (!product) return;
-        toast.dismiss();
         addToCart(product); 
         setTimeout(() => {
-            toast.dismiss();
             if (type === 'buy') {
                 toast.success("🎊 Perfect! Moving to Checkout...");
                 fireCelebration();
-                setTimeout(() => navigate('/cart'), 1500);
+                setTimeout(() => navigate('/cart'), 1200);
             } else {
                 toast.success("🛒 Added to Bhavyams Cart!");
                 fireCelebration();
             }
         }, 10);
-    };
-
-    const handleShare = () => {
-        navigator.clipboard.writeText(window.location.href);
-        toast.info("Link copied!");
     };
 
     if (loading) return <div style={styles.loader}>Loading Hub...</div>;
@@ -111,13 +99,13 @@ useEffect(() => {
                     <ArrowLeft size={18}/> <span>Back to Store</span>
                 </button>
                 
-                <div style={styles.mainGrid}>
+                <div style={isMobile ? styles.mobileLayout : styles.mainGrid}>
                     {/* 🖼️ LEFT COLUMN: IMAGE GALLERY */}
                     <div style={styles.imageColumn}>
-                        <div style={styles.stickyWrapper}>
-                            <div style={styles.galleryWrapper}>
+                        <div style={isMobile ? {} : styles.stickyWrapper}>
+                            <div style={isMobile ? styles.mobileGallery : styles.galleryWrapper}>
                                 {/* THUMBNAIL STRIP */}
-                                <div style={styles.thumbStrip}>
+                                <div style={isMobile ? styles.mobileThumbStrip : styles.thumbStrip}>
                                     {gallery.map((img, index) => (
                                         <div 
                                             key={index} 
@@ -125,7 +113,8 @@ useEffect(() => {
                                                 ...styles.thumbBox, 
                                                 border: mainImage === img ? '2px solid #2874f0' : '1px solid #e0e0e0'
                                             }}
-                                            onMouseEnter={() => setMainImage(img)} // Change on hover like Flipkart
+                                            onClick={() => setMainImage(img)}
+                                            onMouseEnter={() => !isMobile && setMainImage(img)}
                                         >
                                             <img src={img} alt="thumb" style={styles.thumbImg} />
                                         </div>
@@ -133,28 +122,25 @@ useEffect(() => {
                                 </div>
 
                                 {/* MAIN BIG IMAGE */}
-                                <div style={styles.imageCard}>
+                                <div style={isMobile ? styles.mobileImageCard : styles.imageCard}>
                                     <img src={mainImage} alt={product.name} style={styles.image} />
                                     {!isAvailable && <div style={styles.soldOutBadge}>OUT OF STOCK</div>}
                                 </div>
                             </div>
 
-                            <div style={styles.actionRow}>
-                                <button 
-                                    style={isAvailable ? styles.addToCartBtn : styles.disabledBtn}
-                                    disabled={!isAvailable}
-                                    onClick={() => handleAction('cart')}
-                                >
-                                    <ShoppingCart size={20} /> ADD TO CART
-                                </button>
-                                <button 
-                                    style={isAvailable ? styles.buyNowBtn : styles.disabledBtn}
-                                    disabled={!isAvailable}
-                                    onClick={() => handleAction('buy')}
-                                >
-                                    <Zap size={20} /> BUY NOW
-                                </button>
-                            </div>
+                            {/* DESKTOP ONLY ACTION BUTTONS */}
+                            {!isMobile && (
+                                <div style={styles.actionRow}>
+                                    <button style={isAvailable ? styles.addToCartBtn : styles.disabledBtn} 
+                                            disabled={!isAvailable} onClick={() => handleAction('cart')}>
+                                        <ShoppingCart size={20} /> ADD TO CART
+                                    </button>
+                                    <button style={isAvailable ? styles.buyNowBtn : styles.disabledBtn} 
+                                            disabled={!isAvailable} onClick={() => handleAction('buy')}>
+                                        <Zap size={20} /> BUY NOW
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -181,56 +167,82 @@ useEffect(() => {
                             <div style={styles.trustItem}><Truck size={18} color="#2874f0" /> <span>Free Delivery</span></div>
                             <div style={styles.trustItem}><ShieldCheck size={18} color="#26a541" /> <span>Secure Payment</span></div>
                         </div>
-                        <button onClick={handleShare} style={styles.shareBtn}><Share2 size={16} /> SHARE</button>
+                        <button onClick={() => {navigator.clipboard.writeText(window.location.href); toast.info("Link copied!");}} style={styles.shareBtn}>
+                            <Share2 size={16} /> SHARE PRODUCT
+                        </button>
+                        {/* Buffer for mobile sticky footer */}
+                        {isMobile && <div style={{height: '80px'}} />}
                     </div>
                 </div>
             </div>
+
+            {/* 📱 MOBILE STICKY FOOTER */}
+            {isMobile && (
+                <div style={styles.mobileStickyFooter}>
+                    <button style={isAvailable ? styles.mobileAddToCart : styles.disabledBtn} 
+                            disabled={!isAvailable} onClick={() => handleAction('cart')}>
+                        ADD TO CART
+                    </button>
+                    <button style={isAvailable ? styles.mobileBuyNow : styles.disabledBtn} 
+                            disabled={!isAvailable} onClick={() => handleAction('buy')}>
+                        BUY NOW
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
 
 const styles = {
-    page: { background: '#fff', minHeight: '100vh', padding: '20px 0', fontFamily: 'Roboto, Arial, sans-serif' },
-    container: { maxWidth: '1240px', margin: '0 auto', padding: '0 15px' },
+    page: { background: '#fff', minHeight: '100vh', padding: '10px 0', fontFamily: 'Roboto, Arial, sans-serif' },
+    container: { maxWidth: '1240px', margin: '0 auto', padding: '0 10px' },
     loader: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh', color: '#2874f0', fontWeight: 'bold' },
-    backBtn: { display: 'flex', alignItems: 'center', gap: '8px', border: 'none', background: 'none', cursor: 'pointer', color: '#878787', marginBottom: '20px', fontSize: '14px', fontWeight: 'bold' },
+    backBtn: { display: 'flex', alignItems: 'center', gap: '8px', border: 'none', background: 'none', cursor: 'pointer', color: '#878787', marginBottom: '15px', fontSize: '12px', fontWeight: 'bold' },
     
-    mainGrid: { display: 'grid', gridTemplateColumns: '45% 55%', gap: '20px' },
+    mainGrid: { display: 'grid', gridTemplateColumns: '42% 58%', gap: '30px' },
+    mobileLayout: { display: 'flex', flexDirection: 'column', gap: '15px' },
+
+    imageColumn: { width: '100%' },
+    stickyWrapper: { position: 'sticky', top: '20px' },
+    galleryWrapper: { display: 'flex', gap: '12px' },
+    mobileGallery: { display: 'flex', flexDirection: 'column-reverse', gap: '10px' },
     
-    // GALLERY STYLES
-    imageColumn: { display: 'flex', flexDirection: 'column' },
-    stickyWrapper: { position: 'sticky', top: '90px' },
-    galleryWrapper: { display: 'flex', gap: '10px' },
     thumbStrip: { display: 'flex', flexDirection: 'column', gap: '8px' },
-    thumbBox: { width: '60px', height: '60px', padding: '2px', cursor: 'pointer', borderRadius: '2px', overflow: 'hidden' },
+    mobileThumbStrip: { display: 'flex', flexDirection: 'row', gap: '8px', overflowX: 'auto', paddingBottom: '5px' },
+    
+    thumbBox: { width: '56px', height: '56px', padding: '2px', cursor: 'pointer', borderRadius: '4px', flexShrink: 0 },
     thumbImg: { width: '100%', height: '100%', objectFit: 'contain' },
-    imageCard: { flex: 1, border: '1px solid #f0f0f0', padding: '20px', textAlign: 'center', position: 'relative', height: '450px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    
+    imageCard: { flex: 1, border: '1px solid #f0f0f0', position: 'relative', height: '450px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    mobileImageCard: { width: '100%', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #f0f0f0' },
     image: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
     
-    soldOutBadge: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '10px 20px', fontWeight: 'bold', fontSize: '18px' },
-    actionRow: { display: 'flex', gap: '10px', marginTop: '20px', marginLeft: '70px' }, // Aligned with the big image
+    actionRow: { display: 'flex', gap: '10px', marginTop: '15px' },
+    addToCartBtn: { flex: 1, padding: '16px', background: '#ff9f00', color: '#fff', border: 'none', fontWeight: '900', borderRadius: '2px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' },
+    buyNowBtn: { flex: 1, padding: '16px', background: '#fb641b', color: '#fff', border: 'none', fontWeight: '900', borderRadius: '2px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' },
     
-    addToCartBtn: { flex: 1, padding: '18px', background: '#ff9f00', color: '#fff', border: 'none', fontWeight: '900', borderRadius: '2px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', fontSize: '16px' },
-    buyNowBtn: { flex: 1, padding: '18px', background: '#fb641b', color: '#fff', border: 'none', fontWeight: '900', borderRadius: '2px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', fontSize: '16px' },
-    disabledBtn: { flex: 1, padding: '18px', background: '#e0e0e0', color: '#9e9e9e', border: 'none', fontWeight: '900', borderRadius: '2px', cursor: 'not-allowed' },
+    // Mobile Sticky Footer Styles
+    mobileStickyFooter: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '60px', display: 'flex', background: '#fff', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)', zIndex: 1000 },
+    mobileAddToCart: { flex: 1, background: '#fff', color: '#212121', border: 'none', fontWeight: '900', fontSize: '14px' },
+    mobileBuyNow: { flex: 1, background: '#fb641b', color: '#fff', border: 'none', fontWeight: '900', fontSize: '14px' },
+    disabledBtn: { flex: 1, background: '#e0e0e0', color: '#9e9e9e', border: 'none', fontWeight: '900' },
 
-    detailsColumn: { padding: '0 20px' },
-    breadcrumb: { fontSize: '12px', color: '#878787', marginBottom: '10px' },
-    titleText: { fontSize: '22px', color: '#212121', margin: '0 0 10px 0', fontWeight: '400' },
-    ratingRow: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' },
-    ratingBadge: { background: '#388e3c', color: '#fff', padding: '2px 8px', borderRadius: '3px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' },
-    reviewsText: { fontSize: '14px', color: '#878787', fontWeight: 'bold' },
-    priceSection: { marginBottom: '20px' },
-    priceRow: { display: 'flex', alignItems: 'baseline', gap: '12px' },
-    mainPrice: { fontSize: '28px', fontWeight: 'bold', color: '#212121' },
-    mrpText: { fontSize: '16px', color: '#878787', textDecoration: 'line-through' },
-    discountText: { fontSize: '16px', color: '#388e3c', fontWeight: 'bold' },
-    descBox: { marginBottom: '25px' },
-    sectionHeading: { fontSize: '16px', fontWeight: 'bold', color: '#212121', marginBottom: '10px' },
-    descriptionText: { fontSize: '14px', color: '#212121', lineHeight: '1.6' },
-    trustBox: { background: '#f9f9f9', padding: '15px', borderRadius: '4px', marginBottom: '25px', display: 'flex', flexDirection: 'column', gap: '10px' },
-    trustItem: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '500' },
-    shareBtn: { background: '#fff', border: '1px solid #e0e0e0', padding: '10px 20px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', color: '#2874f0', display: 'flex', alignItems: 'center', gap: '8px' }
+    detailsColumn: { padding: '0 10px' },
+    breadcrumb: { fontSize: '11px', color: '#878787', marginBottom: '8px' },
+    titleText: { fontSize: '18px', color: '#212121', margin: '0 0 8px 0', fontWeight: '400', lineHeight: '1.4' },
+    ratingRow: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' },
+    ratingBadge: { background: '#388e3c', color: '#fff', padding: '2px 6px', borderRadius: '3px', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' },
+    reviewsText: { fontSize: '12px', color: '#878787', fontWeight: 'bold' },
+    mainPrice: { fontSize: '24px', fontWeight: 'bold', marginRight: '10px' },
+    mrpText: { fontSize: '14px', color: '#878787', textDecoration: 'line-through', marginRight: '10px' },
+    discountText: { fontSize: '14px', color: '#388e3c', fontWeight: 'bold' },
+    descBox: { margin: '20px 0', borderTop: '1px solid #f0f0f0', paddingTop: '15px' },
+    sectionHeading: { fontSize: '14px', fontWeight: 'bold', marginBottom: '8px' },
+    descriptionText: { fontSize: '13px', color: '#212121', lineHeight: '1.6' },
+    trustBox: { background: '#f9f9f9', padding: '12px', borderRadius: '4px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' },
+    trustItem: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' },
+    shareBtn: { background: '#fff', border: '1px solid #e0e0e0', padding: '8px 15px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', color: '#2874f0', display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '2px' },
+    soldOutBadge: { position: 'absolute', background: 'rgba(0,0,0,0.6)', color: '#fff', padding: '8px 15px', fontWeight: 'bold' }
 };
 
 export default ProductDetails;

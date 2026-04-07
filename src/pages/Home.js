@@ -45,7 +45,6 @@ const Home = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // 🛡️ Fixed Filter Logic (Ensures Price is treated as a Number)
     useEffect(() => {
         const results = products.filter(product => {
             const name = (product.name || "").toLowerCase();
@@ -97,17 +96,18 @@ const Home = () => {
                     <div style={styles.drawerDivider} />
                     <div style={styles.drawerLabel}>CATEGORIES</div>
                     {categories.map(cat => (
-                        <div key={cat} style={styles.drawerItem} onClick={() => { setActiveCategory(cat); setIsDrawerOpen(false); }}>{cat}</div>
+                        <div key={cat} style={{...styles.drawerItem, fontWeight: activeCategory === cat ? 'bold' : 'normal', color: activeCategory === cat ? '#2874f0' : '#212121'}} 
+                             onClick={() => { setActiveCategory(cat); setIsDrawerOpen(false); }}>{cat}</div>
                     ))}
                 </div>
             </div>
 
-            {/* 🟦 NAVBAR */}
-            <nav style={styles.navbar}>
+            {/* 🟦 HEADER SECTION */}
+            <header style={styles.navbar}>
                 <div style={styles.navContent}>
                     <div style={styles.navTopRow}>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                            <Menu size={24} color="#fff" onClick={() => setIsDrawerOpen(true)} />
+                        <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                            <Menu size={24} color="#fff" onClick={() => setIsDrawerOpen(true)} style={{cursor: 'pointer'}} />
                             <h1 style={styles.brand} onClick={() => navigate('/')}>Bhavyams</h1>
                         </div>
                         <div style={styles.navIcons}>
@@ -122,17 +122,20 @@ const Home = () => {
                             </div>
                         </div>
                     </div>
-                    <div style={styles.searchBar}>
-                        <input 
-                            type="text" placeholder="Search for products..." style={styles.searchInput} 
-                            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                        <Search size={18} color="#2874f0" />
+                    {/* 🔍 SEARCH BAR */}
+                    <div style={styles.searchContainer}>
+                        <div style={styles.searchBar}>
+                            <Search size={18} color="#999" />
+                            <input 
+                                type="text" placeholder="Search for products, brands and more" style={styles.searchInput} 
+                                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
-            </nav>
+            </header>
 
-            {/* ⚪ CATEGORY & PRICE STRIP */}
+            {/* ⚪ SMOOTH CATEGORY STRIP */}
             <div style={styles.categoryHeader}>
                 <div style={styles.categoryList}>
                     {categories.map(cat => (
@@ -141,37 +144,42 @@ const Home = () => {
                             {cat}
                         </div>
                     ))}
-                    {/* 💰 PRICE FILTER UI */}
                     <div style={styles.priceFilterUI}>
                         <Filter size={14} color="#2874f0" />
-                        <span style={{fontSize: '11px', fontWeight: 'bold'}}>Under: ₹{maxPrice.toLocaleString('en-IN')}</span>
+                        <span style={{fontSize: '11px', fontWeight: '800'}}>₹{maxPrice/1000}k</span>
                         <input 
                             type="range" min="500" max="100000" step="500"
                             value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))}
-                            style={{width: '80px', accentColor: '#2874f0'}}
+                            style={styles.rangeInput}
                         />
                     </div>
                 </div>
             </div>
 
-            {/* 📦 MAIN CONTENT */}
-            <div style={styles.container}>
+            {/* 📦 PRODUCT GRID */}
+            <main style={styles.container}>
                 {loading ? (
-                    <div style={styles.loader}>Loading Shop...</div>
+                    <div style={styles.loader}>
+                        <div className="spinner"></div>
+                        <p>Loading Bhavyams Shop...</p>
+                    </div>
                 ) : (
                     <div style={styles.grid}>
                         {filteredProducts.length === 0 ? (
-                            <div style={{gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: '#878787'}}>No products match your filters.</div>
+                            <div style={styles.noResults}>No products match your filters.</div>
                         ) : filteredProducts.map((item) => {
                             const isAvailable = Number(item.stock_count) > 0;
-                            const imageSrc = item.image_url?.startsWith('http') 
-                                ? item.image_url 
-                                : `https://bhavyams-vendorhub-backend.onrender.com${item.image_url}`;
+                            // Clean URL Logic
+                            const rawUrl = item.image_url || '';
+                            const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
+                            const imageSrc = cleanUrl.startsWith('http') 
+                                ? cleanUrl 
+                                : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl}`;
 
                             return (
                                 <div key={item.id} style={styles.card} onClick={() => navigate(`/product/${item.id}`)}>
                                     <div style={styles.imageBox}>
-                                        <img src={imageSrc} alt={item.name} style={styles.image} />
+                                        <img src={imageSrc} alt={item.name} style={styles.image} loading="lazy" />
                                         {!isAvailable && <div style={styles.soldOut}>OUT OF STOCK</div>}
                                     </div>
                                     <div style={styles.info}>
@@ -179,10 +187,11 @@ const Home = () => {
                                         <div style={styles.ratingRow}>
                                             <div style={styles.ratingBadge}>4.2 ★</div>
                                             <Zap size={14} fill="#2874f0" color="#2874f0" />
+                                            <span style={styles.assuredText}>Assured</span>
                                         </div>
                                         <div style={styles.priceRow}>
                                             <span style={styles.currPrice}>₹{item.price}</span>
-                                            <span style={styles.offText}>Assured</span>
+                                            <span style={styles.mrpText}>₹{Math.round(item.price * 1.2)}</span>
                                         </div>
                                         {isAvailable && (
                                             <button style={styles.addBtn} onClick={(e) => handleAddToCart(e, item)}>ADD TO CART</button>
@@ -193,14 +202,14 @@ const Home = () => {
                         })}
                     </div>
                 )}
-            </div>
+            </main>
 
-            {/* 👨‍💻 DEVELOPER FOOTER */}
             <footer style={styles.footer}>
-                <p><strong>System Engineer:</strong> Venkata Pavan Kumar</p>
+                <p style={{margin:0, fontWeight: '900', color: '#212121'}}>BHAVYAMS VENDOR HUB</p>
+                <p style={{fontSize: '11px', color: '#878787', marginTop: '5px'}}>System Engineered by Venkata Pavan Kumar</p>
                 <div style={styles.footerLinks}>
-                    <a href="mailto:pavanvenkat63@gmail.com"><Mail size={14} /> Email</a>
-                    <a href="https://subhams-vpk.vercel.app/" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Subhams</a>
+                    <a href="mailto:pavanvenkat63@gmail.com" style={styles.footLink}><Mail size={14} /> Email</a>
+                    <a href="https://subhams-vpk.vercel.app/" target="_blank" rel="noreferrer" style={styles.footLink}><ExternalLink size={14} /> Subhams</a>
                 </div>
             </footer>
         </div>
@@ -208,50 +217,56 @@ const Home = () => {
 };
 
 const styles = {
-    page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: 'Roboto, sans-serif' },
-    drawerOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000 },
-    drawer: { position: 'fixed', top: 0, width: '280px', height: '100%', background: '#fff', zIndex: 2001, transition: '0.3s ease' },
+    page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: "'Roboto', sans-serif" },
+    drawerOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000 },
+    drawer: { position: 'fixed', top: 0, width: '280px', height: '100%', background: '#fff', zIndex: 2001, transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '5px 0 15px rgba(0,0,0,0.1)' },
     drawerHeader: { background: '#2874f0', padding: '20px', color: '#fff', display: 'flex', alignItems: 'center', gap: '15px', fontWeight: 'bold' },
-    closeIcon: { marginLeft: 'auto' },
+    closeIcon: { marginLeft: 'auto', cursor: 'pointer' },
     drawerContent: { padding: '10px 0' },
-    drawerItem: { padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px', borderBottom: '1px solid #f0f0f0' },
-    drawerLabel: { padding: '15px 20px 5px', fontSize: '12px', color: '#878787', fontWeight: 'bold' },
+    drawerItem: { padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', fontSize: '14px' },
+    drawerLabel: { padding: '15px 20px 5px', fontSize: '11px', color: '#878787', fontWeight: '800', letterSpacing: '0.5px' },
     drawerDivider: { height: '8px', background: '#f1f3f6' },
     
-    navbar: { background: '#2874f0', padding: '10px 0', position: 'sticky', top: 0, zIndex: 1000 },
-    navContent: { maxWidth: '1240px', margin: '0 auto', padding: '0 15px' },
-    navTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
-    brand: { color: '#fff', fontSize: '20px', fontWeight: 'bold', fontStyle: 'italic' },
-    navIcons: { display: 'flex', alignItems: 'center', gap: '20px' },
-    searchBar: { background: '#fff', display: 'flex', alignItems: 'center', padding: '0 12px', borderRadius: '4px', height: '40px' },
-    searchInput: { border: 'none', width: '100%', outline: 'none', fontSize: '14px' },
-    loginBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '5px 15px', fontWeight: 'bold', borderRadius: '2px' },
-    cartBtn: { position: 'relative' },
-    cartBadge: { position: 'absolute', top: '-8px', right: '-10px', background: '#ff6161', color: '#fff', fontSize: '10px', padding: '2px 5px', borderRadius: '50%', border: '1px solid #fff' },
+    navbar: { background: '#2874f0', padding: '8px 0 12px', position: 'sticky', top: 0, zIndex: 1000, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
+    navContent: { maxWidth: '1240px', margin: '0 auto', padding: '0 12px' },
+    navTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
+    brand: { color: '#fff', fontSize: '18px', fontWeight: '900', fontStyle: 'italic', cursor: 'pointer', letterSpacing: '0.5px' },
+    navIcons: { display: 'flex', alignItems: 'center', gap: '18px' },
+    searchContainer: { width: '100%' },
+    searchBar: { background: '#fff', display: 'flex', alignItems: 'center', padding: '0 12px', borderRadius: '2px', height: '36px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' },
+    searchInput: { border: 'none', width: '100%', outline: 'none', fontSize: '13px', marginLeft: '8px', color: '#212121' },
+    loginBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '4px 18px', fontWeight: 'bold', borderRadius: '2px', fontSize: '13px' },
+    cartBtn: { position: 'relative', cursor: 'pointer' },
+    cartBadge: { position: 'absolute', top: '-8px', right: '-10px', background: '#ff6161', color: '#fff', fontSize: '9px', fontWeight: 'bold', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: '1px solid #2874f0' },
 
-    categoryHeader: { background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.1)', overflowX: 'auto', whiteSpace: 'nowrap' },
-    categoryList: { display: 'flex', padding: '12px 15px', gap: '25px', alignItems: 'center' },
-    catItem: { fontSize: '13px', fontWeight: 'bold', color: '#212121' },
-    activeCatItem: { fontSize: '13px', fontWeight: 'bold', color: '#2874f0' },
-    priceFilterUI: { display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '15px', borderLeft: '1px solid #e0e0e0' },
+    categoryHeader: { background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflowX: 'auto', position: 'sticky', top: '92px', zIndex: 900 },
+    categoryList: { display: 'flex', padding: '10px 15px', gap: '20px', alignItems: 'center', minWidth: 'max-content' },
+    catItem: { fontSize: '12px', fontWeight: '500', color: '#212121', cursor: 'pointer' },
+    activeCatItem: { fontSize: '12px', fontWeight: 'bold', color: '#2874f0', cursor: 'pointer', borderBottom: '2px solid #2874f0', paddingBottom: '2px' },
+    priceFilterUI: { display: 'flex', alignItems: 'center', gap: '6px', paddingLeft: '15px', borderLeft: '1px solid #e0e0e0' },
+    rangeInput: { width: '60px', accentColor: '#2874f0', cursor: 'pointer' },
 
-    container: { maxWidth: '1240px', margin: '0 auto', padding: '15px 10px' },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' },
-    card: { background: '#fff', borderRadius: '4px', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-    imageBox: { height: '160px', padding: '10px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    container: { maxWidth: '1240px', margin: '0 auto', padding: '10px 8px' },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }, // 🚀 2 per row on mobile
+    card: { background: '#fff', borderRadius: '2px', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
+    imageBox: { height: '150px', padding: '8px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' },
     image: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
-    soldOut: { position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontWeight: 'bold', fontSize: '12px' },
-    info: { padding: '10px', flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' },
-    productName: { fontSize: '13px', color: '#212121', height: '32px', overflow: 'hidden' },
-    ratingRow: { display: 'flex', alignItems: 'center', gap: '5px' },
-    ratingBadge: { background: '#388e3c', color: '#fff', padding: '2px 6px', borderRadius: '3px', fontSize: '11px', fontWeight: 'bold' },
-    priceRow: { display: 'flex', alignItems: 'center', gap: '5px' },
-    currPrice: { fontSize: '15px', fontWeight: 'bold' },
-    offText: { fontSize: '10px', color: '#2874f0', fontWeight: 'bold', border: '1px solid #2874f0', padding: '0 4px' },
-    addBtn: { background: '#ff9f00', color: '#fff', border: 'none', padding: '8px', fontWeight: 'bold', borderRadius: '2px', marginTop: '5px', fontSize: '12px' },
-    loader: { textAlign: 'center', padding: '50px', color: '#2874f0', fontWeight: 'bold' },
-    footer: { textAlign: 'center', padding: '30px 20px', background: '#fff', marginTop: '20px', fontSize: '13px', borderTop: '1px solid #e2e8f0' },
-    footerLinks: { display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '10px', color: '#2874f0' }
+    soldOut: { position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontWeight: '900', fontSize: '10px', textTransform: 'uppercase' },
+    info: { padding: '8px 10px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' },
+    productName: { fontSize: '12px', color: '#212121', height: '32px', overflow: 'hidden', lineHeight: '1.3' },
+    ratingRow: { display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' },
+    ratingBadge: { background: '#388e3c', color: '#fff', padding: '1px 5px', borderRadius: '2px', fontSize: '10px', fontWeight: 'bold' },
+    assuredText: { fontSize: '10px', color: '#878787', fontWeight: 'bold' },
+    priceRow: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' },
+    currPrice: { fontSize: '14px', fontWeight: 'bold', color: '#212121' },
+    mrpText: { fontSize: '11px', color: '#878787', textDecoration: 'line-through' },
+    addBtn: { background: '#ff9f00', color: '#fff', border: 'none', padding: '7px', fontWeight: 'bold', borderRadius: '2px', marginTop: '6px', fontSize: '11px', width: '100%' },
+    
+    loader: { textAlign: 'center', padding: '100px 20px', color: '#2874f0', fontWeight: 'bold' },
+    noResults: { gridColumn: '1/-1', textAlign: 'center', padding: '60px 20px', color: '#878787', fontSize: '14px' },
+    footer: { textAlign: 'center', padding: '40px 20px', background: '#fff', marginTop: '40px', borderTop: '1px solid #e2e8f0' },
+    footerLinks: { display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '15px' },
+    footLink: { color: '#2874f0', textDecoration: 'none', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }
 };
 
 export default Home;
