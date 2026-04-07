@@ -5,12 +5,12 @@ import { useCart } from '../context/CartContext';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
-const Cart= () => {
+const Cart = () => {
     const { cart, removeFromCart, clearCart } = useCart();
     const navigate = useNavigate();
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [orderPlaced, setOrderPlaced] = useState(false);
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [,setIsMobile] = useState(window.innerWidth < 768);
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -29,25 +29,24 @@ const Cart= () => {
         if (!token) return navigate('/login');
         setIsCheckingOut(true);
         try {
-            // 🛡️ Ensure we have the latest user data before opening Razorpay
             const { data: freshUser } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             localStorage.setItem('user', JSON.stringify(freshUser));
 
             if (!freshUser.address || freshUser.address.length < 5) {
-                toast.error("❌ Address missing! Add it in 'My Profile'.");
+                toast.error("Address missing!");
                 navigate('/dashboard'); 
                 setIsCheckingOut(false);
                 return;
             }
 
             const { data: keyData } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/orders/get-razorpay-key', {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` }
             });
 
             const { data: orderData } = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/orders/checkout', 
-                { cartItems: cart }, { headers: { 'Authorization': `Bearer ${token}` } }
+                { cartItems: cart }, { headers: { Authorization: `Bearer ${token}` } }
             );
 
             const options = {
@@ -55,41 +54,27 @@ const Cart= () => {
                 amount: orderData.razorpayOrder.amount,
                 currency: "INR",
                 name: "Bhavyams VendorHub",
-                description: "Secure Payment",
                 order_id: orderData.razorpayOrder.id,
                 handler: async function (response) {
                     try {
                         const verifyRes = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/orders/verify-payment', 
-                            { ...response, cartItems: cart }, { headers: { 'Authorization': `Bearer ${token}` } }
+                            { ...response, cartItems: cart }, { headers: { Authorization: `Bearer ${token}` } }
                         );
-                        
                         if (verifyRes.data.status === 'success') {
-                            // 🚀 FIX: Clear cart immediately and update local storage to prevent duplicate orders
                             clearCart();
                             setOrderPlaced(true);
-                            toast.success("Payment Received! Order Placed.");
-
-                            // Refresh user data again so dashboard reflects new order/stats
-                            const { data: finalUser } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', {
-                                headers: { Authorization: `Bearer ${token}` }
-                            });
-                            localStorage.setItem('user', JSON.stringify(finalUser));
+                            toast.success("Order Placed!");
                         }
                     } catch (err) {
-                        toast.error(err.response?.data?.message || "Payment verification failed.");
+                        toast.error("Verification failed");
                     }
                 },
                 prefill: { name: freshUser.username, email: freshUser.email },
-                theme: { color: "#2874f0" },
-                modal: {
-                    ondismiss: function() {
-                        setIsCheckingOut(false);
-                    }
-                }
+                theme: { color: "#2874f0" }
             };
             new window.Razorpay(options).open();
         } catch (err) { 
-            toast.error(err.response?.data?.message || "Checkout failed. Item might be out of stock."); 
+            toast.error("Out of stock!"); 
         } finally { 
             setIsCheckingOut(false); 
         }
@@ -98,117 +83,77 @@ const Cart= () => {
     if (orderPlaced) return (
         <div style={styles.successScreen}>
             <CheckCircle size={80} color="#26a541" />
-            <h1 style={{fontSize: '28px', margin: '20px 0', color: '#212121'}}>Order Placed Successfully!</h1>
-            <p style={{color: '#64748b', marginBottom: '30px'}}>Your vendor has been notified and is preparing your items.</p>
-            <div style={{display: 'flex', gap: '15px', justifyContent: 'center'}}>
-                <button onClick={() => navigate('/')} style={styles.shopNowBtn}>CONTINUE SHOPPING</button>
-                <button onClick={() => navigate('/dashboard')} style={styles.viewOrdersBtn}>VIEW MY ORDERS</button>
+            <h1>Order Placed!</h1>
+            <div style={{display: 'flex', gap: '15px'}}>
+                <button onClick={() => navigate('/')} style={styles.shopNowBtn}>SHOP MORE</button>
+                <button onClick={() => navigate('/dashboard')} style={styles.viewOrdersBtn}>VIEW ORDERS</button>
             </div>
         </div>
     );
 
-    // ... (Keep the rest of your return JSX and styles exactly as they were)
     return (
         <div style={styles.page}>
             <header style={styles.fkHeader}>
                 <div style={styles.headerContent}>
-                    <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
-                        <ArrowLeft size={20} onClick={() => navigate('/')} style={{cursor:'pointer'}} />
-                        <h2 style={{margin: 0, fontSize: '18px'}}>My Cart ({totalCartItems})</h2>
-                    </div>
+                   <ArrowLeft size={20} onClick={() => navigate('/')} style={{cursor:'pointer'}} />
+                   <h2 style={{display: 'inline', marginLeft: '10px'}}>My Cart ({totalCartItems})</h2>
                 </div>
             </header>
-
             <div style={styles.container}>
                 {cart.length === 0 ? (
                     <div style={styles.emptyCart}>
-                        <ShoppingBag size={80} color="#2874f0" />
-                        <h3>Your cart is empty!</h3>
+                        <ShoppingBag size={80} />
+                        <h3>Empty Cart</h3>
                         <button onClick={() => navigate('/')} style={styles.shopNowBtn}>Shop Now</button>
                     </div>
                 ) : (
-                    <div style={isMobile ? styles.mobileCartGrid : styles.cartGrid}>
+                    <div style={styles.cartGrid}>
                         <div style={styles.itemColumn}>
-                            <div style={styles.addressBar}>
-                                <div>Deliver to: <b>{JSON.parse(localStorage.getItem('user'))?.username || 'Customer'}</b></div>
-                                <button onClick={() => navigate('/dashboard')} style={styles.changeBtn}>Change</button>
-                            </div>
-
-                            {cart.map(item => {
-                                const rawUrl = item.image_url || '';
-                                const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
-                                const imageSrc = cleanUrl.startsWith('http') 
-                                    ? cleanUrl 
-                                    : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl}`;
-                                return (
-                                    <div key={item.id} style={styles.itemCard}>
-                                        <img src={imageSrc} alt={item.name} style={styles.img} />
-                                        <div style={styles.details}>
-                                            <div style={styles.itemName}>{item.name}</div>
-                                            <div style={styles.itemPrice}>₹{item.price} <span style={{fontSize:'12px', color:'#878787'}}>x {item.quantity}</span></div>
-                                            <div style={styles.sellerText}>Seller: Bhavyams Vendor</div>
-                                            <button onClick={() => removeFromCart(item.id)} style={styles.removeBtn}>REMOVE</button>
-                                        </div>
+                            {cart.map(item => (
+                                <div key={item.id} style={styles.itemCard}>
+                                    <div style={styles.details}>
+                                        <div style={styles.itemName}>{item.name}</div>
+                                        <div style={styles.itemPrice}>₹{item.price} x {item.quantity}</div>
+                                        <button onClick={() => removeFromCart(item.id)} style={styles.removeBtn}>REMOVE</button>
                                     </div>
-                                );
-                            })}
+                                </div>
+                            ))}
                         </div>
-
                         <div style={styles.priceColumn}>
                             <div style={styles.priceCard}>
                                 <div style={styles.priceHeader}>PRICE DETAILS</div>
                                 <div style={styles.priceRow}>
-                                    <div>Price ({totalCartItems} items)</div>
-                                    <div>₹{subtotal}</div>
+                                    <div>Total</div>
+                                    <div style={{fontWeight:'bold'}}>₹{total}</div>
                                 </div>
-                                <div style={styles.priceRow}>
-                                    <div>Discount</div>
-                                    <div style={{color: '#26a541'}}>- ₹{discount}</div>
-                                </div>
-                                <div style={styles.priceRow}>
-                                    <div>Delivery Charges</div>
-                                    <div style={{color: '#26a541'}}>{delivery === 0 ? 'FREE' : `₹${delivery}`}</div>
-                                </div>
-                                <div style={styles.totalRow}>
-                                    <div>Total Amount</div>
-                                    <div>₹{total}</div>
-                                </div>
-                                <div style={styles.savingsText}>You will save ₹{discount} on this order</div>
                             </div>
-                            
-                            {!isMobile && (
-                                <div style={styles.placeOrderRow}>
-                                    <button onClick={handleCheckout} disabled={isCheckingOut} style={styles.checkoutBtn}>
-                                        {isCheckingOut ? "PROCESSING..." : "PLACE ORDER"}
-                                    </button>
-                                </div>
-                            )}
+                            <button onClick={handleCheckout} disabled={isCheckingOut} style={styles.checkoutBtn}>
+                                {isCheckingOut ? "WAIT..." : "PLACE ORDER"}
+                            </button>
                         </div>
                     </div>
                 )}
             </div>
-
-            {isMobile && cart.length > 0 && (
-                <div style={styles.mobileStickyFooter}>
-                    <div style={styles.mobilePriceTotal}>
-                        <div style={{fontSize:'12px', color:'#878787', textDecoration:'line-through'}}>₹{subtotal + delivery}</div>
-                        <div style={{fontSize:'18px', fontWeight:'bold'}}>₹{total}</div>
-                    </div>
-                    <button onClick={handleCheckout} disabled={isCheckingOut} style={styles.mobileCheckoutBtn}>
-                        {isCheckingOut ? "WAIT..." : "PLACE ORDER"}
-                    </button>
-                </div>
-            )}
         </div>
     );
 };
 
-// ... (Add these specific buttons to your styles object)
 const styles = {
-    // ... all your existing styles ...
-    viewOrdersBtn: { background: '#fff', color: '#2874f0', border: '1px solid #e0e0e0', padding: '12px 30px', fontWeight: 'bold', borderRadius: '2px', cursor: 'pointer' },
-    shopNowBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '12px 30px', fontWeight: 'bold', borderRadius: '2px', cursor: 'pointer' },
-    // Ensure successScreen is well padded
-    successScreen: { textAlign: 'center', padding: '100px 20px', background: '#fff', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
+    page: { background: '#f1f3f6', minHeight: '100vh' },
+    fkHeader: { background: '#2874f0', color: '#fff', padding: '12px' },
+    headerContent: { maxWidth: '1200px', margin: '0 auto' },
+    container: { maxWidth: '1200px', margin: '0 auto', padding: '10px' },
+    cartGrid: { display: 'grid', gridTemplateColumns: '1fr 350px', gap: '16px' },
+    itemColumn: { background: '#fff' },
+    itemCard: { padding: '15px', borderBottom: '1px solid #f0f0f0' },
+    checkoutBtn: { background: '#fb641b', color: '#fff', border: 'none', padding: '12px', width: '100%', fontWeight: 'bold', marginTop: '10px', cursor: 'pointer' },
+    successScreen: { textAlign: 'center', padding: '100px 20px', background: '#fff', minHeight: '100vh' },
+    shopNowBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '10px 30px', cursor: 'pointer' },
+    viewOrdersBtn: { background: '#fff', color: '#2874f0', border: '1px solid #2874f0', padding: '10px 30px', cursor: 'pointer' },
+    priceCard: { background: '#fff', padding: '15px' },
+    priceHeader: { borderBottom: '1px solid #f0f0f0', paddingBottom: '10px', marginBottom: '10px' },
+    priceRow: { display: 'flex', justifyContent: 'space-between' },
+    emptyCart: { textAlign: 'center', padding: '50px' }
 };
+
 export default Cart;

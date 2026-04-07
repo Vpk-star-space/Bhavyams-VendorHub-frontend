@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { DollarSign, Package, ShoppingBag, TrendingUp, Edit3, Save, X } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -12,9 +12,9 @@ const VendorDashboard = () => {
 
     const token = localStorage.getItem('token');
 
-    const fetchData = async () => {
+    // 🚀 Wrapped in useCallback so it doesn't cause loops
+    const fetchData = useCallback(async () => {
         try {
-            // 1. Fetch Stats
             const statsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/stats', {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -24,22 +24,20 @@ const VendorDashboard = () => {
                 products: statsRes.data.products || 0
             });
 
-            // 2. Fetch Vendor Products (To edit stock)
             const productsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/my-products', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setProducts(productsRes.data);
-
         } catch (err) {
             console.error("Dashboard Error:", err);
         } finally {
             setLoading(false);
         }
-    };
+    }, [token]);
 
     useEffect(() => {
         fetchData();
-    }, );
+    }, [fetchData]); // ✅ Fixed: Added proper dependency
 
     const handleUpdateStock = async (product) => {
         try {
@@ -47,13 +45,13 @@ const VendorDashboard = () => {
                 `https://bhavyams-vendorhub-backend.onrender.com/api/products/update/${product.id}`,
                 { 
                     ...product, 
-                    stock_count: Number(editStock) // Update the stock
+                    stock_count: Number(editStock) 
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-            toast.success("Stock updated successfully!");
+            toast.success("Stock updated!");
             setEditingId(null);
-            fetchData(); // Refresh data
+            fetchData(); 
         } catch (err) {
             toast.error("Failed to update stock");
         }
@@ -74,13 +72,11 @@ const VendorDashboard = () => {
                     <p style={styles.label}>Revenue</p>
                     <h3 style={styles.value}>₹{Number(stats.revenue).toLocaleString('en-IN')}</h3>
                 </div>
-
                 <div style={{ ...styles.card, borderLeft: '5px solid #3b82f6' }}>
                     <div style={styles.iconCircle}><ShoppingBag color="#3b82f6" size={20}/></div>
                     <p style={styles.label}>Orders</p>
                     <h3 style={styles.value}>{stats.orders}</h3>
                 </div>
-
                 <div style={{ ...styles.card, borderLeft: '5px solid #8b5cf6' }}>
                     <div style={styles.iconCircle}><Package color="#8b5cf6" size={20}/></div>
                     <p style={styles.label}>Total Items</p>
@@ -88,7 +84,6 @@ const VendorDashboard = () => {
                 </div>
             </div>
 
-            {/* 🛠️ INVENTORY MANAGEMENT SECTION */}
             <div style={styles.inventorySection}>
                 <h3 style={styles.subTitle}>Manage Inventory</h3>
                 <div style={styles.tableWrapper}>
@@ -156,8 +151,8 @@ const styles = {
     table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
     th: { textAlign: 'left', padding: '12px', background: '#f8fafc', color: '#64748b' },
     td: { padding: '12px', borderTop: '1px solid #f1f5f9' },
-    stockInput: { width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1' },
-    editBtn: { background: '#f1f5f9', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' },
+    stockInput: { width: '60px', padding: '4px', border: '1px solid #cbd5e1' },
+    editBtn: { background: '#f1f5f9', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer' },
     saveBtn: { background: '#10b981', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px' },
     cancelBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px' },
     loader: { textAlign: 'center', padding: '40px' }
