@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { ShoppingCart, Search, User, LogOut } from 'lucide-react';
+import { ShoppingCart, Search, User, Menu } from 'lucide-react'; // 🚀 ADDED: Menu icon
 import { useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 
@@ -44,12 +44,6 @@ const Home = () => {
         fetchProducts();
     }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        navigate('/login');
-    };
-
     if (loading) {
         return (
             <div style={styles.loaderContainer}>
@@ -64,9 +58,20 @@ const Home = () => {
             {/* 🔵 BLUE HEADER */}
             <div style={styles.header}>
                 <div style={isMobile ? styles.mobileHeaderContent : styles.desktopHeaderContent}>
-                    <h1 style={isMobile ? styles.mobileLogoText : styles.logoText} onClick={() => navigate('/')}>
-                        Bhavyams <span style={styles.hubText}>Hub</span>
-                    </h1>
+                    
+                    {/* 🚀 FIX: Mobile Left Side (Menu Icon + Logo) */}
+                    {isMobile ? (
+                        <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                            <Menu size={24} color="#fff" onClick={() => navigate('/dashboard')} style={{cursor: 'pointer'}} />
+                            <h1 style={styles.mobileLogoText} onClick={() => navigate('/')}>
+                                Bhavyams <span style={styles.hubText}>Hub</span>
+                            </h1>
+                        </div>
+                    ) : (
+                        <h1 style={styles.logoText} onClick={() => navigate('/')}>
+                            Bhavyams <span style={styles.hubText}>Hub</span>
+                        </h1>
+                    )}
                     
                     <div style={isMobile ? styles.mobileSearchBar : styles.searchBar}>
                         <input 
@@ -78,19 +83,14 @@ const Home = () => {
                     </div>
 
                     <div style={isMobile ? styles.mobileNavActions : styles.navActions}>
-                        {/* 🚀 FIX: DYNAMIC LOGIN / PROFILE BUTTONS */}
+                        {/* 🚀 FIX: REMOVED LOGOUT. Added Profile/Login Logic */}
                         {token ? (
-                            <div style={{ display: 'flex', gap: isMobile ? '5px' : '15px' }}>
-                                <button 
-                                    style={isMobile ? styles.mobileNavBtn : styles.navBtn} 
-                                    onClick={() => navigate(user?.role === 'vendor' ? '/dashboard' : '/profile')}
-                                >
-                                    {isMobile ? <User size={16}/> : (user?.username || 'Profile')}
-                                </button>
-                                <button style={isMobile ? styles.mobileNavBtn : styles.navBtn} onClick={handleLogout}>
-                                    {isMobile ? <LogOut size={16}/> : 'Logout'}
-                                </button>
-                            </div>
+                            <button 
+                                style={isMobile ? styles.mobileNavBtn : styles.navBtn} 
+                                onClick={() => navigate(user?.role === 'vendor' ? '/dashboard' : '/profile')}
+                            >
+                                {isMobile ? <User size={16}/> : (user?.username || 'Profile')}
+                            </button>
                         ) : (
                             <button style={isMobile ? styles.mobileNavBtn : styles.navBtn} onClick={() => navigate('/login')}>
                                 Login
