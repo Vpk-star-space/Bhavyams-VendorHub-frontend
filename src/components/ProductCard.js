@@ -1,23 +1,28 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap } from 'lucide-react'; // Added for Flipkart-style feel
+import { Zap } from 'lucide-react';
 
 const ProductCard = ({ product }) => {
     const navigate = useNavigate();
 
-    // 🚀 FIX 1: Smart Image Logic (Connects to Render Backend)
+    // 🚀 FIX 1: Smart Image Logic
     const imageSrc = product.image_url?.startsWith('http') 
         ? product.image_url 
         : `https://bhavyams-vendorhub-backend.onrender.com${product.image_url}`;
 
-    // 🚀 FIX 2: Correct Naming (stock_count from DB)
-    const stockAvailable = product.stock_count ?? product.stock ?? 0;
-    const isOutOfStock = Number(stockAvailable) <= 0;
+    // 🚀 FIX 2: Correct Naming & Out of Stock Logic
+    const stockAvailable = Number(product.stock_count ?? product.stock ?? 0);
+    const isOutOfStock = stockAvailable <= 0;
 
     return (
         <div 
-            onClick={() => navigate(`/product/${product.id}`)} 
-            style={styles.card}
+            onClick={() => !isOutOfStock && navigate(`/product/${product.id}`)} 
+            style={{
+                ...styles.card,
+                cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                filter: isOutOfStock ? 'grayscale(0.8)' : 'none', // 🌑 Makes it look unavailable
+                opacity: isOutOfStock ? 0.8 : 1
+            }}
         >
             <div style={styles.imageContainer}>
                 <img 
@@ -26,25 +31,49 @@ const ProductCard = ({ product }) => {
                     style={styles.image} 
                     onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Bhavyams'; }}
                 />
-                {isOutOfStock && <div style={styles.soldOutOverlay}>OUT OF STOCK</div>}
+                
+                {/* 🔴 RED OVERLAY FOR OUT OF STOCK */}
+                {isOutOfStock && (
+                    <div style={styles.soldOutOverlay}>
+                        <span style={styles.soldOutText}>OUT OF STOCK</span>
+                    </div>
+                )}
             </div>
 
             <div style={styles.info}>
-                <h3 style={styles.name}>{product.name}</h3>
+                <h3 style={{
+                    ...styles.name, 
+                    color: isOutOfStock ? '#878787' : '#212121'
+                }}>{product.name}</h3>
                 
                 <div style={styles.ratingRow}>
-                    <div style={styles.ratingBadge}>4.2 ★</div>
-                    <span style={styles.assuredText}><Zap size={10} fill="#2874f0"/> Assured</span>
+                    <div style={{
+                        ...styles.ratingBadge, 
+                        background: isOutOfStock ? '#9e9e9e' : '#388e3c'
+                    }}>4.2 ★</div>
+                    {!isOutOfStock && (
+                        <span style={styles.assuredText}><Zap size={10} fill="#2874f0"/> Assured</span>
+                    )}
                 </div>
 
                 <div style={styles.priceRow}>
-                    <span style={styles.price}>₹{Number(product.price).toLocaleString('en-IN')}</span>
-                    {/* Optional: Add a fake discount to look professional */}
+                    <span style={{
+                        ...styles.price, 
+                        color: isOutOfStock ? '#878787' : '#212121'
+                    }}>₹{Number(product.price).toLocaleString('en-IN')}</span>
                     <span style={styles.originalPrice}>₹{Number(product.price * 1.2).toFixed(0)}</span>
                 </div>
 
-                <p style={{...styles.stock, color: isOutOfStock ? '#ef4444' : '#64748b'}}>
-                    {isOutOfStock ? "Restocking Soon" : `Only ${stockAvailable} left`}
+                {/* 📊 DYNAMIC STOCK TEXT */}
+                <p style={{
+                    ...styles.stock, 
+                    color: isOutOfStock ? '#ef4444' : (stockAvailable < 5 ? '#ff9f00' : '#388e3c'),
+                    fontWeight: stockAvailable < 5 ? 'bold' : 'normal'
+                }}>
+                    {isOutOfStock 
+                        ? "Temporarily Unavailable" 
+                        : (stockAvailable < 10 ? `Hurry, only ${stockAvailable} left!` : "In Stock")
+                    }
                 </p>
             </div>
         </div>
@@ -58,10 +87,10 @@ const styles = {
         overflow: 'hidden',
         display: 'flex', 
         flexDirection: 'column',
-        cursor: 'pointer', 
         border: '1px solid #e2e8f0',
-        transition: 'transform 0.2s ease-in-out',
-        height: '100%'
+        transition: 'all 0.2s ease-in-out',
+        height: '100%',
+        position: 'relative'
     },
     imageContainer: {
         position: 'relative',
@@ -70,7 +99,8 @@ const styles = {
         background: '#fff',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        overflow: 'hidden'
     },
     image: { 
         maxWidth: '100%', 
@@ -80,13 +110,20 @@ const styles = {
     soldOutOverlay: {
         position: 'absolute',
         inset: 0,
-        background: 'rgba(255,255,255,0.7)',
+        background: 'rgba(255, 255, 255, 0.6)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: '#ef4444',
+        zIndex: 2
+    },
+    soldOutText: {
+        background: '#ef4444',
+        color: '#fff',
+        padding: '4px 12px',
+        fontSize: '11px',
         fontWeight: 'bold',
-        fontSize: '12px'
+        borderRadius: '2px',
+        letterSpacing: '0.5px'
     },
     info: { 
         padding: '12px', 
@@ -98,7 +135,6 @@ const styles = {
     name: { 
         fontSize: '14px', 
         fontWeight: '500', 
-        color: '#212121', 
         margin: 0,
         height: '34px',
         overflow: 'hidden',
@@ -107,10 +143,10 @@ const styles = {
         WebkitBoxOrient: 'vertical'
     },
     ratingRow: { display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0' },
-    ratingBadge: { background: '#388e3c', color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '3px', fontWeight: 'bold' },
+    ratingBadge: { color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '3px', fontWeight: 'bold' },
     assuredText: { color: '#2874f0', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' },
     priceRow: { display: 'flex', alignItems: 'center', gap: '8px' },
-    price: { color: '#212121', fontWeight: 'bold', fontSize: '16px' },
+    price: { fontWeight: 'bold', fontSize: '16px' },
     originalPrice: { color: '#878787', fontSize: '12px', textDecoration: 'line-through' },
     stock: { fontSize: '11px', margin: '2px 0 0 0' }
 };
