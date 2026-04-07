@@ -9,7 +9,7 @@ import confetti from 'canvas-confetti';
 const ProductDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { addToCart } = useCart();
+    const { cart, addToCart } = useCart(); 
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [mainImage, setMainImage] = useState('');
@@ -78,10 +78,23 @@ const ProductDetails = () => {
     const handleAction = (type) => {
         if (!product) return;
         
-        // 🛡️ SECURITY CHECK: Prevent adding to cart if out of stock
-        const stockCount = Number(product.stock_count || 0);
+        const stockCount = Number(product.stock_count ?? product.stock ?? 0);
+        
+        // 🚀 FIX: Convert both IDs to Strings so JavaScript never misses the match!
+        const itemInCart = cart.find(item => String(item.id) === String(product.id));
+        
+        // 🚀 FIX: Safely fallback to 1 if quantity is undefined
+        const quantityInCart = itemInCart ? (itemInCart.quantity || 1) : 0;
+
         if (stockCount <= 0) {
             toast.error("🛑 Sorry, this product is currently out of stock!");
+            return;
+        }
+
+        // 🚀 FIX: Block adding if cart quantity reaches stock limit
+        if (quantityInCart >= stockCount) {
+            toast.warning(`You already have all available stock (${stockCount}) in your cart!`);
+            if (type === 'buy') navigate('/cart');
             return;
         }
 
@@ -101,9 +114,14 @@ const ProductDetails = () => {
     if (loading) return <div style={styles.loader}>Loading Hub...</div>;
     if (!product) return null;
 
-    const stockCount = Number(product.stock_count || 0);
+    const stockCount = Number(product.stock_count ?? product.stock ?? 0);
     const isAvailable = stockCount > 0;
     const isLowStock = stockCount > 0 && stockCount <= 5;
+
+    // 🚀 FIX: Calculate maxReached safely for the UI rendering
+    const itemInCart = cart.find(item => String(item.id) === String(product.id));
+    const quantityInCart = itemInCart ? (itemInCart.quantity || 1) : 0;
+    const maxReached = quantityInCart >= stockCount;
 
     return (
         <div style={styles.page}>
@@ -113,7 +131,6 @@ const ProductDetails = () => {
                 </button>
                 
                 <div style={isMobile ? styles.mobileLayout : styles.mainGrid}>
-                    {/* 🖼️ LEFT COLUMN: IMAGE GALLERY */}
                     <div style={styles.imageColumn}>
                         <div style={isMobile ? {} : styles.stickyWrapper}>
                             <div style={isMobile ? styles.mobileGallery : styles.galleryWrapper}>
@@ -146,11 +163,12 @@ const ProductDetails = () => {
                             {!isMobile && (
                                 <div style={styles.actionRow}>
                                     <button 
-                                        style={isAvailable ? styles.addToCartBtn : styles.disabledBtn} 
-                                        disabled={!isAvailable} 
+                                        style={(isAvailable && !maxReached) ? styles.addToCartBtn : styles.disabledBtn} 
+                                        disabled={!isAvailable || maxReached} 
                                         onClick={() => handleAction('cart')}
                                     >
-                                        <ShoppingCart size={20} /> {isAvailable ? "ADD TO CART" : "SOLD OUT"}
+                                        <ShoppingCart size={20} /> 
+                                        {!isAvailable ? "SOLD OUT" : (maxReached ? "MAX IN CART" : "ADD TO CART")}
                                     </button>
                                     <button 
                                         style={isAvailable ? styles.buyNowBtn : styles.disabledBtn} 
@@ -164,7 +182,6 @@ const ProductDetails = () => {
                         </div>
                     </div>
 
-                    {/* 📝 RIGHT COLUMN: DETAILS */}
                     <div style={styles.detailsColumn}>
                         <div style={styles.breadcrumb}>Home {'>'} Products {'>'} {product.name}</div>
                         <h1 style={styles.titleText}>{product.name}</h1>
@@ -174,14 +191,9 @@ const ProductDetails = () => {
                             <span style={styles.reviewsText}>Assured Quality</span>
                         </div>
 
-                        {/* 📊 DYNAMIC STOCK STATUS */}
                         <div style={{ margin: '10px 0' }}>
                             {isAvailable ? (
-                                <span style={{ 
-                                    color: isLowStock ? '#fb641b' : '#388e3c', 
-                                    fontWeight: 'bold', 
-                                    fontSize: '14px' 
-                                }}>
+                                <span style={{ color: isLowStock ? '#fb641b' : '#388e3c', fontWeight: 'bold', fontSize: '14px' }}>
                                     {isLowStock ? `🔥 Hurry, only ${stockCount} left in stock!` : '✓ Item in Stock'}
                                 </span>
                             ) : (
@@ -222,15 +234,15 @@ const ProductDetails = () => {
             {isMobile && (
                 <div style={styles.mobileStickyFooter}>
                     <button 
-                        style={isAvailable ? styles.mobileAddToCart : styles.disabledBtn} 
-                        disabled={!isAvailable} 
+                        style={(isAvailable && !maxReached) ? styles.mobileAddToCart : styles.disabledBtn} 
+                        disabled={!isAvailable || maxReached} 
                         onClick={() => handleAction('cart')}
                     >
-                        {isAvailable ? "ADD TO CART" : "OUT OF STOCK"}
+                        {!isAvailable ? "SOLD OUT" : (maxReached ? "MAX IN CART" : "ADD TO CART")}
                     </button>
                     <button 
                         style={isAvailable ? styles.mobileBuyNow : styles.disabledBtn} 
-                        disabled={!isAvailable} 
+                        disabled={!isAvailable}  // 🚀 FIX: Removed the empty space here!
                         onClick={() => handleAction('buy')}
                     >
                         {isAvailable ? "BUY NOW" : "NOT AVAILABLE"}
@@ -246,34 +258,26 @@ const styles = {
     container: { maxWidth: '1240px', margin: '0 auto', padding: '0 10px' },
     loader: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh', color: '#2874f0', fontWeight: 'bold' },
     backBtn: { display: 'flex', alignItems: 'center', gap: '8px', border: 'none', background: 'none', cursor: 'pointer', color: '#878787', marginBottom: '15px', fontSize: '12px', fontWeight: 'bold' },
-    
     mainGrid: { display: 'grid', gridTemplateColumns: '42% 58%', gap: '30px' },
     mobileLayout: { display: 'flex', flexDirection: 'column', gap: '15px' },
-
     imageColumn: { width: '100%' },
     stickyWrapper: { position: 'sticky', top: '20px' },
     galleryWrapper: { display: 'flex', gap: '12px' },
     mobileGallery: { display: 'flex', flexDirection: 'column-reverse', gap: '10px' },
-    
     thumbStrip: { display: 'flex', flexDirection: 'column', gap: '8px' },
     mobileThumbStrip: { display: 'flex', flexDirection: 'row', gap: '8px', overflowX: 'auto', paddingBottom: '5px' },
-    
     thumbBox: { width: '56px', height: '56px', padding: '2px', cursor: 'pointer', borderRadius: '4px', flexShrink: 0 },
     thumbImg: { width: '100%', height: '100%', objectFit: 'contain' },
-    
     imageCard: { flex: 1, border: '1px solid #f0f0f0', position: 'relative', height: '450px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     mobileImageCard: { width: '100%', height: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #f0f0f0' },
     image: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
-    
     actionRow: { display: 'flex', gap: '10px', marginTop: '15px' },
     addToCartBtn: { flex: 1, padding: '16px', background: '#ff9f00', color: '#fff', border: 'none', fontWeight: '900', borderRadius: '2px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' },
     buyNowBtn: { flex: 1, padding: '16px', background: '#fb641b', color: '#fff', border: 'none', fontWeight: '900', borderRadius: '2px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' },
-    
     mobileStickyFooter: { position: 'fixed', bottom: 0, left: 0, right: 0, height: '60px', display: 'flex', background: '#fff', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)', zIndex: 1000 },
     mobileAddToCart: { flex: 1, background: '#fff', color: '#212121', border: 'none', fontWeight: '900', fontSize: '14px', cursor: 'pointer' },
     mobileBuyNow: { flex: 1, background: '#fb641b', color: '#fff', border: 'none', fontWeight: '900', fontSize: '14px', cursor: 'pointer' },
-    disabledBtn: { flex: 1, background: '#f1f3f6', color: '#878787', border: '1px solid #e0e0e0', fontWeight: '900', cursor: 'not-allowed' },
-
+    disabledBtn: { flex: 1, background: '#f1f3f6', color: '#878787', border: '1px solid #e0e0e0', fontWeight: '900', cursor: 'not-allowed', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', padding: '16px' },
     detailsColumn: { padding: '0 10px' },
     breadcrumb: { fontSize: '11px', color: '#878787', marginBottom: '8px' },
     titleText: { fontSize: '18px', color: '#212121', margin: '0 0 8px 0', fontWeight: '400', lineHeight: '1.4' },

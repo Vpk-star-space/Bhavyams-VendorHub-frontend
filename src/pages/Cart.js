@@ -22,7 +22,7 @@ const Cart = () => {
     const totalCartItems = cart.reduce((total, item) => total + (item.quantity || 1), 0);
     const subtotal = cart.reduce((total, item) => total + (Number(item.price) * (item.quantity || 1)), 0);
     const discount = Math.round(subtotal * 0.1); 
-    const delivery = (subtotal * 0); // 🚀 Kept your custom logic!
+    const delivery = (subtotal * 0); // Free delivery logic
     const total = subtotal - discount + delivery;
 
     // 🚀 FIX: Prevent checkout if an item exceeds stock
@@ -58,13 +58,14 @@ const Cart = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
+            // 🔥 CRITICAL FIX: Sending `finalTotal: total` so Backend knows about the discount!
             const { data: orderData } = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/orders/checkout', 
-                { cartItems: cart }, { headers: { Authorization: `Bearer ${token}` } }
+                { cartItems: cart, finalTotal: total }, { headers: { Authorization: `Bearer ${token}` } }
             );
 
             const options = {
                 key: keyData.key, 
-                amount: orderData.razorpayOrder.amount,
+                amount: orderData.razorpayOrder.amount, // This will now correctly be 90!
                 currency: "INR",
                 name: "Bhavyams VendorHub",
                 description: "Secure Payment",
@@ -133,30 +134,23 @@ const Cart = () => {
                             </div>
 
                             {cart.map(item => {
-                                // 🚀 FIX: Bulletproof Image Loading
                                 const rawUrl = item.image_url || '';
                                 const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
                                 const imageSrc = cleanUrl 
                                     ? (cleanUrl.startsWith('http') ? cleanUrl : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`)
                                     : 'https://via.placeholder.com/80?text=No+Image';
 
-                                // 🚀 FIX: Calculate Stock Count
                                 const currentStock = item.stock_count ?? item.stock ?? 0;
                                 const isItemOutOfStock = item.quantity > currentStock;
 
                                 return (
                                     <div key={item.id} style={styles.itemCard}>
-                                        <img 
-                                            src={imageSrc} 
-                                            alt={item.name} 
-                                            style={styles.img} 
-                                            onError={(e) => { e.target.src = 'https://via.placeholder.com/80?text=No+Image'; }}
-                                        />
+                                        <img src={imageSrc} alt={item.name} style={styles.img} onError={(e) => { e.target.src = 'https://via.placeholder.com/80?text=No+Image'; }} />
                                         <div style={styles.details}>
                                             <div style={styles.itemName}>{item.name}</div>
                                             <div style={styles.itemPrice}>₹{item.price} <span style={{fontSize:'12px', color:'#878787'}}>x {item.quantity}</span></div>
                                             
-                                            {/* 🚀 FIX: SHOW STOCK IN CART */}
+                                            {/* 📦 STOCK WARNING */}
                                             <div style={{fontSize: '12px', fontWeight: 'bold', color: isItemOutOfStock ? '#ef4444' : '#26a541', marginTop: '4px'}}>
                                                 {currentStock > 0 ? `In Stock: ${currentStock}` : 'Out of Stock!'}
                                             </div>
@@ -194,7 +188,7 @@ const Cart = () => {
                             {!isMobile && (
                                 <div style={styles.placeOrderRow}>
                                     <button onClick={handleCheckout} disabled={isCheckingOut || hasOutofStock} style={styles.checkoutBtn}>
-                                        {isCheckingOut ? "PROCESSING..." : (hasOutofStock ? "ITEM OUT OF STOCK" : "PLACE ORDER")}
+                                        {isCheckingOut ? "PROCESSING..." : (hasOutofStock ? "OUT OF STOCK" : "PLACE ORDER")}
                                     </button>
                                 </div>
                             )}

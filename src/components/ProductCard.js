@@ -5,10 +5,12 @@ import { Zap } from 'lucide-react';
 const ProductCard = ({ product }) => {
     const navigate = useNavigate();
 
-    // 🚀 FIX 1: Smart Image Logic
-    const imageSrc = product.image_url?.startsWith('http') 
-        ? product.image_url 
-        : `https://bhavyams-vendorhub-backend.onrender.com${product.image_url}`;
+    // 🚀 FIX 1: Bulletproof Image Logic (Now matching Cart and Details perfectly!)
+    const rawUrl = product.image_url || '';
+    const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
+    const imageSrc = cleanUrl 
+        ? (cleanUrl.startsWith('http') ? cleanUrl : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`)
+        : 'https://via.placeholder.com/150?text=Bhavyams';
 
     // 🚀 FIX 2: Correct Naming & Out of Stock Logic
     const stockAvailable = Number(product.stock_count ?? product.stock ?? 0);
