@@ -12,18 +12,12 @@ const Home = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products');
+                // 🚀 FIX: Changed URL to '/api/products/all' to match your backend!
+                const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/all');
                 
-                // 🛡️ CRITICAL FIX: Safely parse the backend data
-                let fetchedData = res.data;
-                if (res.data && res.data.products) {
-                    fetchedData = res.data.products;
-                } else if (res.data && res.data.data) {
-                    fetchedData = res.data.data;
-                }
-                
-                // Ensure it is an array before setting
-                setProducts(Array.isArray(fetchedData) ? fetchedData : []);
+                // 🚀 FIX: Your backend sends { products: [...] }, so we extract it safely
+                const fetchedData = res.data?.products || [];
+                setProducts(fetchedData);
                 
             } catch (err) {
                 console.error("Error fetching products:", err);
@@ -84,7 +78,7 @@ const Home = () => {
                     </div>
 
                     {products.length === 0 ? (
-                        <div style={styles.emptyState}>No products available.</div>
+                        <div style={styles.emptyState}>No products available right now.</div>
                     ) : (
                         <div style={styles.productGrid}>
                             {products.map(product => (
