@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import ProductCard from '../components/ProductCard'; // Make sure this path matches your folder structure!
+import ProductCard from '../components/ProductCard'; 
 import { Loader2, PackageX } from 'lucide-react';
 
 const Home = () => {
@@ -10,15 +10,18 @@ const Home = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                // Fetching all products from your Render backend
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products');
                 
-                // 🛡️ CRASH PROTECTION: Ensure we always set an array
-                if (Array.isArray(res.data)) {
-                    setProducts(res.data);
-                } else {
-                    setProducts([]);
-                }
+                // 🔍 DEBUG LOG: Look at your browser console (F12) to see what the backend sends!
+                console.log("Raw Backend Data:", res.data);
+
+                // 🛡️ FLEXIBLE DATA SETTER
+                // This checks if the products are directly in res.data OR inside res.data.products
+                const fetchedProducts = Array.isArray(res.data) 
+                    ? res.data 
+                    : (res.data.products || res.data.data || []);
+                
+                setProducts(fetchedProducts);
             } catch (err) {
                 console.error("Error fetching products:", err);
                 setProducts([]);
@@ -51,13 +54,16 @@ const Home = () => {
 
             {/* 🛍️ PRODUCT GRID SECTION */}
             <div style={styles.container}>
-                <h2 style={styles.sectionHeading}>Featured Products</h2>
+                <div style={styles.headerRow}>
+                    <h2 style={styles.sectionHeading}>Featured Products</h2>
+                    <span style={styles.countBadge}>{products.length} Items Found</span>
+                </div>
                 
                 {products.length === 0 ? (
                     <div style={styles.emptyState}>
                         <PackageX size={64} color="#cbd5e1" />
-                        <h3 style={{ marginTop: '15px', color: '#475569' }}>No products available right now.</h3>
-                        <p style={{ color: '#878787', fontSize: '14px' }}>Vendors are adding new stock soon!</p>
+                        <h3 style={{ marginTop: '15px', color: '#475569' }}>No products available.</h3>
+                        <p style={{ color: '#878787', fontSize: '14px' }}>Check back soon for new inventory!</p>
                     </div>
                 ) : (
                     <div style={styles.grid}>
@@ -72,75 +78,19 @@ const Home = () => {
 };
 
 const styles = {
-    page: { 
-        background: '#f1f3f6', 
-        minHeight: '100vh', 
-        fontFamily: 'Roboto, Arial, sans-serif',
-        paddingBottom: '40px'
-    },
-    banner: {
-        background: 'linear-gradient(90deg, #2874f0 0%, #0053c0 100%)',
-        color: '#fff',
-        padding: '40px 20px',
-        textAlign: 'center',
-        marginBottom: '20px'
-    },
-    bannerContent: {
-        maxWidth: '1200px',
-        margin: '0 auto'
-    },
-    bannerTitle: {
-        margin: '0 0 10px 0',
-        fontSize: '28px',
-        fontWeight: 'bold'
-    },
-    bannerSub: {
-        margin: 0,
-        fontSize: '16px',
-        opacity: 0.9
-    },
-    container: { 
-        maxWidth: '1240px', 
-        margin: '0 auto', 
-        padding: '0 15px' 
-    },
-    sectionHeading: {
-        fontSize: '20px',
-        fontWeight: 'bold',
-        color: '#212121',
-        marginBottom: '20px',
-        borderBottom: '2px solid #e0e0e0',
-        paddingBottom: '10px'
-    },
-    grid: { 
-        display: 'grid', 
-        // 📱 Responsive Grid: 2 items on mobile, up to 5 on large screens
-        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', 
-        gap: '16px' 
-    },
-    loaderContainer: { 
-        display: 'flex', 
-        flexDirection: 'column', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '80vh', 
-        background: '#f1f3f6' 
-    },
-    loaderText: { 
-        marginTop: '15px', 
-        color: '#2874f0', 
-        fontWeight: 'bold' 
-    },
-    emptyState: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#fff',
-        padding: '60px 20px',
-        borderRadius: '8px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-    }
+    page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: 'Roboto, Arial, sans-serif', paddingBottom: '40px' },
+    banner: { background: 'linear-gradient(90deg, #2874f0 0%, #0053c0 100%)', color: '#fff', padding: '40px 20px', textAlign: 'center', marginBottom: '20px' },
+    bannerContent: { maxWidth: '1200px', margin: '0 auto' },
+    bannerTitle: { margin: '0 0 10px 0', fontSize: '28px', fontWeight: 'bold' },
+    bannerSub: { margin: 0, fontSize: '16px', opacity: 0.9 },
+    container: { maxWidth: '1240px', margin: '0 auto', padding: '0 15px' },
+    headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #e0e0e0', paddingBottom: '10px' },
+    sectionHeading: { fontSize: '20px', fontWeight: 'bold', color: '#212121', margin: 0 },
+    countBadge: { background: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', color: '#2874f0', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' },
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' },
+    loaderContainer: { display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '80vh', background: '#f1f3f6' },
+    loaderText: { marginTop: '15px', color: '#2874f0', fontWeight: 'bold' },
+    emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff', padding: '60px 20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }
 };
 
 export default Home;
