@@ -110,9 +110,8 @@ const AddProduct = () => {
                     <div style={styles.inputGroup}>
                         <Clock size={18} color="#64748b"/>
                         <select name="delivery_minutes" onChange={handleChange} style={styles.select}>
-                            <option value="30">30 Mins Delivery</option>
-                            <option value="60">1 Hour Delivery</option>
-                            <option value="1440">1 Day Delivery</option>
+                            <option value="">6 Mins Delivery</option>
+                           
                         </select>
                     </div>
 
