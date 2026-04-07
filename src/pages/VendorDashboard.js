@@ -27,7 +27,11 @@ const VendorDashboard = () => {
             const productsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/my-products', {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setProducts(productsRes.data);
+            
+            // 🛡️ CRASH PROTECTION: Ensure it's an array
+            const fetchedProducts = Array.isArray(productsRes.data) ? productsRes.data : [];
+            setProducts(fetchedProducts);
+            
         } catch (err) {
             console.error("Dashboard Stats Error:", err);
         } finally {
@@ -41,7 +45,6 @@ const VendorDashboard = () => {
 
     const handleUpdateStock = async (product) => {
         try {
-            // 🚀 FIX: The backend SQL needs ALL these fields or it fails silently!
             await axios.put(
                 `https://bhavyams-vendorhub-backend.onrender.com/api/products/update/${product.id}`,
                 { 
@@ -90,51 +93,72 @@ const VendorDashboard = () => {
 
             <div style={styles.inventorySection}>
                 <h3 style={styles.subTitle}>Manage Inventory</h3>
+                {/* 🚀 CRITICAL FIX: Changed overflow to 'auto' so it scrolls horizontally on mobile! */}
                 <div style={styles.tableWrapper}>
                     <table style={styles.table}>
                         <thead>
                             <tr style={styles.thr}>
+                                <th style={styles.th}>Image</th>
                                 <th style={styles.th}>Product</th>
                                 <th style={styles.th}>Current Stock</th>
                                 <th style={styles.th}>Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {products.map(prod => {
-                                const currentStock = prod.stock_count ?? prod.stock ?? 0;
-                                return (
-                                    <tr key={prod.id} style={styles.tr}>
-                                        <td style={styles.td}>{prod.name}</td>
-                                        <td style={styles.td}>
-                                            {editingId === prod.id ? (
-                                                <input 
-                                                    type="number" 
-                                                    value={editStock} 
-                                                    onChange={(e) => setEditStock(e.target.value)}
-                                                    style={styles.stockInput}
-                                                    autoFocus
-                                                />
-                                            ) : (
-                                                <span style={{color: currentStock < 5 ? 'red' : 'inherit', fontWeight: 'bold'}}>
-                                                    {currentStock}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td style={styles.td}>
-                                            {editingId === prod.id ? (
-                                                <div style={{display:'flex', gap:'5px'}}>
-                                                    <button onClick={() => handleUpdateStock(prod)} style={styles.saveBtn}><Save size={14}/></button>
-                                                    <button onClick={() => setEditingId(null)} style={styles.cancelBtn}><X size={14}/></button>
+                            {products.length === 0 ? (
+                                <tr><td colSpan="4" style={{textAlign:'center', padding:'20px'}}>No products found.</td></tr>
+                            ) : (
+                                products.map(prod => {
+                                    const currentStock = prod.stock_count ?? prod.stock ?? 0;
+                                    
+                                    // 🖼️ FIX: Safe Image Loading
+                                    const rawUrl = prod.image_url || '';
+                                    const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
+                                    const imageSrc = cleanUrl 
+                                        ? (cleanUrl.startsWith('http') ? cleanUrl : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`)
+                                        : 'https://via.placeholder.com/80?text=No+Image';
+
+                                    return (
+                                        <tr key={prod.id} style={styles.tr}>
+                                            <td style={styles.td}>
+                                                <img src={imageSrc} alt="product" style={{width: '40px', height: '40px', objectFit: 'contain', borderRadius: '4px'}} onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=Img'; }} />
+                                            </td>
+                                            <td style={styles.td}>
+                                                <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
+                                                    {prod.name}
                                                 </div>
-                                            ) : (
-                                                <button onClick={() => { setEditingId(prod.id); setEditStock(currentStock); }} style={styles.editBtn}>
-                                                    <Edit3 size={14}/> Edit Stock
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                                            </td>
+                                            <td style={styles.td}>
+                                                {editingId === prod.id ? (
+                                                    <input 
+                                                        type="number" 
+                                                        value={editStock} 
+                                                        onChange={(e) => setEditStock(e.target.value)}
+                                                        style={styles.stockInput}
+                                                        autoFocus
+                                                    />
+                                                ) : (
+                                                    <span style={{color: currentStock < 5 ? 'red' : 'inherit', fontWeight: 'bold'}}>
+                                                        {currentStock}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td style={styles.td}>
+                                                {editingId === prod.id ? (
+                                                    <div style={{display:'flex', gap:'5px'}}>
+                                                        <button onClick={() => handleUpdateStock(prod)} style={styles.saveBtn}><Save size={14}/></button>
+                                                        <button onClick={() => setEditingId(null)} style={styles.cancelBtn}><X size={14}/></button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => { setEditingId(prod.id); setEditStock(currentStock); }} style={styles.editBtn}>
+                                                        <Edit3 size={14}/> Edit
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -144,7 +168,7 @@ const VendorDashboard = () => {
 };
 
 const styles = {
-    container: { padding: '15px' },
+    container: { padding: '15px', background: '#f8fafc', minHeight: '100vh' },
     headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
     title: { fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0 },
     subTitle: { fontSize: '18px', fontWeight: '800', margin: '30px 0 15px' },
@@ -155,13 +179,14 @@ const styles = {
     label: { fontSize: '11px', fontWeight: '800', color: '#64748b', margin: '0 0 5px', textTransform: 'uppercase' },
     value: { fontSize: '22px', fontWeight: '900', color: '#1e293b' },
     inventorySection: { marginTop: '20px' },
-    tableWrapper: { background: '#fff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #f1f5f9' },
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
+    // 🚀 CRITICAL FIX: overflowX 'auto' allows horizontal scrolling on mobile!
+    tableWrapper: { background: '#fff', borderRadius: '12px', overflowX: 'auto', border: '1px solid #f1f5f9', WebkitOverflowScrolling: 'touch' },
+    table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px', minWidth: '400px' },
     thr: { background: '#f8fafc' },
-    th: { textAlign: 'left', padding: '12px', color: '#64748b' },
-    td: { padding: '12px', borderTop: '1px solid #f1f5f9' },
+    th: { textAlign: 'left', padding: '12px', color: '#64748b', whiteSpace: 'nowrap' },
+    td: { padding: '12px', borderTop: '1px solid #f1f5f9', verticalAlign: 'middle' },
     stockInput: { width: '60px', padding: '4px', border: '1px solid #cbd5e1', borderRadius: '4px' },
-    editBtn: { background: '#f1f5f9', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' },
+    editBtn: { background: '#f1f5f9', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold' },
     saveBtn: { background: '#10b981', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px', cursor: 'pointer' },
     cancelBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px', cursor: 'pointer' },
     loader: { textAlign: 'center', padding: '40px', fontWeight: 'bold' }
