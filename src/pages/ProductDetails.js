@@ -16,26 +16,38 @@ const ProductDetails = () => {
     // 📸 GALLERY STATES
     const [mainImage, setMainImage] = useState('');
     const [gallery, setGallery] = useState([]);
-
-    useEffect(() => {
+useEffect(() => {
         const fetchProduct = async () => {
             try {
                 const res = await axios.get(`https://bhavyams-vendorhub-backend.onrender.com/api/products/${id}`);
                 const data = res.data;
                 setProduct(data);
 
-                // 🌐 Set initial main image (Smart Cloud Logic)
-                // 🌐 Set initial main image (Smart Cloud Logic)
-                const initialImg = data.image_url?.startsWith('http') 
-                    ? data.image_url 
-                    // 🚀 FIX: Point to the live Render Backend!
-                    : `https://bhavyams-vendorhub-backend.onrender.com${data.image_url}`;
+                // 🚀 FIX 1: Clean the URL (Remove quotes and backslashes)
+                const rawUrl = data.image_url || '';
+                const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
+
+                // 🚀 FIX 2: Set the correct full path
+                const initialImg = cleanUrl.startsWith('http') 
+                    ? cleanUrl 
+                    : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl}`;
+
+                // 🚀 FIX 3: CRITICAL - Update the state so the big image shows immediately!
+                setMainImage(initialImg);
 
                 // ☁️ Parse Gallery JSON from Database
                 if (data.gallery) {
                     try {
-                        const parsed = JSON.parse(data.gallery);
-                        setGallery(Array.isArray(parsed) ? parsed : [initialImg]);
+                        // Clean the gallery string before parsing
+                        const cleanGalleryStr = data.gallery.replace(/\\"/g, '"');
+                        const parsed = JSON.parse(cleanGalleryStr);
+                        
+                        // Clean each individual URL in the gallery array
+                        const cleanGallery = Array.isArray(parsed) 
+                            ? parsed.map(url => url.replace(/["\\]/g, ''))
+                            : [initialImg];
+                            
+                        setGallery(cleanGallery);
                     } catch (e) {
                         setGallery([initialImg]);
                     }
