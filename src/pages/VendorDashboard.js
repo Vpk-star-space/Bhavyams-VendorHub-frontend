@@ -12,11 +12,9 @@ const VendorDashboard = () => {
 
     const token = localStorage.getItem('token');
 
-    // 🚀 Wrapped in useCallback to prevent infinite refresh loops
     const fetchData = useCallback(async () => {
         if (!token) return;
         try {
-            // 1. Get Stats (Revenue, Orders, total products)
             const statsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/stats', {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -26,7 +24,6 @@ const VendorDashboard = () => {
                 products: statsRes.data.products || 0
             });
 
-            // 2. Get Product List for this vendor
             const productsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/my-products', {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -45,7 +42,6 @@ const VendorDashboard = () => {
 
     const handleUpdateStock = async (product) => {
         try {
-            // Sends update to: /api/products/update/:id
             await axios.put(
                 `https://bhavyams-vendorhub-backend.onrender.com/api/products/update/${product.id}`,
                 { 
@@ -56,7 +52,7 @@ const VendorDashboard = () => {
             );
             toast.success("Inventory Updated!");
             setEditingId(null);
-            fetchData(); // 🔄 Refresh everything
+            fetchData(); 
         } catch (err) {
             toast.error("Stock update failed");
         }
@@ -71,7 +67,6 @@ const VendorDashboard = () => {
                 <div style={styles.liveBadge}><TrendingUp size={14}/> LIVE STATS</div>
             </div>
             
-            {/* 📦 STATS SECTION */}
             <div style={styles.grid}>
                 <div style={{ ...styles.card, borderLeft: '5px solid #10b981' }}>
                     <div style={styles.iconCircle}><DollarSign color="#10b981" size={20}/></div>
@@ -92,13 +87,13 @@ const VendorDashboard = () => {
                 </div>
             </div>
 
-            {/* 🛠️ MANAGE PRODUCTS SECTION */}
             <div style={styles.inventorySection}>
                 <h3 style={styles.subTitle}>Manage Stock Levels</h3>
                 <div style={styles.tableWrapper}>
                     <table style={styles.table}>
                         <thead>
                             <tr style={styles.thr}>
+                                <th style={styles.th}>Image</th>
                                 <th style={styles.th}>Product Name</th>
                                 <th style={styles.th}>Stock Count</th>
                                 <th style={styles.th}>Action</th>
@@ -106,43 +101,57 @@ const VendorDashboard = () => {
                         </thead>
                         <tbody>
                             {products.length === 0 ? (
-                                <tr><td colSpan="3" style={{textAlign:'center', padding:'20px'}}>No products found.</td></tr>
+                                <tr><td colSpan="4" style={{textAlign:'center', padding:'20px'}}>No products found.</td></tr>
                             ) : (
-                                products.map(prod => (
-                                    <tr key={prod.id} style={styles.tr}>
-                                        <td style={styles.td}>{prod.name}</td>
-                                        <td style={styles.td}>
-                                            {editingId === prod.id ? (
-                                                <input 
-                                                    type="number" 
-                                                    value={editStock} 
-                                                    onChange={(e) => setEditStock(e.target.value)}
-                                                    style={styles.stockInput}
-                                                    autoFocus
-                                                />
-                                            ) : (
-                                                <span style={{
-                                                    color: Number(prod.stock_count) <= 0 ? '#ef4444' : 'inherit', 
-                                                    fontWeight: 'bold'
-                                                }}>
-                                                    {prod.stock_count} {Number(prod.stock_count) <= 0 && "(Out of Stock)"}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td style={styles.td}>
-                                            {editingId === prod.id ? (
-                                                <div style={{display:'flex', gap:'5px'}}>
-                                                    <button onClick={() => handleUpdateStock(prod)} style={styles.saveBtn}><Save size={14}/></button>
-                                                    <button onClick={() => setEditingId(null)} style={styles.cancelBtn}><X size={14}/></button>
-                                                </div>
-                                            ) : (
-                                                <button onClick={() => { setEditingId(prod.id); setEditStock(prod.stock_count); }} style={styles.editBtn}>
-                                                    <Edit3 size={14}/> Edit Stock
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))
+                                products.map(prod => {
+                                    // 🚀 FIX 1: Find the true stock number, regardless of what the database calls it
+                                    const currentStock = prod.stock_count ?? prod.stock ?? 0;
+                                    
+                                    // 🖼️ FIX 2: Added Image Rendering so you can see what you are editing
+                                    const rawUrl = prod.image_url || '';
+                                    const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
+                                    const imageSrc = cleanUrl.startsWith('http') 
+                                        ? cleanUrl : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
+
+                                    return (
+                                        <tr key={prod.id} style={styles.tr}>
+                                            <td style={styles.td}>
+                                                <img src={imageSrc} alt="product" style={{width: '40px', height: '40px', objectFit: 'contain', borderRadius: '4px'}} />
+                                            </td>
+                                            <td style={styles.td}>{prod.name}</td>
+                                            <td style={styles.td}>
+                                                {editingId === prod.id ? (
+                                                    <input 
+                                                        type="number" 
+                                                        value={editStock} 
+                                                        onChange={(e) => setEditStock(e.target.value)}
+                                                        style={styles.stockInput}
+                                                        autoFocus
+                                                    />
+                                                ) : (
+                                                    <span style={{
+                                                        color: Number(currentStock) <= 0 ? '#ef4444' : 'inherit', 
+                                                        fontWeight: 'bold'
+                                                    }}>
+                                                        {currentStock} {Number(currentStock) <= 0 && "(Out of Stock)"}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td style={styles.td}>
+                                                {editingId === prod.id ? (
+                                                    <div style={{display:'flex', gap:'5px'}}>
+                                                        <button onClick={() => handleUpdateStock(prod)} style={styles.saveBtn}><Save size={14}/></button>
+                                                        <button onClick={() => setEditingId(null)} style={styles.cancelBtn}><X size={14}/></button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => { setEditingId(prod.id); setEditStock(currentStock); }} style={styles.editBtn}>
+                                                        <Edit3 size={14}/> Edit
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
@@ -164,10 +173,10 @@ const styles = {
     label: { fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '5px' },
     value: { fontSize: '24px', fontWeight: '900', color: '#0f172a', margin: 0 },
     inventorySection: { marginTop: '10px' },
-    tableWrapper: { background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' },
+    tableWrapper: { background: '#fff', borderRadius: '12px', overflow: 'auto', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' },
     table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
     thr: { background: '#f8fafc' },
-    th: { textAlign: 'left', padding: '15px', color: '#475569', fontWeight: '700', borderBottom: '2px solid #f1f5f9' },
+    th: { textAlign: 'left', padding: '15px', color: '#475569', fontWeight: '700', borderBottom: '2px solid #f1f5f9', whiteSpace: 'nowrap' },
     td: { padding: '15px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle' },
     stockInput: { width: '70px', padding: '6px', borderRadius: '4px', border: '2px solid #2874f0', textAlign: 'center', fontWeight: 'bold' },
     editBtn: { background: '#f1f5f9', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold', color: '#475569' },
