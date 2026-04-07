@@ -10,7 +10,7 @@ const Cart = () => {
     const navigate = useNavigate();
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [orderPlaced, setOrderPlaced] = useState(false);
-    const [,setIsMobile] = useState(window.innerWidth < 768);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -32,12 +32,10 @@ const Cart = () => {
             const { data: freshUser } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            localStorage.setItem('user', JSON.stringify(freshUser));
 
             if (!freshUser.address || freshUser.address.length < 5) {
-                toast.error("Address missing!");
+                toast.error("Address missing in profile!");
                 navigate('/dashboard'); 
-                setIsCheckingOut(false);
                 return;
             }
 
@@ -53,7 +51,7 @@ const Cart = () => {
                 key: keyData.key, 
                 amount: orderData.razorpayOrder.amount,
                 currency: "INR",
-                name: "Bhavyams VendorHub",
+                name: "Bhavyams Hub",
                 order_id: orderData.razorpayOrder.id,
                 handler: async function (response) {
                     try {
@@ -66,7 +64,7 @@ const Cart = () => {
                             toast.success("Order Placed!");
                         }
                     } catch (err) {
-                        toast.error("Verification failed");
+                        toast.error("Payment verification failed");
                     }
                 },
                 prefill: { name: freshUser.username, email: freshUser.email },
@@ -74,7 +72,7 @@ const Cart = () => {
             };
             new window.Razorpay(options).open();
         } catch (err) { 
-            toast.error("Out of stock!"); 
+            toast.error(err.response?.data?.message || "Checkout error"); 
         } finally { 
             setIsCheckingOut(false); 
         }
@@ -83,9 +81,10 @@ const Cart = () => {
     if (orderPlaced) return (
         <div style={styles.successScreen}>
             <CheckCircle size={80} color="#26a541" />
-            <h1>Order Placed!</h1>
-            <div style={{display: 'flex', gap: '15px'}}>
-                <button onClick={() => navigate('/')} style={styles.shopNowBtn}>SHOP MORE</button>
+            <h1 style={{margin: '20px 0'}}>Success!</h1>
+            <p>Your order was placed successfully.</p>
+            <div style={{display: 'flex', gap: '15px', marginTop: '20px'}}>
+                <button onClick={() => navigate('/')} style={styles.shopNowBtn}>CONTINUE SHOPPING</button>
                 <button onClick={() => navigate('/dashboard')} style={styles.viewOrdersBtn}>VIEW ORDERS</button>
             </div>
         </div>
@@ -96,22 +95,22 @@ const Cart = () => {
             <header style={styles.fkHeader}>
                 <div style={styles.headerContent}>
                    <ArrowLeft size={20} onClick={() => navigate('/')} style={{cursor:'pointer'}} />
-                   <h2 style={{display: 'inline', marginLeft: '10px'}}>My Cart ({totalCartItems})</h2>
+                   <span style={{marginLeft: '15px', fontWeight: 'bold'}}>My Cart ({totalCartItems})</span>
                 </div>
             </header>
             <div style={styles.container}>
                 {cart.length === 0 ? (
                     <div style={styles.emptyCart}>
-                        <ShoppingBag size={80} />
-                        <h3>Empty Cart</h3>
+                        <ShoppingBag size={60} color="#ccc" />
+                        <p>Your cart is empty!</p>
                         <button onClick={() => navigate('/')} style={styles.shopNowBtn}>Shop Now</button>
                     </div>
                 ) : (
-                    <div style={styles.cartGrid}>
+                    <div style={isMobile ? styles.mobileCartGrid : styles.cartGrid}>
                         <div style={styles.itemColumn}>
                             {cart.map(item => (
                                 <div key={item.id} style={styles.itemCard}>
-                                    <div style={styles.details}>
+                                    <div>
                                         <div style={styles.itemName}>{item.name}</div>
                                         <div style={styles.itemPrice}>₹{item.price} x {item.quantity}</div>
                                         <button onClick={() => removeFromCart(item.id)} style={styles.removeBtn}>REMOVE</button>
@@ -123,12 +122,12 @@ const Cart = () => {
                             <div style={styles.priceCard}>
                                 <div style={styles.priceHeader}>PRICE DETAILS</div>
                                 <div style={styles.priceRow}>
-                                    <div>Total</div>
-                                    <div style={{fontWeight:'bold'}}>₹{total}</div>
+                                    <span>Total Amount</span>
+                                    <span style={{fontWeight:'bold'}}>₹{total}</span>
                                 </div>
                             </div>
                             <button onClick={handleCheckout} disabled={isCheckingOut} style={styles.checkoutBtn}>
-                                {isCheckingOut ? "WAIT..." : "PLACE ORDER"}
+                                {isCheckingOut ? "PLEASE WAIT..." : "PLACE ORDER"}
                             </button>
                         </div>
                     </div>
@@ -140,20 +139,24 @@ const Cart = () => {
 
 const styles = {
     page: { background: '#f1f3f6', minHeight: '100vh' },
-    fkHeader: { background: '#2874f0', color: '#fff', padding: '12px' },
-    headerContent: { maxWidth: '1200px', margin: '0 auto' },
+    fkHeader: { background: '#2874f0', color: '#fff', padding: '15px' },
+    headerContent: { maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center' },
     container: { maxWidth: '1200px', margin: '0 auto', padding: '10px' },
-    cartGrid: { display: 'grid', gridTemplateColumns: '1fr 350px', gap: '16px' },
-    itemColumn: { background: '#fff' },
+    cartGrid: { display: 'grid', gridTemplateColumns: '1fr 350px', gap: '15px' },
+    mobileCartGrid: { display: 'flex', flexDirection: 'column', gap: '15px' },
+    itemColumn: { background: '#fff', borderRadius: '4px' },
     itemCard: { padding: '15px', borderBottom: '1px solid #f0f0f0' },
+    itemName: { fontWeight: '500', fontSize: '15px' },
+    itemPrice: { margin: '5px 0', fontSize: '14px' },
+    removeBtn: { border: 'none', background: 'none', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer', padding: 0 },
+    priceCard: { background: '#fff', padding: '15px', borderRadius: '4px' },
+    priceHeader: { borderBottom: '1px solid #f0f0f0', paddingBottom: '10px', marginBottom: '10px', color: '#878787', fontWeight: 'bold' },
+    priceRow: { display: 'flex', justifyContent: 'space-between' },
     checkoutBtn: { background: '#fb641b', color: '#fff', border: 'none', padding: '12px', width: '100%', fontWeight: 'bold', marginTop: '10px', cursor: 'pointer' },
     successScreen: { textAlign: 'center', padding: '100px 20px', background: '#fff', minHeight: '100vh' },
-    shopNowBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '10px 30px', cursor: 'pointer' },
-    viewOrdersBtn: { background: '#fff', color: '#2874f0', border: '1px solid #2874f0', padding: '10px 30px', cursor: 'pointer' },
-    priceCard: { background: '#fff', padding: '15px' },
-    priceHeader: { borderBottom: '1px solid #f0f0f0', paddingBottom: '10px', marginBottom: '10px' },
-    priceRow: { display: 'flex', justifyContent: 'space-between' },
-    emptyCart: { textAlign: 'center', padding: '50px' }
+    shopNowBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '10px 25px', borderRadius: '2px', cursor: 'pointer', marginTop: '10px' },
+    viewOrdersBtn: { background: '#fff', color: '#2874f0', border: '1px solid #2874f0', padding: '10px 25px', borderRadius: '2px', cursor: 'pointer', marginTop: '10px' },
+    emptyCart: { textAlign: 'center', background: '#fff', padding: '50px', borderRadius: '4px' }
 };
 
 export default Cart;

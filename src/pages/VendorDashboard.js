@@ -12,8 +12,9 @@ const VendorDashboard = () => {
 
     const token = localStorage.getItem('token');
 
-    // 🚀 Wrapped in useCallback so it doesn't cause loops
+    // ✅ Define fetchData first so it's available everywhere
     const fetchData = useCallback(async () => {
+        if (!token) return;
         try {
             const statsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/stats', {
                 headers: { Authorization: `Bearer ${token}` }
@@ -35,11 +36,16 @@ const VendorDashboard = () => {
         }
     }, [token]);
 
+    // ✅ Run once on load
     useEffect(() => {
         fetchData();
-    }, [fetchData]); // ✅ Fixed: Added proper dependency
+    }, [fetchData]);
 
     const handleUpdateStock = async (product) => {
+        if (!editStock || isNaN(editStock)) {
+            toast.warning("Please enter a valid number");
+            return;
+        }
         try {
             await axios.put(
                 `https://bhavyams-vendorhub-backend.onrender.com/api/products/update/${product.id}`,
@@ -51,13 +57,13 @@ const VendorDashboard = () => {
             );
             toast.success("Stock updated!");
             setEditingId(null);
-            fetchData(); 
+            fetchData(); // 🔄 Refresh stats and list
         } catch (err) {
-            toast.error("Failed to update stock");
+            toast.error("Update failed");
         }
     };
 
-    if (loading) return <div style={styles.loader}>Fetching your business stats...</div>;
+    if (loading) return <div style={styles.loader}>Loading Business Stats...</div>;
 
     return (
         <div style={styles.container}>
@@ -91,7 +97,7 @@ const VendorDashboard = () => {
                         <thead>
                             <tr style={styles.thr}>
                                 <th style={styles.th}>Product</th>
-                                <th style={styles.th}>Current Stock</th>
+                                <th style={styles.th}>Stock</th>
                                 <th style={styles.th}>Action</th>
                             </tr>
                         </thead>
@@ -121,7 +127,7 @@ const VendorDashboard = () => {
                                             </div>
                                         ) : (
                                             <button onClick={() => { setEditingId(prod.id); setEditStock(prod.stock_count); }} style={styles.editBtn}>
-                                                <Edit3 size={14}/> Edit Stock
+                                                <Edit3 size={14}/> Edit
                                             </button>
                                         )}
                                     </td>
@@ -138,24 +144,24 @@ const VendorDashboard = () => {
 const styles = {
     container: { padding: '15px' },
     headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-    title: { fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0 },
+    title: { fontSize: '20px', fontWeight: '900', color: '#0f172a' },
     subTitle: { fontSize: '18px', fontWeight: '800', margin: '30px 0 15px' },
     liveBadge: { background: '#dcfce7', color: '#166534', padding: '4px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '5px' },
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' },
     card: { background: '#fff', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', alignItems: 'center' },
     iconCircle: { background: '#f8fafc', padding: '10px', borderRadius: '50%', marginBottom: '10px' },
-    label: { fontSize: '11px', fontWeight: '800', color: '#64748b', margin: '0 0 5px', textTransform: 'uppercase' },
+    label: { fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' },
     value: { fontSize: '22px', fontWeight: '900', color: '#1e293b' },
     inventorySection: { marginTop: '20px' },
-    tableWrapper: { background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
-    table: { width: '100%', borderCollapse: 'collapse', fontSize: '14px' },
-    th: { textAlign: 'left', padding: '12px', background: '#f8fafc', color: '#64748b' },
-    td: { padding: '12px', borderTop: '1px solid #f1f5f9' },
-    stockInput: { width: '60px', padding: '4px', border: '1px solid #cbd5e1' },
-    editBtn: { background: '#f1f5f9', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer' },
-    saveBtn: { background: '#10b981', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px' },
-    cancelBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px' },
-    loader: { textAlign: 'center', padding: '40px' }
+    tableWrapper: { background: '#fff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #f1f5f9' },
+    table: { width: '100%', borderCollapse: 'collapse' },
+    th: { textAlign: 'left', padding: '12px', background: '#f8fafc', color: '#64748b', fontSize: '12px' },
+    td: { padding: '12px', borderTop: '1px solid #f1f5f9', fontSize: '13px' },
+    stockInput: { width: '60px', padding: '4px', border: '1px solid #cbd5e1', borderRadius: '4px' },
+    editBtn: { background: '#f1f5f9', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' },
+    saveBtn: { background: '#10b981', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px', cursor: 'pointer' },
+    cancelBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '6px', borderRadius: '4px', cursor: 'pointer' },
+    loader: { textAlign: 'center', padding: '50px', fontWeight: 'bold' }
 };
 
 export default VendorDashboard;
