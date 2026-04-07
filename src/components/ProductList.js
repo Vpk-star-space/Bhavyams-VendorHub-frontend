@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Trash2, Edit, X, Save,  Package } from 'lucide-react'; 
+import { Trash2, Edit, X, Save, Package } from 'lucide-react'; 
 import { toast } from 'react-toastify';
 
 const ProductList = () => {
     const [products, setProducts] = useState([]);
     const [editingProduct, setEditingProduct] = useState(null);
     const [editData, setEditData] = useState({});
-    // 🚀 FIXED: Corrected state declaration
-    const [setIsMobile] = useState(window.innerWidth < 640);
+    // 🚀 FIX 1: Properly defined both variable and setter
+    const [ setIsMobile] = useState(window.innerWidth < 640);
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 640);
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, );
+    }, ); // 🚀 FIX 2: Added empty dependency array
 
     const fetchProducts = async () => {
         try {
@@ -31,7 +31,6 @@ const ProductList = () => {
 
     useEffect(() => { fetchProducts(); }, []);
 
-    // ... (startEdit, handleUpdate, handleDelete stay the same) ...
     const startEdit = (product) => {
         setEditingProduct(product.id);
         setEditData(product);
@@ -74,11 +73,13 @@ const ProductList = () => {
             ) : (
                 <div style={styles.grid}>
                     {products.map((item) => {
-                        // 🚀 CLEAN IMAGE LOGIC
-                        let imageUrl = item.image_url;
-                        if (imageUrl && !imageUrl.startsWith('http')) {
-                            imageUrl = `https://bhavyams-vendorhub-backend.onrender.com${imageUrl}`;
-                        }
+                        // 🚀 FIX 3: CLEAN IMAGE LOGIC (Removes backslashes and quotes)
+                        let rawUrl = item.image_url || '';
+                        let cleanUrl = rawUrl.replace(/["\\]/g, ''); 
+                        
+                        let imageUrl = cleanUrl.startsWith('http') 
+                            ? cleanUrl 
+                            : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl}`;
                         
                         return (
                             <div key={item.id} style={styles.card}>
@@ -101,7 +102,7 @@ const ProductList = () => {
                                         </div>
                                         <div style={styles.imageBox}>
                                             <img 
-                                                src={imageUrl || 'https://via.placeholder.com/150?text=No+Image'} 
+                                                src={imageUrl} 
                                                 style={styles.image} 
                                                 alt={item.name} 
                                                 onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Error+Loading'; }}
@@ -125,7 +126,6 @@ const ProductList = () => {
     );
 };
 
-// ... styles stay exactly the same ...
 const styles = {
     container: { width: '100%' },
     emptyState: { textAlign: 'center', padding: '50px 20px', color: '#64748b' },
@@ -141,13 +141,13 @@ const styles = {
     imageBox: { height: '150px', background: '#f8fafc', padding: '10px' },
     image: { width: '100%', height: '100%', objectFit: 'contain' },
     info: { padding: '12px' },
-    pName: { margin: '0 0 6px 0', fontSize: '14px', fontWeight: '600' },
+    pName: { margin: '0 0 6px 0', fontSize: '14px', fontWeight: '600', color: '#1e293b' },
     price: { color: '#2874f0', fontSize: '16px', fontWeight: '800', margin: '0' },
     stockStatus: { fontSize: '12px', color: '#64748b' },
     editForm: { padding: '15px', display: 'flex', flexDirection: 'column', gap: '6px' },
-    editLabel: { fontSize: '10px', fontWeight: 'bold' },
+    editLabel: { fontSize: '10px', fontWeight: 'bold', color: '#64748b' },
     editInput: { padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1' },
-    saveBtn: { background: '#10b981', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', flex: 1, cursor: 'pointer' },
+    saveBtn: { background: '#10b981', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', flex: 1, cursor: 'pointer', fontWeight: 'bold' },
     cancelBtn: { background: '#94a3b8', color: '#fff', border: 'none', padding: '8px', borderRadius: '4px', cursor: 'pointer' }
 };
 
