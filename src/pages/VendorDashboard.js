@@ -89,7 +89,6 @@ const VendorDashboard = () => {
     return (
         <div style={styles.container}>
             
-            {/* 📦 STATS GRID (Matches your left side / top view) */}
             <div style={styles.grid}>
                 <div style={styles.statCard}>
                     <DollarSign color="#10b981" size={24} style={{marginBottom: '5px'}}/>
@@ -108,7 +107,6 @@ const VendorDashboard = () => {
                 </div>
             </div>
 
-            {/* 🛠️ PRODUCT CARDS (Matches your screenshot exactly) */}
             <div style={styles.inventorySection}>
                 {products.length === 0 ? (
                     <div style={styles.emptyState}>No products found. Add some!</div>
@@ -118,12 +116,10 @@ const VendorDashboard = () => {
                             const isEditing = editingId === prod.id;
                             const currentStock = prod.stock_count ?? prod.stock ?? 0;
                             
-                            // Safe Image logic
                             const rawUrl = prod.image_url || '';
                             const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
                             const imageSrc = cleanUrl.startsWith('http') ? cleanUrl : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
 
-                            // 🟢 EDIT MODE UI
                             if (isEditing) {
                                 return (
                                     <div key={prod.id} style={styles.productCard}>
@@ -165,12 +161,23 @@ const VendorDashboard = () => {
                                 );
                             }
 
-                            // 🔴 NORMAL VIEW UI (Matches your Screenshot!)
                             return (
                                 <div key={prod.id} style={styles.productCard}>
+                                    
+                                    {/* ✅ UPDATED BUTTONS */}
                                     <div style={styles.cardActions}>
-                                        <button onClick={() => handleEditClick(prod)} style={styles.blueBtn}><Edit3 size={16}/></button>
-                                        <button onClick={() => handleDeleteProduct(prod.id)} style={styles.redBtn}><Trash2 size={16}/></button>
+                                        <button onClick={() => handleEditClick(prod)} style={styles.blueBtn}>
+                                            <Edit3 size={16}/>
+                                        </button>
+
+                                        {/* NEW STOCK BUTTON */}
+                                        <button onClick={() => handleEditClick(prod)} style={styles.blueBtn}>
+                                            <Package size={16}/>
+                                        </button>
+
+                                        <button onClick={() => handleDeleteProduct(prod.id)} style={styles.redBtn}>
+                                            <Trash2 size={16}/>
+                                        </button>
                                     </div>
                                     
                                     <img src={imageSrc} alt={prod.name} style={styles.cardImage} onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=No+Image'; }} />
@@ -194,36 +201,26 @@ const VendorDashboard = () => {
 
 const styles = {
     container: { padding: '15px', background: '#f8fafc', minHeight: '100vh', fontFamily: 'Roboto, sans-serif' },
-    
-    // Stats Grid
     grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '15px', marginBottom: '20px' },
     statCard: { background: '#fff', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', border: '1px solid #f1f5f9' },
     statLabel: { fontSize: '10px', fontWeight: '800', color: '#64748b', margin: '5px 0', letterSpacing: '0.5px' },
     statValue: { fontSize: '20px', fontWeight: '900', color: '#1e293b', margin: 0 },
-    
-    // Product List Area
     inventorySection: { display: 'flex', flexDirection: 'column', gap: '15px' },
     cardList: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' },
-    
-    // Individual Product Card (Matching Screenshot)
     productCard: { background: '#fff', borderRadius: '12px', padding: '15px', position: 'relative', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' },
     cardActions: { position: 'absolute', top: '15px', right: '15px', display: 'flex', gap: '8px' },
     blueBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' },
     redBtn: { background: '#ef4444', color: '#fff', border: 'none', padding: '8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' },
-    
     cardImage: { width: '100%', height: '140px', objectFit: 'contain', marginBottom: '15px', marginTop: '30px' },
     cardDetails: { borderTop: '1px solid #f1f5f9', paddingTop: '10px' },
     cardTitle: { margin: '0 0 5px 0', fontSize: '16px', color: '#1e293b' },
     cardPrice: { margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#2874f0' },
-
-    // Edit Form Styles
     formGroup: { marginBottom: '12px' },
     label: { display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#64748b', marginBottom: '4px' },
     input: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none' },
     actionButtons: { display: 'flex', gap: '10px', marginTop: '15px' },
     saveBtn: { flex: 1, background: '#10b981', color: '#fff', border: 'none', padding: '10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' },
     cancelBtn: { background: '#94a3b8', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' },
-    
     emptyState: { textAlign: 'center', padding: '40px', color: '#94a3b8', fontWeight: 'bold' },
     loader: { textAlign: 'center', padding: '50px', fontWeight: 'bold', color: '#2874f0' }
 };
