@@ -1,27 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import ProductCard from '../components/ProductCard'; 
-import { Loader2, PackageX } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import ProductCard from '../components/ProductCard';
 
 const Home = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchProducts = async () => {
             try {
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products');
                 
-                // 🔍 DEBUG LOG: Look at your browser console (F12) to see what the backend sends!
-                console.log("Raw Backend Data:", res.data);
-
-                // 🛡️ FLEXIBLE DATA SETTER
-                // This checks if the products are directly in res.data OR inside res.data.products
-                const fetchedProducts = Array.isArray(res.data) 
-                    ? res.data 
-                    : (res.data.products || res.data.data || []);
+                // 🛡️ CRITICAL FIX: Safely parse the backend data
+                let fetchedData = res.data;
+                if (res.data && res.data.products) {
+                    fetchedData = res.data.products;
+                } else if (res.data && res.data.data) {
+                    fetchedData = res.data.data;
+                }
                 
-                setProducts(fetchedProducts);
+                // Ensure it is an array before setting
+                setProducts(Array.isArray(fetchedData) ? fetchedData : []);
+                
             } catch (err) {
                 console.error("Error fetching products:", err);
                 setProducts([]);
@@ -29,68 +32,111 @@ const Home = () => {
                 setLoading(false);
             }
         };
-
         fetchProducts();
     }, []);
 
     if (loading) {
         return (
             <div style={styles.loaderContainer}>
-                <Loader2 size={40} color="#2874f0" className="animate-spin" />
-                <h3 style={styles.loaderText}>Loading Bhavyams Hub...</h3>
+                <div style={styles.spinner}></div>
+                <div style={styles.loaderText}>Loading Products...</div>
             </div>
         );
     }
 
     return (
         <div style={styles.page}>
-            {/* 🌟 BANNER SECTION */}
-            <div style={styles.banner}>
-                <div style={styles.bannerContent}>
-                    <h1 style={styles.bannerTitle}>Welcome to Bhavyams Hub</h1>
-                    <p style={styles.bannerSub}>Top quality products directly from verified vendors.</p>
+            {/* FLIPKART STYLE BLUE HEADER */}
+            <div style={styles.header}>
+                <div style={styles.headerContent}>
+                    <h1 style={styles.logoText} onClick={() => navigate('/')}>Bhavyams <span style={styles.hubText}>Hub</span></h1>
+                    <div style={styles.searchBar}>
+                        <input type="text" placeholder="Search for products, brands and more" style={styles.searchInput} />
+                    </div>
+                    <div style={styles.navActions}>
+                        <button style={styles.navBtn} onClick={() => navigate('/login')}>Login</button>
+                        <div style={styles.cartIcon} onClick={() => navigate('/cart')}>
+                            <ShoppingCart size={22} />
+                            <span style={styles.cartText}>Cart</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* 🛍️ PRODUCT GRID SECTION */}
-            <div style={styles.container}>
-                <div style={styles.headerRow}>
-                    <h2 style={styles.sectionHeading}>Featured Products</h2>
-                    <span style={styles.countBadge}>{products.length} Items Found</span>
+            {/* WHITE CATEGORY STRIP */}
+            <div style={styles.categoryStrip}>
+                <div style={styles.catContent}>
+                    <span style={styles.catItem}>Top Offers</span>
+                    <span style={styles.catItem}>Mobiles & Tablets</span>
+                    <span style={styles.catItem}>Electronics</span>
+                    <span style={styles.catItem}>TVs & Appliances</span>
+                    <span style={styles.catItem}>Fashion</span>
+                    <span style={styles.catItem}>Beauty</span>
                 </div>
-                
-                {products.length === 0 ? (
-                    <div style={styles.emptyState}>
-                        <PackageX size={64} color="#cbd5e1" />
-                        <h3 style={{ marginTop: '15px', color: '#475569' }}>No products available.</h3>
-                        <p style={{ color: '#878787', fontSize: '14px' }}>Check back soon for new inventory!</p>
+            </div>
+
+            {/* MAIN CONTENT AREA */}
+            <div style={styles.mainContainer}>
+                <div style={styles.productSection}>
+                    <div style={styles.sectionHeader}>
+                        <h2 style={styles.sectionTitle}>Best of Electronics</h2>
+                        <button style={styles.viewAllBtn}>VIEW ALL</button>
                     </div>
-                ) : (
-                    <div style={styles.grid}>
-                        {products.map(product => (
-                            <ProductCard key={product.id} product={product} />
-                        ))}
-                    </div>
-                )}
+
+                    {products.length === 0 ? (
+                        <div style={styles.emptyState}>No products available.</div>
+                    ) : (
+                        <div style={styles.productGrid}>
+                            {products.map(product => (
+                                <ProductCard key={product.id} product={product} />
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 };
 
 const styles = {
-    page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: 'Roboto, Arial, sans-serif', paddingBottom: '40px' },
-    banner: { background: 'linear-gradient(90deg, #2874f0 0%, #0053c0 100%)', color: '#fff', padding: '40px 20px', textAlign: 'center', marginBottom: '20px' },
-    bannerContent: { maxWidth: '1200px', margin: '0 auto' },
-    bannerTitle: { margin: '0 0 10px 0', fontSize: '28px', fontWeight: 'bold' },
-    bannerSub: { margin: 0, fontSize: '16px', opacity: 0.9 },
-    container: { maxWidth: '1240px', margin: '0 auto', padding: '0 15px' },
-    headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #e0e0e0', paddingBottom: '10px' },
-    sectionHeading: { fontSize: '20px', fontWeight: 'bold', color: '#212121', margin: 0 },
-    countBadge: { background: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold', color: '#2874f0', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' },
-    loaderContainer: { display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '80vh', background: '#f1f3f6' },
-    loaderText: { marginTop: '15px', color: '#2874f0', fontWeight: 'bold' },
-    emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff', padding: '60px 20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }
+    page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: 'Roboto, Arial, sans-serif' },
+    
+    // Header Styles
+    header: { background: '#2874f0', padding: '12px 0', position: 'sticky', top: 0, zIndex: 100 },
+    headerContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', gap: '20px' },
+    logoText: { color: '#fff', fontSize: '20px', fontStyle: 'italic', fontWeight: 'bold', margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', lineHeight: '1' },
+    hubText: { color: '#ffe500', fontSize: '12px', letterSpacing: '1px' },
+    
+    // Search Bar
+    searchBar: { flex: 1, maxWidth: '500px', display: 'flex' },
+    searchInput: { width: '100%', padding: '10px 15px', borderRadius: '2px', border: 'none', outline: 'none', fontSize: '14px', boxShadow: '0 2px 4px 0 rgba(0,0,0,.23)' },
+    
+    // Nav Actions
+    navActions: { display: 'flex', alignItems: 'center', gap: '30px' },
+    navBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '5px 40px', fontWeight: 'bold', fontSize: '15px', borderRadius: '2px', cursor: 'pointer' },
+    cartIcon: { color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    cartText: { fontSize: '15px' },
+
+    // Category Strip
+    categoryStrip: { background: '#fff', borderBottom: '1px solid #f0f0f0', padding: '10px 0', boxShadow: '0 1px 1px 0 rgba(0,0,0,.16)' },
+    catContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', padding: '0 20px', overflowX: 'auto', whiteSpace: 'nowrap' },
+    catItem: { fontSize: '14px', fontWeight: '500', color: '#212121', cursor: 'pointer', margin: '0 15px' },
+
+    // Main Content
+    mainContainer: { maxWidth: '1240px', margin: '15px auto', padding: '0 10px' },
+    productSection: { background: '#fff', padding: '15px', borderRadius: '2px', boxShadow: '0 2px 4px 0 rgba(0,0,0,.08)' },
+    sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f0f0f0', paddingBottom: '15px', marginBottom: '15px' },
+    sectionTitle: { margin: 0, fontSize: '22px', fontWeight: '500' },
+    viewAllBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 4px 0 rgba(0,0,0,.2)' },
+
+    // Grid
+    productGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '15px' },
+    
+    // States
+    emptyState: { padding: '40px', textAlign: 'center', color: '#878787', fontSize: '16px' },
+    loaderContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f1f3f6' },
+    spinner: { width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #2874f0', borderRadius: '50%', animation: 'spin 1s linear infinite' },
+    loaderText: { marginTop: '15px', fontWeight: 'bold', color: '#2874f0' }
 };
 
 export default Home;
