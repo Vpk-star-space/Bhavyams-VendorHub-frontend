@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { ShoppingCart, Search } from 'lucide-react';
+import { ShoppingCart, Search, User, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 
@@ -10,7 +10,11 @@ const Home = () => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const navigate = useNavigate();
 
-    // 📱 Handle screen resize for Mobile View
+    // 🚀 AUTH CHECK: See if user is logged in
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
+
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
         window.addEventListener('resize', handleResize);
@@ -20,22 +24,16 @@ const Home = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                // 🚀 FIX: Fetching from your specific backend route
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/all');
                 
-                console.log("Raw Backend Data:", res.data); // Check your F12 Console if it's empty!
-
-                // 🛡️ BULLETPROOF DATA EXTRACTION: Will find the array no matter what
+                // Bulletproof data extraction
                 if (res.data && Array.isArray(res.data.products)) {
                     setProducts(res.data.products);
                 } else if (Array.isArray(res.data)) {
                     setProducts(res.data);
-                } else if (res.data && Array.isArray(res.data.data)) {
-                    setProducts(res.data.data);
                 } else {
                     setProducts([]);
                 }
-                
             } catch (err) {
                 console.error("Error fetching products:", err);
                 setProducts([]);
@@ -45,6 +43,12 @@ const Home = () => {
         };
         fetchProducts();
     }, []);
+
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+    };
 
     if (loading) {
         return (
@@ -57,7 +61,7 @@ const Home = () => {
 
     return (
         <div style={styles.page}>
-            {/* 🔵 FLIPKART STYLE BLUE HEADER */}
+            {/* 🔵 BLUE HEADER */}
             <div style={styles.header}>
                 <div style={isMobile ? styles.mobileHeaderContent : styles.desktopHeaderContent}>
                     <h1 style={isMobile ? styles.mobileLogoText : styles.logoText} onClick={() => navigate('/')}>
@@ -67,20 +71,35 @@ const Home = () => {
                     <div style={isMobile ? styles.mobileSearchBar : styles.searchBar}>
                         <input 
                             type="text" 
-                            placeholder={isMobile ? "Search..." : "Search for products, brands and more"} 
+                            placeholder={isMobile ? "Search..." : "Search products, brands"} 
                             style={styles.searchInput} 
                         />
                         {isMobile && <Search size={18} color="#2874f0" style={{position: 'absolute', right: '8px'}} />}
                     </div>
 
                     <div style={isMobile ? styles.mobileNavActions : styles.navActions}>
-                        <button style={isMobile ? styles.mobileNavBtn : styles.navBtn} onClick={() => navigate('/login')}>
-                            Login
-                        </button>
+                        {/* 🚀 FIX: DYNAMIC LOGIN / PROFILE BUTTONS */}
+                        {token ? (
+                            <div style={{ display: 'flex', gap: isMobile ? '5px' : '15px' }}>
+                                <button 
+                                    style={isMobile ? styles.mobileNavBtn : styles.navBtn} 
+                                    onClick={() => navigate(user?.role === 'vendor' ? '/dashboard' : '/profile')}
+                                >
+                                    {isMobile ? <User size={16}/> : (user?.username || 'Profile')}
+                                </button>
+                                <button style={isMobile ? styles.mobileNavBtn : styles.navBtn} onClick={handleLogout}>
+                                    {isMobile ? <LogOut size={16}/> : 'Logout'}
+                                </button>
+                            </div>
+                        ) : (
+                            <button style={isMobile ? styles.mobileNavBtn : styles.navBtn} onClick={() => navigate('/login')}>
+                                Login
+                            </button>
+                        )}
+
                         <div style={styles.cartIcon} onClick={() => navigate('/cart')}>
                             <ShoppingCart size={isMobile ? 20 : 22} />
                             {!isMobile && <span style={styles.cartText}>Cart</span>}
-                            {isMobile && <span style={{fontSize: '12px', fontWeight: 'bold'}}>Cart</span>}
                         </div>
                     </div>
                 </div>
@@ -98,7 +117,7 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* 📦 MAIN CONTENT AREA */}
+            {/* 📦 MAIN CONTENT */}
             <div style={styles.mainContainer}>
                 <div style={styles.productSection}>
                     <div style={styles.sectionHeader}>
@@ -109,7 +128,6 @@ const Home = () => {
                     {products.length === 0 ? (
                         <div style={styles.emptyState}>No products available right now.</div>
                     ) : (
-                        // 📱 FIX: Uses 1 column on Mobile (like your screenshot), Grid on Desktop
                         <div style={isMobile ? styles.mobileProductGrid : styles.desktopProductGrid}>
                             {products.map(product => (
                                 <ProductCard key={product.id} product={product} />
@@ -124,47 +142,32 @@ const Home = () => {
 
 const styles = {
     page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: 'Roboto, Arial, sans-serif' },
-    
-    // --- Header Styles ---
     header: { background: '#2874f0', padding: '10px 0', position: 'sticky', top: 0, zIndex: 100 },
     desktopHeaderContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', gap: '20px' },
     mobileHeaderContent: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', gap: '10px' },
-    
     logoText: { color: '#fff', fontSize: '20px', fontStyle: 'italic', fontWeight: 'bold', margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', lineHeight: '1' },
     mobileLogoText: { color: '#fff', fontSize: '16px', fontStyle: 'italic', fontWeight: 'bold', margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', lineHeight: '1' },
     hubText: { color: '#ffe500', fontSize: '11px', letterSpacing: '1px' },
-    
-    // --- Search Bar ---
     searchBar: { flex: 1, maxWidth: '500px', display: 'flex' },
     mobileSearchBar: { flex: 1, display: 'flex', position: 'relative', alignItems: 'center' },
     searchInput: { width: '100%', padding: '8px 12px', borderRadius: '2px', border: 'none', outline: 'none', fontSize: '14px', boxShadow: '0 2px 4px 0 rgba(0,0,0,.23)' },
-    
-    // --- Nav Actions ---
     navActions: { display: 'flex', alignItems: 'center', gap: '30px' },
     mobileNavActions: { display: 'flex', alignItems: 'center', gap: '10px' },
-    navBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '5px 40px', fontWeight: 'bold', fontSize: '15px', borderRadius: '2px', cursor: 'pointer' },
-    mobileNavBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '4px 12px', fontWeight: 'bold', fontSize: '13px', borderRadius: '2px' },
+    navBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '6px 20px', fontWeight: 'bold', fontSize: '14px', borderRadius: '2px', cursor: 'pointer' },
+    mobileNavBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '4px 8px', fontWeight: 'bold', fontSize: '12px', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     cartIcon: { color: '#fff', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' },
     cartText: { fontSize: '15px', fontWeight: 'bold' },
-
-    // --- Category Strip ---
     categoryStrip: { background: '#fff', borderBottom: '1px solid #f0f0f0', padding: '10px 0', boxShadow: '0 1px 1px 0 rgba(0,0,0,.16)' },
     catContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', gap: '20px', padding: '0 15px', overflowX: 'auto', whiteSpace: 'nowrap', WebkitOverflowScrolling: 'touch' },
     catItem: { fontSize: '14px', fontWeight: '500', color: '#212121', cursor: 'pointer', paddingBottom: '8px' },
-
-    // --- Main Content ---
     mainContainer: { maxWidth: '1240px', margin: '10px auto', padding: '0 10px' },
     productSection: { background: '#fff', padding: '15px', borderRadius: '4px', boxShadow: '0 1px 2px 0 rgba(0,0,0,.1)' },
     sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f0f0f0', paddingBottom: '15px', marginBottom: '15px' },
     sectionTitle: { margin: 0, fontSize: '22px', fontWeight: '500' },
     mobileSectionTitle: { margin: 0, fontSize: '18px', fontWeight: '500' },
     viewAllBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
-
-    // --- Grid Layouts ---
     desktopProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '15px' },
-    mobileProductGrid: { display: 'flex', flexDirection: 'column', gap: '15px' }, // Matches the screenshot exactly!
-    
-    // --- Loading & Empty States ---
+    mobileProductGrid: { display: 'flex', flexDirection: 'column', gap: '15px' },
     emptyState: { padding: '40px', textAlign: 'center', color: '#878787', fontSize: '16px' },
     loaderContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f1f3f6' },
     spinner: { width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #2874f0', borderRadius: '50%', animation: 'spin 1s linear infinite' },
