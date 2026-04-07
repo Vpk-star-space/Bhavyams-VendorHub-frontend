@@ -50,8 +50,8 @@ const OrderStatus = ({ order, role }) => {
                     <h4 style={styles.orderTitle}>Order #{order.order_id || order.id}</h4>
                     <div style={styles.orderSub}>
                         {order.product_name || "Bhavyams Product"}
-                        {role === 'admin' && ` | Customer: ${order.customer_name}`}
-                        {role === 'vendor' && ` | Revenue: ₹${order.total_price}`}
+                        {role?.toLowerCase() === 'admin' && ` | Customer: ${order.customer_name}`}
+                        {role?.toLowerCase() === 'vendor' && ` | Revenue: ₹${order.total_price}`}
                     </div>
                 </div>
                 <span style={isDelivered ? styles.badgeSuccess : styles.badgeInfo}>
@@ -63,7 +63,7 @@ const OrderStatus = ({ order, role }) => {
                     transition={{ duration: 1.2 }} style={{ background: isDelivered ? '#10b981' : '#2874f0', height: '100%', borderRadius: '8px' }}
                 />
             </div>
-            {isDelivered && role === 'customer' && (
+            {isDelivered && role?.toLowerCase() === 'customer' && (
                 <div style={{marginTop: '15px'}}>
                     <AnimatePresence mode="wait">
                         {isReviewed ? (
@@ -96,7 +96,8 @@ const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [adminView, setAdminView] = useState('stats'); 
     const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')));
-    const [ordersList] = useState([]);
+    // 🚀 FIX: Added setter for ordersList
+    const [ordersList, setOrdersList] = useState([]);
     const [vendorStats, setVendorStats] = useState({ revenue: 0, orders: 0, products: 0 });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
     const navigate = useNavigate();
@@ -106,33 +107,43 @@ const Dashboard = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
-useEffect(() => {
-    const fetchData = async () => {
-        const token = localStorage.getItem('token');
-        if (!token) return navigate('/login');
-        
-        const headers = { Authorization: `Bearer ${token}` };
 
-        try {
-            // 1. Sync User Info
-            const userRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', { headers });
-            setCurrentUser(userRes.data);
+    useEffect(() => {
+        const fetchData = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) return navigate('/login');
+            
+            const headers = { Authorization: `Bearer ${token}` };
 
-            // 2. Fetch Vendor Stats only if role is vendor
-            if (userRes.data.role === 'vendor') {
-                const statsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/stats', { headers });
-                setVendorStats(statsRes.data);
+            try {
+                // 1. Sync User Info
+                const userRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', { headers });
+                const user = userRes.data;
+                setCurrentUser(user);
+
+                // 🚀 2. Fetch Orders/Sales based on role
+                const ordersUrl = user.role?.toLowerCase() === 'vendor' 
+                    ? 'https://bhavyams-vendorhub-backend.onrender.com/api/orders/my-sales' 
+                    : 'https://bhavyams-vendorhub-backend.onrender.com/api/orders/my-orders';
+                
+                const ordersRes = await axios.get(ordersUrl, { headers });
+                setOrdersList(ordersRes.data);
+
+                // 3. Fetch Vendor Stats
+                if (user.role?.toLowerCase() === 'vendor') {
+                    const statsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/stats', { headers });
+                    setVendorStats(statsRes.data);
+                }
+            } catch (err) { 
+                console.error("Dashboard error:", err);
+                if (err.response?.status === 401) {
+                    localStorage.clear();
+                    navigate('/login');
+                }
             }
-        } catch (err) { 
-            console.error("Dashboard error:", err);
-            if (err.response?.status === 401) {
-                localStorage.clear();
-                navigate('/login');
-            }
-        }
-    };
-    fetchData();
-}, [activeTab, navigate]);
+        };
+        fetchData();
+    }, [activeTab, navigate]);
 
     const handleLogout = () => { localStorage.clear(); navigate('/login'); };
 
@@ -144,62 +155,59 @@ useEffect(() => {
                     <nav style={styles.nav}>
                         <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.activeNavItem : styles.navItem}><Home size={20}/> Home</div>
                         <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.activeNavItem : styles.navItem}><User size={20}/> Profile</div>
-                        {currentUser?.role === 'customer' && <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><History size={20}/> Orders</div>}
-                        {currentUser?.role === 'vendor' && (
+                        
+                        {currentUser?.role?.toLowerCase() === 'customer' && <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><History size={20}/> Orders</div>}
+                        
+                        {currentUser?.role?.toLowerCase() === 'vendor' && (
                             <>
                                 <div style={styles.navSectionHeader}>VENDOR</div>
                                 <div onClick={() => navigate('/add-product')} style={styles.navItem}><PlusCircle size={20}/> Add Item</div>
                                 <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><ShoppingBag size={20}/> Sales</div>
                             </>
                         )}
-                       {/* 🚀 Change this line */}
-{currentUser?.role?.toLowerCase() === 'admin' && (
-    <>
-        <div style={styles.navSectionHeader}>ADMIN</div>
-        <div onClick={() => setActiveTab('admin')} style={activeTab === 'admin' ? styles.activeNavItem : styles.navItem}>
-            <Shield size={20}/> Control
-        </div>
-        <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}>
-            <ListOrdered size={20}/> Master
-        </div>
-    </>
-)}
+
+                        {currentUser?.role?.toLowerCase() === 'admin' && (
+                            <>
+                                <div style={styles.navSectionHeader}>ADMIN</div>
+                                <div onClick={() => setActiveTab('admin')} style={activeTab === 'admin' ? styles.activeNavItem : styles.navItem}>
+                                    <Shield size={20}/> Control
+                                </div>
+                                <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}>
+                                    <ListOrdered size={20}/> Master
+                                </div>
+                            </>
+                        )}
                     </nav>
                     <button onClick={handleLogout} style={styles.logoutBtn}><LogOut size={18}/> LOGOUT</button>
                 </aside>
             )}
-{/* 📱 MOBILE BOTTOM NAV */}
-{isMobile && (
-    <div style={styles.mobileBottomNav}>
-        <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.mobileActiveTab : styles.mobileTab}>
-            <Home size={22}/>
-        </div>
-        
-        {/* 🚀 FIX: Show "Orders" for everyone, but "Add Product" only for Vendors */}
-        <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.mobileActiveTab : styles.mobileTab}>
-            <ShoppingBag size={22}/>
-        </div>
 
-        {/* ➕ ADD THIS SECTION SPECIFICALLY FOR VENDORS */}
-        {currentUser?.role?.toLowerCase() === 'vendor' && (
-            <div onClick={() => navigate('/add-product')} style={styles.mobileTab}>
-                <PlusCircle size={28} color="#fb641b" strokeWidth={3} />
-            </div>
-        )}
+            {isMobile && (
+                <div style={styles.mobileBottomNav}>
+                    <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.mobileActiveTab : styles.mobileTab}>
+                        <Home size={22}/>
+                    </div>
+                    <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.mobileActiveTab : styles.mobileTab}>
+                        <ShoppingBag size={22}/>
+                    </div>
+                    {currentUser?.role?.toLowerCase() === 'vendor' && (
+                        <div onClick={() => navigate('/add-product')} style={styles.mobileTab}>
+                            <PlusCircle size={28} color="#fb641b" strokeWidth={3} />
+                        </div>
+                    )}
+                    <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.mobileActiveTab : styles.mobileTab}>
+                        <User size={22}/>
+                    </div>
+                    <div onClick={handleLogout} style={styles.mobileTab}>
+                        <LogOut size={22} color="#e11d48"/>
+                    </div>
+                </div>
+            )}
 
-        <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.mobileActiveTab : styles.mobileTab}>
-            <User size={22}/>
-        </div>
-        
-        <div onClick={handleLogout} style={styles.mobileTab}>
-            <LogOut size={22} color="#e11d48"/>
-        </div>
-    </div>
-)}
             <main style={{...styles.main, marginLeft: isMobile ? 0 : '260px', paddingBottom: isMobile ? '80px' : '40px'}}>
                 <header style={styles.header}>
                     <div>
-                        <h2 style={styles.welcomeHeading}>Hi, {currentUser?.username.split(' ')[0]}</h2>
+                        <h2 style={styles.welcomeHeading}>Hi, {currentUser?.username?.split(' ')[0]}</h2>
                         <div style={styles.roleBadge}>{currentUser?.role?.toUpperCase()}</div>
                     </div>
                     <Store onClick={() => navigate('/')} size={24} color="#2874f0" style={{cursor: 'pointer'}}/>
@@ -209,16 +217,15 @@ useEffect(() => {
                     <AnimatePresence mode="wait">
                         <motion.div key={activeTab + adminView} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                             
-                            {/* TAB 1: OVERVIEW (Dynamic based on role) */}
                             {activeTab === 'overview' && (
-                                currentUser?.role === 'vendor' ? (
+                                currentUser?.role?.toLowerCase() === 'vendor' ? (
                                     <div style={styles.vendorStatsGrid}>
                                         <div style={styles.statCard}><IndianRupee size={20} color="#10b981"/><div style={styles.statLabel}>Revenue</div><div style={styles.statValue}>₹{vendorStats.revenue}</div></div>
                                         <div style={styles.statCard}><ShoppingBag size={20} color="#2874f0"/><div style={styles.statLabel}>Orders</div><div style={styles.statValue}>{vendorStats.orders}</div></div>
                                         <div style={styles.statCard}><Package size={20} color="#f59e0b"/><div style={styles.statLabel}>Inventory</div><div style={styles.statValue}>{vendorStats.products}</div></div>
                                         <div style={{gridColumn: isMobile ? 'span 1' : 'span 3', marginTop: '20px'}}><ProductList /></div>
                                     </div>
-                                ) : currentUser?.role === 'admin' ? (
+                                ) : currentUser?.role?.toLowerCase() === 'admin' ? (
                                     <div style={styles.adminStatsGrid}>
                                         <div style={styles.statCard} onClick={() => {setActiveTab('admin'); setAdminView('users')}}><Users size={32} color="#2874f0"/><br/>USERS</div>
                                         <div style={styles.statCard} onClick={() => {setActiveTab('admin'); setAdminView('products')}}><Package size={32} color="#10b981"/><br/>PRODUCTS</div>
@@ -232,18 +239,15 @@ useEffect(() => {
                                 )
                             )}
 
-                            {/* TAB 2: PROFILE */}
                             {activeTab === 'profile' && <Profile />}
                             
-                            {/* TAB 3: ORDERS */}
                             {activeTab === 'orders' && (
                                 <div style={styles.ordersGrid}>
-                                    <h3 style={styles.sectionTitle}>{currentUser?.role === 'vendor' ? 'Sales History' : 'Your Orders'}</h3>
+                                    <h3 style={styles.sectionTitle}>{currentUser?.role?.toLowerCase() === 'vendor' ? 'Sales History' : 'Your Orders'}</h3>
                                     {ordersList.length === 0 ? <div style={styles.noData}>No records found.</div> : ordersList.map(o => <OrderStatus key={o.id} order={o} role={currentUser?.role} />)}
                                 </div>
                             )}
 
-                            {/* TAB 4: ADMIN CONTROLS */}
                             {activeTab === 'admin' && (
                                 <div>
                                     {adminView !== 'stats' && <button onClick={() => setAdminView('stats')} style={styles.backBtn}><ArrowLeft size={16}/> Back to Stats</button>}
