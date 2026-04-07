@@ -1,156 +1,146 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import ProductCard from '../components/ProductCard'; // Make sure this path matches your folder structure!
+import { Loader2, PackageX } from 'lucide-react';
 
-const ProductCard = ({ product }) => {
-    const navigate = useNavigate();
+const Home = () => {
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // 🚀 FIX 1: Bulletproof Image Logic (Same as Cart/Details)
-    const rawUrl = product.image_url || '';
-    const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
-    const imageSrc = cleanUrl 
-        ? (cleanUrl.startsWith('http') ? cleanUrl : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`)
-        : 'https://via.placeholder.com/150?text=Bhavyams';
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                // Fetching all products from your Render backend
+                const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products');
+                
+                // 🛡️ CRASH PROTECTION: Ensure we always set an array
+                if (Array.isArray(res.data)) {
+                    setProducts(res.data);
+                } else {
+                    setProducts([]);
+                }
+            } catch (err) {
+                console.error("Error fetching products:", err);
+                setProducts([]);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    // 🚀 FIX 2: Correct Naming & Out of Stock Logic
-    const stockAvailable = Number(product.stock_count ?? product.stock ?? 0);
-    const isOutOfStock = stockAvailable <= 0;
+        fetchProducts();
+    }, []);
+
+    if (loading) {
+        return (
+            <div style={styles.loaderContainer}>
+                <Loader2 size={40} color="#2874f0" className="animate-spin" />
+                <h3 style={styles.loaderText}>Loading Bhavyams Hub...</h3>
+            </div>
+        );
+    }
 
     return (
-        <div 
-            onClick={() => !isOutOfStock && navigate(`/product/${product.id}`)} 
-            style={{
-                ...styles.card,
-                cursor: isOutOfStock ? 'not-allowed' : 'pointer',
-                filter: isOutOfStock ? 'grayscale(0.8)' : 'none', // 🌑 Makes it look unavailable
-                opacity: isOutOfStock ? 0.8 : 1
-            }}
-        >
-            <div style={styles.imageContainer}>
-                <img 
-                    src={imageSrc} 
-                    alt={product.name} 
-                    style={styles.image} 
-                    onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Bhavyams'; }}
-                />
-                
-                {/* 🔴 RED OVERLAY FOR OUT OF STOCK */}
-                {isOutOfStock && (
-                    <div style={styles.soldOutOverlay}>
-                        <span style={styles.soldOutText}>OUT OF STOCK</span>
-                    </div>
-                )}
+        <div style={styles.page}>
+            {/* 🌟 BANNER SECTION */}
+            <div style={styles.banner}>
+                <div style={styles.bannerContent}>
+                    <h1 style={styles.bannerTitle}>Welcome to Bhavyams Hub</h1>
+                    <p style={styles.bannerSub}>Top quality products directly from verified vendors.</p>
+                </div>
             </div>
 
-            <div style={styles.info}>
-                <h3 style={{
-                    ...styles.name, 
-                    color: isOutOfStock ? '#878787' : '#212121'
-                }}>{product.name}</h3>
+            {/* 🛍️ PRODUCT GRID SECTION */}
+            <div style={styles.container}>
+                <h2 style={styles.sectionHeading}>Featured Products</h2>
                 
-                <div style={styles.ratingRow}>
-                    <div style={{
-                        ...styles.ratingBadge, 
-                        background: isOutOfStock ? '#9e9e9e' : '#388e3c'
-                    }}>4.2 ★</div>
-                    {!isOutOfStock && (
-                        <span style={styles.assuredText}><Zap size={10} fill="#2874f0"/> Assured</span>
-                    )}
-                </div>
-
-                <div style={styles.priceRow}>
-                    <span style={{
-                        ...styles.price, 
-                        color: isOutOfStock ? '#878787' : '#212121'
-                    }}>₹{Number(product.price).toLocaleString('en-IN')}</span>
-                    <span style={styles.originalPrice}>₹{Number(product.price * 1.2).toFixed(0)}</span>
-                </div>
-
-                {/* 📊 DYNAMIC STOCK TEXT */}
-                <p style={{
-                    ...styles.stock, 
-                    color: isOutOfStock ? '#ef4444' : (stockAvailable < 5 ? '#ff9f00' : '#388e3c'),
-                    fontWeight: stockAvailable < 5 ? 'bold' : 'normal'
-                }}>
-                    {isOutOfStock 
-                        ? "Temporarily Unavailable" 
-                        : (stockAvailable < 10 ? `Hurry, only ${stockAvailable} left!` : "In Stock")
-                    }
-                </p>
+                {products.length === 0 ? (
+                    <div style={styles.emptyState}>
+                        <PackageX size={64} color="#cbd5e1" />
+                        <h3 style={{ marginTop: '15px', color: '#475569' }}>No products available right now.</h3>
+                        <p style={{ color: '#878787', fontSize: '14px' }}>Vendors are adding new stock soon!</p>
+                    </div>
+                ) : (
+                    <div style={styles.grid}>
+                        {products.map(product => (
+                            <ProductCard key={product.id} product={product} />
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
 };
 
 const styles = {
-    card: { 
-        background: '#fff', 
-        borderRadius: '8px', 
-        overflow: 'hidden',
-        display: 'flex', 
-        flexDirection: 'column',
-        border: '1px solid #e2e8f0',
-        transition: 'all 0.2s ease-in-out',
-        height: '100%',
-        position: 'relative'
+    page: { 
+        background: '#f1f3f6', 
+        minHeight: '100vh', 
+        fontFamily: 'Roboto, Arial, sans-serif',
+        paddingBottom: '40px'
     },
-    imageContainer: {
-        position: 'relative',
-        height: '160px',
-        padding: '10px',
-        background: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden'
-    },
-    image: { 
-        maxWidth: '100%', 
-        maxHeight: '100%', 
-        objectFit: 'contain' 
-    },
-    soldOutOverlay: {
-        position: 'absolute',
-        inset: 0,
-        background: 'rgba(255, 255, 255, 0.6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 2
-    },
-    soldOutText: {
-        background: '#ef4444',
+    banner: {
+        background: 'linear-gradient(90deg, #2874f0 0%, #0053c0 100%)',
         color: '#fff',
-        padding: '4px 12px',
-        fontSize: '11px',
-        fontWeight: 'bold',
-        borderRadius: '2px',
-        letterSpacing: '0.5px'
+        padding: '40px 20px',
+        textAlign: 'center',
+        marginBottom: '20px'
     },
-    info: { 
-        padding: '12px', 
+    bannerContent: {
+        maxWidth: '1200px',
+        margin: '0 auto'
+    },
+    bannerTitle: {
+        margin: '0 0 10px 0',
+        fontSize: '28px',
+        fontWeight: 'bold'
+    },
+    bannerSub: {
+        margin: 0,
+        fontSize: '16px',
+        opacity: 0.9
+    },
+    container: { 
+        maxWidth: '1240px', 
+        margin: '0 auto', 
+        padding: '0 15px' 
+    },
+    sectionHeading: {
+        fontSize: '20px',
+        fontWeight: 'bold',
+        color: '#212121',
+        marginBottom: '20px',
+        borderBottom: '2px solid #e0e0e0',
+        paddingBottom: '10px'
+    },
+    grid: { 
+        display: 'grid', 
+        // 📱 Responsive Grid: 2 items on mobile, up to 5 on large screens
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', 
+        gap: '16px' 
+    },
+    loaderContainer: { 
         display: 'flex', 
         flexDirection: 'column', 
-        gap: '4px',
-        borderTop: '1px solid #f1f5f9'
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '80vh', 
+        background: '#f1f3f6' 
     },
-    name: { 
-        fontSize: '14px', 
-        fontWeight: '500', 
-        margin: 0,
-        height: '34px',
-        overflow: 'hidden',
-        display: '-webkit-box',
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical'
+    loaderText: { 
+        marginTop: '15px', 
+        color: '#2874f0', 
+        fontWeight: 'bold' 
     },
-    ratingRow: { display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0' },
-    ratingBadge: { color: '#fff', fontSize: '10px', padding: '2px 6px', borderRadius: '3px', fontWeight: 'bold' },
-    assuredText: { color: '#2874f0', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' },
-    priceRow: { display: 'flex', alignItems: 'center', gap: '8px' },
-    price: { fontWeight: 'bold', fontSize: '16px' },
-    originalPrice: { color: '#878787', fontSize: '12px', textDecoration: 'line-through' },
-    stock: { fontSize: '11px', margin: '2px 0 0 0' }
+    emptyState: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#fff',
+        padding: '60px 20px',
+        borderRadius: '8px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+    }
 };
 
-export default ProductCard;
+export default Home;
