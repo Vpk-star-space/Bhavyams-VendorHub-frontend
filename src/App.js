@@ -29,21 +29,29 @@ function ScrollToTop() {
 
 function App() {
     const [googleClientId, setGoogleClientId] = useState(null);
+    const [isInitializing, setIsInitializing] = useState(true); // 🚀 FIX: New state to control the loading screen
 
     useEffect(() => {
         const fetchGoogleId = async () => {
             try {
-                const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
+                // Set a timeout so if Render is asleep, it doesn't block the app forever
+                const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id', { timeout: 4000 });
                 setGoogleClientId(res.data.clientId);
             } catch (err) {
-                console.error("Google ID fetch failed.", err);
+                console.error("Google ID fetch failed or timed out. Proceeding without Google Auth.", err);
+                // 🚀 Fallback to a dummy ID so the app still loads!
+                setGoogleClientId("dummy-client-id-to-prevent-crash");
+            } finally {
+                // 🚀 FIX: No matter what happens (success or fail), turn off the loading screen!
+                setIsInitializing(false);
             }
         };
+
         fetchGoogleId();
     }, []);
 
     // 🎨 Improved Branding for the Loading Screen
-    if (!googleClientId) {
+    if (isInitializing) {
         return (
             <div style={styles.loadingScreen}>
                 <div style={styles.loadingContent}>
@@ -58,7 +66,7 @@ function App() {
     }
 
     return (
-        <GoogleOAuthProvider clientId={googleClientId}>
+        <GoogleOAuthProvider clientId={googleClientId || "dummy-client-id"}>
             <CartProvider>
                 <Router>
                     <ScrollToTop /> {/* 🚀 Ensures pro navigation */}
@@ -117,8 +125,5 @@ const styles = {
         animation: 'loadingAnim 1.5s infinite ease-in-out'
     }
 };
-
-// Add this to your App.css later for the animation:
-// @keyframes loadingAnim { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
 
 export default App;
