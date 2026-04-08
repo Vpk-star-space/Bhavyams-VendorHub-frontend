@@ -29,7 +29,7 @@ function ScrollToTop() {
 
 function App() {
     const [googleClientId, setGoogleClientId] = useState(null);
-    const [isInitializing, setIsInitializing] = useState(true); // 🚀 FIX: New state to control the loading screen
+    const [isInitializing, setIsInitializing] = useState(true);
 
     useEffect(() => {
         const fetchGoogleId = async () => {
@@ -39,10 +39,8 @@ function App() {
                 setGoogleClientId(res.data.clientId);
             } catch (err) {
                 console.error("Google ID fetch failed or timed out. Proceeding without Google Auth.", err);
-                // 🚀 Fallback to a dummy ID so the app still loads!
                 setGoogleClientId("dummy-client-id-to-prevent-crash");
             } finally {
-                // 🚀 FIX: No matter what happens (success or fail), turn off the loading screen!
                 setIsInitializing(false);
             }
         };
@@ -50,14 +48,14 @@ function App() {
         fetchGoogleId();
     }, []);
 
-    // 🎨 Improved Branding for the Loading Screen
     if (isInitializing) {
         return (
             <div style={styles.loadingScreen}>
                 <div style={styles.loadingContent}>
                     <div style={styles.brandName}>Bhavyams VendorHub</div>
                     <div style={styles.loaderBar}>
-                        <div style={styles.loaderProgress}></div>
+                        {/* 🚀 FIX: Replaced crash-causing animation with a safe CSS transition */}
+                        <div style={{...styles.loaderProgress, width: '100%', transition: 'width 2s ease-in-out'}}></div>
                     </div>
                     <div style={styles.loadingText}>Initializing Secure System...</div>
                 </div>
@@ -69,10 +67,10 @@ function App() {
         <GoogleOAuthProvider clientId={googleClientId || "dummy-client-id"}>
             <CartProvider>
                 <Router>
-                    <ScrollToTop /> {/* 🚀 Ensures pro navigation */}
+                    <ScrollToTop /> 
                     <ToastContainer 
                         theme="colored" 
-                        position="top-center" // Better for Mobile
+                        position="top-center" 
                         autoClose={1500} 
                         hideProgressBar={true}
                     />
@@ -118,11 +116,9 @@ const styles = {
         overflow: 'hidden'
     },
     loaderProgress: {
-        width: '50%',
         height: '100%',
         background: '#2874f0',
-        borderRadius: '10px',
-        animation: 'loadingAnim 1.5s infinite ease-in-out'
+        borderRadius: '10px'
     }
 };
 
