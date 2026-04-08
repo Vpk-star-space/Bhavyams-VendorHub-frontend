@@ -228,7 +228,7 @@ const Dashboard = () => {
                 <div style={styles.testModeAlert}>
                     <AlertTriangle size={20} style={{ minWidth: '20px' }} />
                     <span style={{ fontSize: '13px', fontWeight: '600' }}>
-                        <strong>TEST MODE:</strong> Safe ! This payments for testing purpose only not u are orginal money ,u clcik any net banking options, free to book orders,no need to worry!!.
+                        <strong>TEST MODE:</strong> Safe ! This payments for testing purpose only not u are orginal money ,u clcik any net banking options, free to book demo orders,no need to worry!!.
                     </span>
                 </div>
 
