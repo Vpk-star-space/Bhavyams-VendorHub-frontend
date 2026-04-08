@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Package, DollarSign, FileText, Image as ImageIcon, ArrowLeft, Clock, X, Layers } from 'lucide-react';
+import { Package, DollarSign, FileText, Image as ImageIcon, ArrowLeft, Clock, X, Layers, Tag } from 'lucide-react'; // 🚀 ADDED: Tag icon for category
 import confetti from 'canvas-confetti';
 
 const AddProduct = () => {
@@ -15,7 +15,7 @@ const AddProduct = () => {
         price: '',
         description: '',
         stock_count: '',
-        category: '',
+        category: '', // 🚀 Now this will actually get filled!
         delivery_minutes: '', 
     });
 
@@ -105,6 +105,21 @@ const AddProduct = () => {
                             <Layers size={18} color="#f59e0b"/>
                             <input name="stock_count" type="number" placeholder="Stock" onChange={handleChange} required style={styles.input} />
                         </div>
+                    </div>
+
+                    {/* 🚀 FIX: ADDED MISSING CATEGORY FIELD HERE */}
+                    <div style={styles.inputGroup}>
+                        <Tag size={18} color="#8b5cf6"/>
+                        <select name="category" value={productData.category} onChange={handleChange} required style={styles.select}>
+                            <option value="" disabled>Select Category</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Mobiles & Tablets">Mobiles & Tablets</option>
+                            <option value="TVs & Appliances">TVs & Appliances</option>
+                            <option value="Fashion">Fashion</option>
+                            <option value="Beauty">Beauty</option>
+                            <option value="Top Offers">Top Offers</option>
+                            <option value="Others">Others</option>
+                        </select>
                     </div>
 
                     <div style={styles.inputGroup}>
