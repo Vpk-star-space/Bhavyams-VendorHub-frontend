@@ -3,7 +3,7 @@ import axios from 'axios';
 import { ShoppingCart, Search, User, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
-import { useCart } from '../context/CartContext'; 
+import { useCart } from '../context/CartContext'; // 🚀 ADDED: Import Cart Context!
 
 const Home = () => {
     const [products, setProducts] = useState([]);
@@ -11,6 +11,7 @@ const Home = () => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const navigate = useNavigate();
     
+    // 🚀 ADDED: Get cart items to calculate the badge number
     const { cart } = useCart();
     const totalCartItems = cart ? cart.reduce((total, item) => total + (item.quantity || 1), 0) : 0;
 
@@ -97,6 +98,7 @@ const Home = () => {
                             </button>
                         )}
 
+                        {/* 🚀 FIX: Added the Cart Badge here! */}
                         <div style={styles.cartIconWrapper} onClick={() => navigate('/cart')}>
                             <div style={{ position: 'relative' }}>
                                 <ShoppingCart size={isMobile ? 20 : 22} />
@@ -141,19 +143,12 @@ const Home = () => {
                     )}
                 </div>
             </div>
-
-            {/* 🚀 ADDED: Professional Developer Footer */}
-            <footer style={styles.footer}>
-                <p style={styles.footerBrand}>Bhavyams Hub App</p>
-                <p style={styles.footerText}>System Engineered by <strong>Venkata Pavan Kumar</strong></p>
-                <p style={styles.footerContact}>pavanvenkat63@gmail.com</p>
-            </footer>
         </div>
     );
 };
 
 const styles = {
-    page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: 'Roboto, Arial, sans-serif', display: 'flex', flexDirection: 'column' },
+    page: { background: '#f1f3f6', minHeight: '100vh', fontFamily: 'Roboto, Arial, sans-serif' },
     header: { background: '#2874f0', padding: '10px 0', position: 'sticky', top: 0, zIndex: 100 },
     desktopHeaderContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', gap: '20px' },
     mobileHeaderContent: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px', gap: '10px' },
@@ -168,6 +163,7 @@ const styles = {
     navBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '6px 20px', fontWeight: 'bold', fontSize: '14px', borderRadius: '2px', cursor: 'pointer' },
     mobileNavBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '4px 8px', fontWeight: 'bold', fontSize: '12px', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     
+    // 🚀 NEW STYLES FOR CART BADGE
     cartIconWrapper: { color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' },
     cartBadge: { position: 'absolute', top: '-8px', right: '-10px', background: '#ff9f00', color: '#fff', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px', border: '1px solid #2874f0' },
     cartText: { fontSize: '15px', fontWeight: 'bold' },
@@ -175,7 +171,7 @@ const styles = {
     categoryStrip: { background: '#fff', borderBottom: '1px solid #f0f0f0', padding: '10px 0', boxShadow: '0 1px 1px 0 rgba(0,0,0,.16)' },
     catContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', gap: '20px', padding: '0 15px', overflowX: 'auto', whiteSpace: 'nowrap', WebkitOverflowScrolling: 'touch' },
     catItem: { fontSize: '14px', fontWeight: '500', color: '#212121', cursor: 'pointer', paddingBottom: '8px' },
-    mainContainer: { maxWidth: '1240px', margin: '10px auto', padding: '0 10px', flex: 1 },
+    mainContainer: { maxWidth: '1240px', margin: '10px auto', padding: '0 10px' },
     productSection: { background: '#fff', padding: '15px', borderRadius: '4px', boxShadow: '0 1px 2px 0 rgba(0,0,0,.1)' },
     sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f0f0f0', paddingBottom: '15px', marginBottom: '15px' },
     sectionTitle: { margin: 0, fontSize: '22px', fontWeight: '500' },
@@ -186,13 +182,7 @@ const styles = {
     emptyState: { padding: '40px', textAlign: 'center', color: '#878787', fontSize: '16px' },
     loaderContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f1f3f6' },
     spinner: { width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #2874f0', borderRadius: '50%', animation: 'spin 1s linear infinite' },
-    loaderText: { marginTop: '15px', fontWeight: 'bold', color: '#2874f0' },
-
-    // 🚀 NEW FOOTER STYLES
-    footer: { background: '#ffffff', padding: '25px 20px', textAlign: 'center', borderTop: '1px solid #e0e0e0', marginTop: '40px', boxShadow: '0 -1px 3px rgba(0,0,0,0.05)' },
-    footerBrand: { margin: '0 0 8px 0', fontSize: '16px', fontWeight: 'bold', color: '#2874f0' },
-    footerText: { margin: '0 0 5px 0', fontSize: '13px', color: '#475569' },
-    footerContact: { margin: 0, fontSize: '12px', color: '#878787' }
+    loaderText: { marginTop: '15px', fontWeight: 'bold', color: '#2874f0' }
 };
 
 export default Home;
