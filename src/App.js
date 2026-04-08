@@ -28,20 +28,37 @@ function ScrollToTop() {
 }
 
 function App() {
-    // 🔙 REVERTED TO YOUR ORIGINAL LOGIC
     const [googleClientId, setGoogleClientId] = useState(null);
+    const [loadingText, setLoadingText] = useState("Initializing Secure System...");
 
     useEffect(() => {
+        let isMounted = true;
+
+        // 🚀 UX FIX: Tell the user if the Render server is taking a long time to wake up
+        const timeoutId = setTimeout(() => {
+            if (isMounted) setLoadingText("Waking up secure server. This can take up to 60 seconds...");
+        }, 5000);
+
         const fetchGoogleId = async () => {
             try {
-                // 🔙 Removed the bad timeout. It will now wait for your Render server safely!
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
-                setGoogleClientId(res.data.clientId);
+                if (isMounted) {
+                    setGoogleClientId(res.data.clientId);
+                }
             } catch (err) {
-                console.error("Google ID fetch failed.", err);
+                console.error("Google ID fetch failed. Retrying...", err);
+                if (isMounted) {
+                    // 🚀 THE MAGIC FIX: If Render is asleep, retry every 5 seconds until it wakes up!
+                    setTimeout(fetchGoogleId, 5000);
+                }
             }
         };
         fetchGoogleId();
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
     }, []);
 
     // 🎨 Improved Branding for the Loading Screen
@@ -51,17 +68,15 @@ function App() {
                 <div style={styles.loadingContent}>
                     <div style={styles.brandName}>Bhavyams VendorHub</div>
                     <div style={styles.loaderBar}>
-                        {/* Safe CSS so it doesn't crash to a white screen */}
-                        <div style={{...styles.loaderProgress, width: '100%', transition: 'width 2s ease-in-out'}}></div>
+                        <div style={styles.loaderProgress}></div>
                     </div>
-                    <div style={styles.loadingText}>Initializing Secure System...</div>
+                    <div style={styles.loadingText}>{loadingText}</div>
                 </div>
             </div>
         );
     }
 
     return (
-        // 🔙 REVERTED: Now uses your real Google ID, fixing the 401 error!
         <GoogleOAuthProvider clientId={googleClientId}>
             <CartProvider>
                 <Router>
@@ -104,7 +119,7 @@ const styles = {
     },
     loadingContent: { textAlign: 'center' },
     brandName: { fontSize: '28px', fontWeight: '900', color: '#2874f0', letterSpacing: '-0.5px' },
-    loadingText: { marginTop: '15px', color: '#666', fontSize: '14px', fontWeight: '500' },
+    loadingText: { marginTop: '15px', color: '#666', fontSize: '14px', fontWeight: '500', maxWidth: '250px', margin: '15px auto 0' },
     loaderBar: {
         width: '200px',
         height: '4px',
@@ -114,10 +129,15 @@ const styles = {
         overflow: 'hidden'
     },
     loaderProgress: {
+        width: '50%',
         height: '100%',
         background: '#2874f0',
-        borderRadius: '10px'
+        borderRadius: '10px',
+        animation: 'loadingAnim 1.5s infinite ease-in-out'
     }
 };
+
+// Add this to your App.css later for the animation:
+// @keyframes loadingAnim { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
 
 export default App;
