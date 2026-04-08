@@ -6,7 +6,8 @@ import { toast } from 'react-toastify';
 import { 
     ShoppingBag, PlusCircle, History, Store, LogOut,
     Shield, User, Users, ArrowLeft,  
-    Star, Sparkles, Package, Home, ListOrdered, BarChart3, IndianRupee
+    Star, Sparkles, Package, Home, ListOrdered, BarChart3, IndianRupee,
+    AlertTriangle // 🚀 ADDED: For the Test Mode Warning
 } from 'lucide-react';
 
 import ProductList from '../components/ProductList';
@@ -44,41 +45,62 @@ const OrderStatus = ({ order, role }) => {
     
     return (
         <motion.div layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={styles.statusBox}>
+            
+            {/* 📦 UPGRADED ORDER CARD HEADER */}
+            <div style={styles.orderTopStrip}>
+                <div style={styles.orderIdBlock}>
+                    <span style={styles.orderLabel}>ORDER ID</span>
+                    <span style={styles.orderValue}>#{order.order_id || order.id}</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                    <span style={isDelivered ? styles.badgeSuccess : styles.badgeInfo}>
+                        {order.status?.toUpperCase() || 'CONFIRMED'}
+                    </span>
+                </div>
+            </div>
+
             <div style={styles.orderHeader}>
-                <img src={getProductImg(order.image_url)} alt="product" style={styles.orderImg} />
+                <div style={styles.imageWrapper}>
+                    <img src={getProductImg(order.image_url)} alt="product" style={styles.orderImg} />
+                </div>
                 <div style={{flex: 1}}>
-                    <h4 style={styles.orderTitle}>Order #{order.order_id || order.id}</h4>
+                    <h4 style={styles.orderTitle}>{order.product_name || "Bhavyams Product"}</h4>
                     <div style={styles.orderSub}>
-                        {order.product_name || "Bhavyams Product"}
-                        {role?.toLowerCase() === 'admin' && ` | Customer: ${order.customer_name}`}
-                        {role?.toLowerCase() === 'vendor' && ` | Revenue: ₹${order.total_price}`}
+                        {role?.toLowerCase() === 'admin' && `Customer: ${order.customer_name}`}
+                        {role?.toLowerCase() === 'vendor' && `Revenue: ₹${Number(order.total_price).toLocaleString('en-IN')}`}
+                        {role?.toLowerCase() === 'customer' && `Total: ₹${Number(order.total_price).toLocaleString('en-IN')}`}
                     </div>
                 </div>
-                <span style={isDelivered ? styles.badgeSuccess : styles.badgeInfo}>
-                    {order.status?.toUpperCase() || 'CONFIRMED'}
-                </span>
             </div>
-            <div style={styles.progressBar}>
-                <motion.div initial={{ width: 0 }} animate={{ width: isDelivered ? '100%' : '50%' }}
-                    transition={{ duration: 1.2 }} style={{ background: isDelivered ? '#10b981' : '#2874f0', height: '100%', borderRadius: '8px' }}
-                />
+
+            {/* 🔵 PROGRESS BAR */}
+            <div style={{ padding: '0 15px 15px 15px' }}>
+                <div style={styles.progressBar}>
+                    <motion.div initial={{ width: 0 }} animate={{ width: isDelivered ? '100%' : '50%' }}
+                        transition={{ duration: 1.2 }} style={{ background: isDelivered ? '#26a541' : '#2874f0', height: '100%', borderRadius: '8px' }}
+                    />
+                </div>
+                <p style={styles.progressText}>
+                    {isDelivered ? 'Item has been delivered successfully.' : 'Order is confirmed and preparing for dispatch.'}
+                </p>
             </div>
+
             {isDelivered && role?.toLowerCase() === 'customer' && (
-                <div style={{marginTop: '15px'}}>
+                <div style={styles.reviewSection}>
                     <AnimatePresence mode="wait">
                         {isReviewed ? (
                             <motion.div layout style={styles.reviewedBox}>
-                                <div style={styles.reviewLabelRow}><Star size={16} fill="#2874f0"/> Rating: {rating}/5</div>
+                                <div style={styles.reviewLabelRow}><Star size={16} fill="#2874f0" color="#2874f0"/> Rating: {rating}/5</div>
                                 {comment && <div style={styles.reviewText}>"{comment}"</div>}
                             </motion.div>
                         ) : !showReviewForm ? (
-                            <button onClick={() => setShowReviewForm(true)} style={styles.reviewBtn}>RATE PRODUCT</button>
+                            <button onClick={() => setShowReviewForm(true)} style={styles.reviewBtn}>★ RATE & REVIEW PRODUCT</button>
                         ) : (
                             <motion.div layout style={styles.reviewForm}>
                                 <select value={rating} onChange={(e) => setRating(e.target.value)} style={styles.select}>
-                                    {[5,4,3,2,1].map(num => <option key={num} value={num}>{num} Stars</option>)}
+                                    {[5,4,3,2,1].map(num => <option key={num} value={num}>{num} Stars - {num === 5 ? 'Excellent' : num === 1 ? 'Poor' : 'Good'}</option>)}
                                 </select>
-                                <textarea placeholder="Feedback..." value={comment} onChange={(e) => setComment(e.target.value)} style={styles.textarea} />
+                                <textarea placeholder="Write a review..." value={comment} onChange={(e) => setComment(e.target.value)} style={styles.textarea} />
                                 <div style={{display:'flex', gap:'10px'}}>
                                     <button onClick={submitReview} style={styles.submitReviewBtn}>SUBMIT</button>
                                     <button onClick={() => setShowReviewForm(false)} style={styles.cancelBtn}>CANCEL</button>
@@ -96,7 +118,6 @@ const Dashboard = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [adminView, setAdminView] = useState('stats'); 
     const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')));
-    // 🚀 FIX: Added setter for ordersList
     const [ordersList, setOrdersList] = useState([]);
     const [vendorStats, setVendorStats] = useState({ revenue: 0, orders: 0, products: 0 });
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
@@ -116,12 +137,10 @@ const Dashboard = () => {
             const headers = { Authorization: `Bearer ${token}` };
 
             try {
-                // 1. Sync User Info
                 const userRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', { headers });
                 const user = userRes.data;
                 setCurrentUser(user);
 
-                // 🚀 2. Fetch Orders/Sales based on role
                 const ordersUrl = user.role?.toLowerCase() === 'vendor' 
                     ? 'https://bhavyams-vendorhub-backend.onrender.com/api/orders/my-sales' 
                     : 'https://bhavyams-vendorhub-backend.onrender.com/api/orders/my-orders';
@@ -129,7 +148,6 @@ const Dashboard = () => {
                 const ordersRes = await axios.get(ordersUrl, { headers });
                 setOrdersList(ordersRes.data);
 
-                // 3. Fetch Vendor Stats
                 if (user.role?.toLowerCase() === 'vendor') {
                     const statsRes = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/vendor/stats', { headers });
                     setVendorStats(statsRes.data);
@@ -156,7 +174,7 @@ const Dashboard = () => {
                         <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.activeNavItem : styles.navItem}><Home size={20}/> Home</div>
                         <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.activeNavItem : styles.navItem}><User size={20}/> Profile</div>
                         
-                        {currentUser?.role?.toLowerCase() === 'customer' && <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><History size={20}/> Orders</div>}
+                        {currentUser?.role?.toLowerCase() === 'customer' && <div onClick={() => setActiveTab('orders')} style={activeTab === 'orders' ? styles.activeNavItem : styles.navItem}><History size={20}/> My Orders</div>}
                         
                         {currentUser?.role?.toLowerCase() === 'vendor' && (
                             <>
@@ -199,12 +217,21 @@ const Dashboard = () => {
                         <User size={22}/>
                     </div>
                     <div onClick={handleLogout} style={styles.mobileTab}>
-                        <LogOut size={22} color="#e11d48"/>
+                        <LogOut size={22} color="#ef4444"/>
                     </div>
                 </div>
             )}
 
             <main style={{...styles.main, marginLeft: isMobile ? 0 : '260px', paddingBottom: isMobile ? '80px' : '40px'}}>
+                
+                {/* 🚨 TEST MODE WARNING ALERT 🚨 */}
+                <div style={styles.testModeAlert}>
+                    <AlertTriangle size={20} style={{ minWidth: '20px' }} />
+                    <span style={{ fontSize: '13px', fontWeight: '600' }}>
+                        <strong>TEST MODE:</strong> Payments are simulated. Do NOT use real credit card details or UPI pins.
+                    </span>
+                </div>
+
                 <header style={styles.header}>
                     <div>
                         <h2 style={styles.welcomeHeading}>Hi, {currentUser?.username?.split(' ')[0]}</h2>
@@ -232,9 +259,18 @@ const Dashboard = () => {
                                         <div style={styles.statCard} onClick={() => {setActiveTab('admin'); setAdminView('payments')}}><BarChart3 size={32} color="#f59e0b"/><br/>PAYMENTS</div>
                                     </div>
                                 ) : (
+                                    // 🛍️ PREMIUM CUSTOMER BANNER
                                     <div style={styles.premiumBanner}>
-                                        <Sparkles size={32} color="#fff" /><h3 style={{margin: '15px 0'}}>Ready to Shop?</h3>
-                                        <button onClick={() => navigate('/')} style={styles.premiumShopBtn}>GO TO STORE</button>
+                                        <div style={styles.bannerText}>
+                                            <h2 style={{ margin: '0 0 10px 0', fontSize: '22px' }}>Welcome to Bhavyams Hub</h2>
+                                            <p style={{ margin: '0 0 20px 0', fontSize: '14px', opacity: 0.9 }}>Get top-quality electronics and fashion delivered directly from verified vendors.</p>
+                                            <button onClick={() => navigate('/')} style={styles.premiumShopBtn}>
+                                                <ShoppingBag size={16} /> BROWSE STORE
+                                            </button>
+                                        </div>
+                                        <div style={{ padding: '20px' }}>
+                                            <Sparkles size={60} color="#ffe500" opacity={0.8} />
+                                        </div>
                                     </div>
                                 )
                             )}
@@ -265,51 +301,70 @@ const Dashboard = () => {
 };
 
 const styles = {
-    dashboard: { display: 'flex', minHeight: '100vh', background: '#f8fafc', fontFamily: 'Roboto, sans-serif' },
+    dashboard: { display: 'flex', minHeight: '100vh', background: '#f1f3f6', fontFamily: 'Roboto, Arial, sans-serif' },
+    
+    // 🚨 TEST MODE ALERT
+    testModeAlert: { background: '#fee2e2', color: '#b91c1c', padding: '10px 15px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #fca5a5' },
+    
     sidebar: { width: '260px', background: '#0f172a', padding: '30px 20px', position: 'fixed', height: '100vh', color: '#fff', zIndex: 100 },
     logoSection: { marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px' },
-    logo: { fontSize: '20px', fontWeight: '900', margin: 0, color: '#fff' },
+    logo: { fontSize: '20px', fontStyle: 'italic', fontWeight: 'bold', margin: 0, color: '#fff' },
     nav: { display: 'flex', flexDirection: 'column', gap: '8px' },
-    navItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', color: '#94a3b8', fontSize: '14px' },
+    navItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', color: '#94a3b8', fontSize: '14px', fontWeight: '500' },
     activeNavItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '8px', cursor: 'pointer', background: '#2874f0', color: '#fff', fontWeight: '700' },
     navSectionHeader: { marginTop: '20px', fontSize: '10px', color: '#475569', letterSpacing: '1.5px', fontWeight: '800' },
-    logoutBtn: { marginTop: 'auto', background: '#e11d48', border: 'none', color: '#fff', padding: '12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    logoutBtn: { marginTop: 'auto', background: '#ef4444', border: 'none', color: '#fff', padding: '12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
     mobileBottomNav: { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', height: '65px', display: 'flex', justifyContent: 'space-around', alignItems: 'center', boxShadow: '0 -2px 10px rgba(0,0,0,0.1)', zIndex: 1000 },
-    mobileTab: { color: '#64748b' },
-    mobileActiveTab: { color: '#2874f0' },
-    main: { flex: 1, background: '#f8fafc' },
-    header: { padding: '15px 25px', background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    welcomeHeading: { margin: 0, fontSize: '18px', fontWeight: '900' },
-    roleBadge: { background: '#f1f5f9', color: '#2874f0', padding: '3px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: '900', marginTop: '4px', display: 'inline-block' },
-    body: { padding: '20px' },
-    premiumBanner: { background: 'linear-gradient(135deg, #2874f0 0%, #7c3aed 100%)', padding: '40px 20px', borderRadius: '16px', color: '#fff', textAlign: 'center' },
-    premiumShopBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '10px 25px', borderRadius: '6px', fontWeight: '900', cursor: 'pointer' },
-    vendorStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px' },
-    statCard: { background: '#fff', padding: '20px', borderRadius: '12px', textAlign: 'center', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' },
-    statLabel: { fontSize: '11px', color: '#64748b', fontWeight: '700', marginTop: '10px', textTransform: 'uppercase' },
-    statValue: { fontSize: '18px', fontWeight: '900', color: '#0f172a' },
-    statusBox: { background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '15px' },
-    orderHeader: { display: 'flex', gap: '12px', alignItems: 'center' },
-    orderImg: { width: '50px', height: '50px', borderRadius: '6px', objectFit: 'cover' },
-    orderTitle: { margin: 0, fontSize: '14px', fontWeight: '800' },
-    orderSub: { fontSize: '11px', color: '#64748b' },
-    progressBar: { background: '#f1f5f9', height: '6px', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' },
-    badgeSuccess: { background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: '10px', fontSize: '9px', fontWeight: '800' },
-    badgeInfo: { background: '#e0e7ff', color: '#2874f0', padding: '3px 10px', borderRadius: '10px', fontSize: '9px', fontWeight: '800' },
-    reviewBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800', fontSize: '10px', cursor: 'pointer' },
-    reviewForm: { background: '#eff6ff', padding: '15px', borderRadius: '8px', marginTop: '10px' },
-    select: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', marginBottom: '10px' },
-    textarea: { width: '100%', height: '80px', padding: '10px', borderRadius: '6px', border: '1px solid #bfdbfe', marginBottom: '10px' },
-    submitReviewBtn: { background: '#26a541', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', fontWeight: '800', cursor: 'pointer' },
-    cancelBtn: { background: '#94a3b8', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer' },
-    sectionTitle: { fontSize: '18px', fontWeight: '900', margin: '20px 0 15px 0' },
-    adminStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' },
-    backBtn: { background: 'none', border: 'none', color: '#2874f0', fontWeight: '800', cursor: 'pointer', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' },
-    noData: { textAlign: 'center', padding: '30px', color: '#64748b', fontSize: '13px' },
+    mobileTab: { color: '#64748b', cursor: 'pointer' },
+    mobileActiveTab: { color: '#2874f0', cursor: 'pointer' },
+    main: { flex: 1, background: '#f1f3f6' },
+    header: { padding: '15px 20px', background: '#fff', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    welcomeHeading: { margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#212121' },
+    roleBadge: { background: '#e0e7ff', color: '#2874f0', padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', marginTop: '4px', display: 'inline-block', letterSpacing: '0.5px' },
+    body: { padding: '15px' },
+    
+    // 🛍️ UPGRADED PREMIUM BANNER
+    premiumBanner: { background: 'linear-gradient(135deg, #2874f0 0%, #1e40af 100%)', padding: '30px', borderRadius: '8px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
+    bannerText: { flex: 1 },
+    premiumShopBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '10px 20px', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
+    
+    vendorStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '15px' },
+    statCard: { background: '#fff', padding: '20px', borderRadius: '8px', textAlign: 'center', border: '1px solid #e0e0e0', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+    statLabel: { fontSize: '11px', color: '#878787', fontWeight: 'bold', marginTop: '10px', letterSpacing: '0.5px' },
+    statValue: { fontSize: '20px', fontWeight: 'bold', color: '#212121', marginTop: '5px' },
+    
+    // 📦 UPGRADED ORDER CARD
+    statusBox: { background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0', marginBottom: '15px', overflow: 'hidden', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
+    orderTopStrip: { background: '#f8fafc', padding: '12px 15px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e0e0e0', fontSize: '12px' },
+    orderIdBlock: { display: 'flex', flexDirection: 'column', gap: '2px' },
+    orderLabel: { color: '#878787', fontWeight: '500', fontSize: '10px', letterSpacing: '0.5px' },
+    orderValue: { color: '#212121', fontWeight: 'bold' },
+    orderHeader: { display: 'flex', gap: '15px', alignItems: 'center', padding: '15px' },
+    imageWrapper: { width: '70px', height: '70px', background: '#f1f3f6', borderRadius: '4px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '5px' },
+    orderImg: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
+    orderTitle: { margin: '0 0 5px 0', fontSize: '15px', fontWeight: '500', color: '#212121' },
+    orderSub: { fontSize: '13px', color: '#878787', fontWeight: '500' },
+    progressBar: { background: '#f1f3f6', height: '6px', borderRadius: '10px', overflow: 'hidden' },
+    progressText: { fontSize: '11px', color: '#388e3c', fontWeight: 'bold', marginTop: '8px', margin: '8px 0 0 0' },
+    
+    badgeSuccess: { background: '#388e3c', color: '#fff', padding: '4px 10px', borderRadius: '2px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px' },
+    badgeInfo: { background: '#2874f0', color: '#fff', padding: '4px 10px', borderRadius: '2px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px' },
+    
+    reviewSection: { padding: '15px', borderTop: '1px solid #f0f0f0', background: '#fafafa' },
+    reviewBtn: { background: '#fff', color: '#2874f0', border: '1px solid #2874f0', padding: '8px 15px', borderRadius: '2px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', width: '100%' },
+    reviewForm: { background: '#fff', padding: '15px', borderRadius: '4px', border: '1px solid #e0e0e0' },
+    select: { width: '100%', padding: '10px', borderRadius: '2px', border: '1px solid #e0e0e0', marginBottom: '10px', outline: 'none' },
+    textarea: { width: '100%', height: '80px', padding: '10px', borderRadius: '2px', border: '1px solid #e0e0e0', marginBottom: '10px', outline: 'none', fontFamily: 'inherit' },
+    submitReviewBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', flex: 1 },
+    cancelBtn: { background: '#fff', color: '#212121', border: '1px solid #e0e0e0', padding: '8px 20px', borderRadius: '2px', cursor: 'pointer', fontWeight: 'bold' },
+    sectionTitle: { fontSize: '18px', fontWeight: 'bold', margin: '10px 0 15px 0', color: '#212121', borderBottom: '2px solid #e0e0e0', paddingBottom: '10px' },
+    adminStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px' },
+    backBtn: { background: 'none', border: 'none', color: '#2874f0', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' },
+    noData: { textAlign: 'center', padding: '40px', color: '#878787', fontSize: '14px', background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0' },
     ordersGrid: { display: 'flex', flexDirection: 'column' },
-    reviewedBox: { marginTop: '10px', padding: '10px', background: '#f8fafc', borderRadius: '8px' },
-    reviewLabelRow: { fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' },
-    reviewText: { fontSize: '12px', color: '#475569', marginTop: '5px', fontStyle: 'italic' }
+    reviewedBox: { padding: '12px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '4px' },
+    reviewLabelRow: { fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', color: '#212121' },
+    reviewText: { fontSize: '13px', color: '#878787', marginTop: '8px', fontStyle: 'italic' }
 };
 
 export default Dashboard;
