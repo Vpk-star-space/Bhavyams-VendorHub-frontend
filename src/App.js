@@ -28,33 +28,30 @@ function ScrollToTop() {
 }
 
 function App() {
+    // 🔙 REVERTED TO YOUR ORIGINAL LOGIC
     const [googleClientId, setGoogleClientId] = useState(null);
-    const [isInitializing, setIsInitializing] = useState(true);
 
     useEffect(() => {
         const fetchGoogleId = async () => {
             try {
-                // Set a timeout so if Render is asleep, it doesn't block the app forever
-                const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id', { timeout: 4000 });
+                // 🔙 Removed the bad timeout. It will now wait for your Render server safely!
+                const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
                 setGoogleClientId(res.data.clientId);
             } catch (err) {
-                console.error("Google ID fetch failed or timed out. Proceeding without Google Auth.", err);
-                setGoogleClientId("dummy-client-id-to-prevent-crash");
-            } finally {
-                setIsInitializing(false);
+                console.error("Google ID fetch failed.", err);
             }
         };
-
         fetchGoogleId();
     }, []);
 
-    if (isInitializing) {
+    // 🎨 Improved Branding for the Loading Screen
+    if (!googleClientId) {
         return (
             <div style={styles.loadingScreen}>
                 <div style={styles.loadingContent}>
                     <div style={styles.brandName}>Bhavyams VendorHub</div>
                     <div style={styles.loaderBar}>
-                        {/* 🚀 FIX: Replaced crash-causing animation with a safe CSS transition */}
+                        {/* Safe CSS so it doesn't crash to a white screen */}
                         <div style={{...styles.loaderProgress, width: '100%', transition: 'width 2s ease-in-out'}}></div>
                     </div>
                     <div style={styles.loadingText}>Initializing Secure System...</div>
@@ -64,13 +61,14 @@ function App() {
     }
 
     return (
-        <GoogleOAuthProvider clientId={googleClientId || "dummy-client-id"}>
+        // 🔙 REVERTED: Now uses your real Google ID, fixing the 401 error!
+        <GoogleOAuthProvider clientId={googleClientId}>
             <CartProvider>
                 <Router>
-                    <ScrollToTop /> 
+                    <ScrollToTop /> {/* 🚀 Ensures pro navigation */}
                     <ToastContainer 
                         theme="colored" 
-                        position="top-center" 
+                        position="top-center" // Better for Mobile
                         autoClose={1500} 
                         hideProgressBar={true}
                     />
