@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { ShoppingCart, Search, User, Menu } from 'lucide-react'; // 🚀 ADDED: Menu icon
+import { ShoppingCart, Search, User, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
+import { useCart } from '../context/CartContext'; // 🚀 ADDED: Import Cart Context!
 
 const Home = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const navigate = useNavigate();
+    
+    // 🚀 ADDED: Get cart items to calculate the badge number
+    const { cart } = useCart();
+    const totalCartItems = cart ? cart.reduce((total, item) => total + (item.quantity || 1), 0) : 0;
 
-    // 🚀 AUTH CHECK: See if user is logged in
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
@@ -26,7 +30,6 @@ const Home = () => {
             try {
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/all');
                 
-                // Bulletproof data extraction
                 if (res.data && Array.isArray(res.data.products)) {
                     setProducts(res.data.products);
                 } else if (Array.isArray(res.data)) {
@@ -59,7 +62,6 @@ const Home = () => {
             <div style={styles.header}>
                 <div style={isMobile ? styles.mobileHeaderContent : styles.desktopHeaderContent}>
                     
-                    {/* 🚀 FIX: Mobile Left Side (Menu Icon + Logo) */}
                     {isMobile ? (
                         <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
                             <Menu size={24} color="#fff" onClick={() => navigate('/dashboard')} style={{cursor: 'pointer'}} />
@@ -83,7 +85,6 @@ const Home = () => {
                     </div>
 
                     <div style={isMobile ? styles.mobileNavActions : styles.navActions}>
-                        {/* 🚀 FIX: REMOVED LOGOUT. Added Profile/Login Logic */}
                         {token ? (
                             <button 
                                 style={isMobile ? styles.mobileNavBtn : styles.navBtn} 
@@ -97,8 +98,14 @@ const Home = () => {
                             </button>
                         )}
 
-                        <div style={styles.cartIcon} onClick={() => navigate('/cart')}>
-                            <ShoppingCart size={isMobile ? 20 : 22} />
+                        {/* 🚀 FIX: Added the Cart Badge here! */}
+                        <div style={styles.cartIconWrapper} onClick={() => navigate('/cart')}>
+                            <div style={{ position: 'relative' }}>
+                                <ShoppingCart size={isMobile ? 20 : 22} />
+                                {totalCartItems > 0 && (
+                                    <span style={styles.cartBadge}>{totalCartItems}</span>
+                                )}
+                            </div>
                             {!isMobile && <span style={styles.cartText}>Cart</span>}
                         </div>
                     </div>
@@ -155,8 +162,12 @@ const styles = {
     mobileNavActions: { display: 'flex', alignItems: 'center', gap: '10px' },
     navBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '6px 20px', fontWeight: 'bold', fontSize: '14px', borderRadius: '2px', cursor: 'pointer' },
     mobileNavBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '4px 8px', fontWeight: 'bold', fontSize: '12px', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-    cartIcon: { color: '#fff', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' },
+    
+    // 🚀 NEW STYLES FOR CART BADGE
+    cartIconWrapper: { color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' },
+    cartBadge: { position: 'absolute', top: '-8px', right: '-10px', background: '#ff9f00', color: '#fff', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px', border: '1px solid #2874f0' },
     cartText: { fontSize: '15px', fontWeight: 'bold' },
+    
     categoryStrip: { background: '#fff', borderBottom: '1px solid #f0f0f0', padding: '10px 0', boxShadow: '0 1px 1px 0 rgba(0,0,0,.16)' },
     catContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', gap: '20px', padding: '0 15px', overflowX: 'auto', whiteSpace: 'nowrap', WebkitOverflowScrolling: 'touch' },
     catItem: { fontSize: '14px', fontWeight: '500', color: '#212121', cursor: 'pointer', paddingBottom: '8px' },
