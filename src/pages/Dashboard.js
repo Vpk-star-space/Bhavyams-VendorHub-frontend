@@ -228,7 +228,7 @@ const Dashboard = () => {
                 <div style={styles.testModeAlert}>
                     <AlertTriangle size={20} style={{ minWidth: '20px' }} />
                     <span style={{ fontSize: '13px', fontWeight: '600' }}>
-                        <strong>TEST MODE:</strong> Payments are simulated. Do NOT use real credit card details or UPI pins.
+                        <strong>TEST MODE:</strong> Safe ! This payment test money not ur orginal money,u clcik any net banking option, free to book orders,no need worry!!.
                     </span>
                 </div>
 
