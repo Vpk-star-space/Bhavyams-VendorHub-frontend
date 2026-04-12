@@ -36,7 +36,7 @@ function App() {
 
         // 🚀 UX FIX: Tell the user if the Render server is taking a long time to wake up
         const timeoutId = setTimeout(() => {
-            if (isMounted) setLoadingText("Waking up secure server. This can take up to 60 seconds...");
+            if (isMounted) setLoadingText("Waking up secure server. This can take up to few seconds...");
         }, 5000);
 
         const fetchGoogleId = async () => {
