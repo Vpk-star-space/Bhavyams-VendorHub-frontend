@@ -84,11 +84,12 @@ const Home = () => {
                         {isMobile && <Search size={18} color="#2874f0" style={{position: 'absolute', right: '8px'}} />}
                     </div>
 
-                       <div style={{ backgroundColor: "#f8fafc", padding: "20px", borderRadius: "8px", marginBottom: "30px", textAlign: "left", fontSize: "0.95em", color: "#334155", borderLeft: "4px solid #3b82f6" }}>
-          <p style={{ margin: "0 0 15px 0", lineHeight: "1.5" }}><b>Hello everyone!</b> I am Subhams PMMS. In our busy lives, we often forget to track our daily income and expenses. My aim is to help you easily record and manage every transaction so you can secure your financial future.</p>
-          <p style={{ margin: 0, lineHeight: "1.6", color: "#0f172a" }}><b>అందరికీ నమస్కారం!</b> శుభమ్స్ PMMS కు స్వాగతం. మన బిజీ జీవితంలో రోజువారీ ఆదాయం, ఖర్చులను ట్రాక్ చేయడం తరచుగా మర్చిపోతుంటాం. మీ ప్రతి లావాదేవీని సులభంగా రికార్డ్ చేసి, మీ ఆర్థిక భవిష్యత్తును సురక్షితం చేయడమే నా లక్ష్యం.</p>
-          <b>Venkata Pavan Kumar</b>
-        </div>
+                    <div style={styles.app}>
+      <style>{`@keyframes scrollLeft { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }`}</style>
+      <div style={styles.marqueeContainer}><div style={styles.marqueeText}>🚀 Important Note: Welcome to your Subhams Personal Money Management System! Track your income, manage your expenses, and secure your financial future ! Thank You visiting My website ! Venkata Pavan Kumar.</div></div>
+
+
+      </div>
 
 
                     <div style={isMobile ? styles.mobileNavActions : styles.navActions}>
