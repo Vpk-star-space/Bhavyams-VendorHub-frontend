@@ -84,12 +84,7 @@ const Home = () => {
                         {isMobile && <Search size={18} color="#2874f0" style={{position: 'absolute', right: '8px'}} />}
                     </div>
 
-                    <div style={styles.app}>
-      <style>{`@keyframes scrollLeft { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }`}</style>
-      <div style={styles.marqueeContainer}><div style={styles.marqueeText}>🚀 Important Note: Welcome to your Subhams Personal Money Management System! Track your income, manage your expenses, and secure your financial future ! Thank You visiting My website ! Venkata Pavan Kumar.</div></div>
-
-
-      </div>
+            
 
 
                     <div style={isMobile ? styles.mobileNavActions : styles.navActions}>
