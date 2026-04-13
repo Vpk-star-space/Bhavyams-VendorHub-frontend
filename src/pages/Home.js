@@ -151,7 +151,7 @@ const Home = () => {
                     Contact: <a href="mailto:pavanvenkat63@gmail.com" style={styles.footerLink}>pavanvenkat63@gmail.com</a>
                 </p>
                 <p style={styles.footerContact}>
-                    Check out our other app: <a href="https://subhams-vpk.vercel.app/" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>Subhams App</a>
+                    Check out our other app: <a href="https://subhams-vpk.vercel.app/" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>Subhams </a>
                 </p>
             </footer>
         </div>
