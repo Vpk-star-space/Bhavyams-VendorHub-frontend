@@ -25,33 +25,28 @@ const ProductBannerSlider = ({ products, navigate }) => {
         return () => clearInterval(timer);
     }, [displayProducts.length]);
 
-    // 🟢 MEGA-ROBUST IMAGE EXTRACTOR: Fixes Database Array/String Bugs
+    // 🟢 MAGIC DEEP SCANNER: Finds the image link no matter where it is hidden!
     const getImageUrl = (prod) => {
-        if (prod.image) return prod.image;
-        if (prod.imageUrl) return prod.imageUrl;
-        if (prod.images) {
-            // If it's already a proper array
-            if (Array.isArray(prod.images) && prod.images.length > 0) return prod.images[0];
-            // If the database sent the array as a string block
-            if (typeof prod.images === 'string') {
-                try {
-                    // Try parsing JSON: '["url1.jpg"]'
-                    const parsed = JSON.parse(prod.images);
-                    if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
-                } catch(e) {
-                    // Try fixing PostgreSQL array formatting: '{url1.jpg, url2.jpg}'
-                    if (prod.images.startsWith('{') && prod.images.endsWith('}')) {
-                        return prod.images.replace(/^{|}$/g, '').split(',')[0].replace(/^"|"$/g, '');
-                    }
-                    // If it's just a regular URL hiding in a string
-                    if (prod.images.startsWith('http')) return prod.images;
-                }
-            }
+        try {
+            // Convert the entire product into text to scan it
+            const prodString = JSON.stringify(prod);
+            
+            // Look for standard image files (.jpg, .png, .webp, etc)
+            const imageMatch = prodString.match(/https?:\/\/[^"'\s}\\]+\.(?:jpg|jpeg|gif|png|webp)/i);
+            if (imageMatch) return imageMatch[0];
+
+            // If no extension, just grab the first valid http/https link (for Cloudinary/AWS)
+            const anyLinkMatch = prodString.match(/https?:\/\/[^"'\s}\\]+/i);
+            if (anyLinkMatch) return anyLinkMatch[0];
+            
+        } catch (error) {
+            console.error("Scanner failed:", error);
         }
-        return "https://via.placeholder.com/400?text=No+Image"; // Safe Fallback
+        
+        // Beautiful fallback if absolutely no link exists
+        return "https://placehold.co/400x400/f8fafc/2874f0?text=No+Image";
     };
 
-    // 🟢 SMART ID EXTRACTOR: Finds the correct ID name from your DB
     const getSafeId = (prod) => {
         return prod.id || prod._id || prod.productId || prod.product_id;
     };
@@ -62,12 +57,11 @@ const ProductBannerSlider = ({ products, navigate }) => {
         <div style={{ position: 'relative', width: '100%', maxWidth: '1240px', margin: '10px auto', height: '220px', overflow: 'hidden', borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', transition: 'transform 0.5s ease-in-out', transform: `translateX(-${current * 100}%)`, height: '100%' }}>
                 {displayProducts.map((prod, idx) => {
-                    const prodId = getSafeId(prod); // Safely extract ID
+                    const prodId = getSafeId(prod); 
                     
                     return (
                         <div 
                             key={idx} 
-                            // 🟢 BULLETPROOF CLICK: Safely navigates now!
                             onClick={() => {
                                 if (prodId) navigate(`/product/${prodId}`);
                                 else console.error("Missing Product ID:", prod);
@@ -91,6 +85,7 @@ const ProductBannerSlider = ({ products, navigate }) => {
                                     src={getImageUrl(prod)} 
                                     alt={prod.name || prod.title || "Product"} 
                                     style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                                    onError={(e) => { e.target.src = "https://placehold.co/400x400/f8fafc/2874f0?text=Image+Error" }}
                                 />
                             </div>
 
@@ -259,7 +254,7 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* 🚀 REAL PRODUCT SLIDER ADVERTISEMENT (Passes navigate down) */}
+            {/* 🚀 REAL PRODUCT SLIDER ADVERTISEMENT */}
             {!searchQuery && selectedCategory === 'All' && <ProductBannerSlider products={products} navigate={navigate} />}
 
             {/* 📦 MAIN CONTENT */}
