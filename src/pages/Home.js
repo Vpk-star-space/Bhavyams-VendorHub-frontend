@@ -9,7 +9,8 @@ import { useCart } from '../context/CartContext';
 const CATEGORIES = ['All', 'Top Offers', 'Mobiles & Tablets', 'Electronics', 'TVs & Appliances', 'Fashion', 'Beauty'];
 
 // 🚀 NEW FEATURE: Dynamic Product Auto-Slider
-const ProductBannerSlider = ({ products }) => {
+// Passed 'navigate' down so clicking the banner opens the product
+const ProductBannerSlider = ({ products, navigate }) => {
     const [current, setCurrent] = useState(0);
 
     // Grab up to 5 random products to use as sliding advertisements
@@ -26,13 +27,26 @@ const ProductBannerSlider = ({ products }) => {
         return () => clearInterval(timer);
     }, [displayProducts.length]);
 
+    // 🟢 SMART IMAGE EXTRACTOR: Prevents blank images
+    const getImageUrl = (prod) => {
+        if (prod.image) return prod.image;
+        if (prod.imageUrl) return prod.imageUrl;
+        if (prod.images && prod.images.length > 0) return prod.images[0]; // If it's an array of images
+        return "https://via.placeholder.com/400?text=No+Image"; // Fallback just in case
+    };
+
     if (displayProducts.length === 0) return null;
 
     return (
         <div style={{ position: 'relative', width: '100%', maxWidth: '1240px', margin: '10px auto', height: '220px', overflow: 'hidden', borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', transition: 'transform 0.5s ease-in-out', transform: `translateX(-${current * 100}%)`, height: '100%' }}>
                 {displayProducts.map((prod, idx) => (
-                    <div key={idx} style={{ minWidth: '100%', height: '100%', display: 'flex', backgroundColor: '#fff', cursor: 'pointer' }}>
+                    <div 
+                        key={idx} 
+                        // 🟢 CLICK HANDLER ADDED: Now opens the product page
+                        onClick={() => navigate(`/product/${prod.id || prod._id}`)}
+                        style={{ minWidth: '100%', height: '100%', display: 'flex', backgroundColor: '#fff', cursor: 'pointer' }}
+                    >
                         
                         {/* Left Side: Product Info Ad */}
                         <div style={{ flex: 1, padding: '20px 30px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)' }}>
@@ -47,7 +61,7 @@ const ProductBannerSlider = ({ products }) => {
                         {/* Right Side: Product Image */}
                         <div style={{ flex: 1, padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
                             <img 
-                                src={prod.image || prod.imageUrl} 
+                                src={getImageUrl(prod)} 
                                 alt={prod.name || prod.title} 
                                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
                             />
@@ -217,8 +231,8 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* 🚀 REAL PRODUCT SLIDER ADVERTISEMENT */}
-            {!searchQuery && selectedCategory === 'All' && <ProductBannerSlider products={products} />}
+            {/* 🚀 REAL PRODUCT SLIDER ADVERTISEMENT (Passes navigate down) */}
+            {!searchQuery && selectedCategory === 'All' && <ProductBannerSlider products={products} navigate={navigate} />}
 
             {/* 📦 MAIN CONTENT */}
             <div style={styles.mainContainer}>
@@ -300,7 +314,6 @@ const styles = {
     mobileSectionTitle: { margin: 0, fontSize: '18px', fontWeight: '500' },
     viewAllBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
     desktopProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '15px' },
-    // 🟢 FIXED: Mobile grid is now 2 columns! Fixes "Upload pic is very big" issue.
     mobileProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' },
     emptyState: { padding: '40px', textAlign: 'center', color: '#212121', fontSize: '16px' },
     loaderContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f1f3f6' },
