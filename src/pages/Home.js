@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import { ShoppingCart, Search, User, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -8,34 +8,58 @@ import { useCart } from '../context/CartContext';
 // 🟢 Categories list
 const CATEGORIES = ['All', 'Top Offers', 'Mobiles & Tablets', 'Electronics', 'TVs & Appliances', 'Fashion', 'Beauty'];
 
-// 🚀 NEW FEATURE: Auto-Sliding Banner Component
-const BannerSlider = () => {
-    // Standard e-commerce placeholder banners (you can replace these URLs with your own later)
-    const banners = [
-        "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&h=300&q=80",
-        "https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&w=1200&h=300&q=80",
-        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&h=300&q=80"
-    ];
+// 🚀 NEW FEATURE: Dynamic Product Auto-Slider
+const ProductBannerSlider = ({ products }) => {
     const [current, setCurrent] = useState(0);
 
+    // Grab up to 5 random products to use as sliding advertisements
+    const displayProducts = useMemo(() => {
+        if (!products || products.length === 0) return [];
+        return [...products].sort(() => 0.5 - Math.random()).slice(0, 5);
+    }, [products]);
+
     useEffect(() => {
+        if (displayProducts.length <= 1) return;
         const timer = setInterval(() => {
-            setCurrent((prev) => (prev + 1) % banners.length);
+            setCurrent((prev) => (prev + 1) % displayProducts.length);
         }, 3000); // Slides every 3 seconds
         return () => clearInterval(timer);
-    }, [banners.length]);
+    }, [displayProducts.length]);
+
+    if (displayProducts.length === 0) return null;
 
     return (
         <div style={{ position: 'relative', width: '100%', maxWidth: '1240px', margin: '10px auto', height: '220px', overflow: 'hidden', borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', transition: 'transform 0.5s ease-in-out', transform: `translateX(-${current * 100}%)`, height: '100%' }}>
-                {banners.map((img, idx) => (
-                    <img key={idx} src={img} alt={`Banner ${idx}`} style={{ minWidth: '100%', height: '100%', objectFit: 'cover' }} />
+                {displayProducts.map((prod, idx) => (
+                    <div key={idx} style={{ minWidth: '100%', height: '100%', display: 'flex', backgroundColor: '#fff', cursor: 'pointer' }}>
+                        
+                        {/* Left Side: Product Info Ad */}
+                        <div style={{ flex: 1, padding: '20px 30px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)' }}>
+                            <p style={{ margin: '0 0 5px 0', color: '#878787', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>FEATURED PRODUCT</p>
+                            <h3 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#212121', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                {prod.name || prod.title}
+                            </h3>
+                            <p style={{ margin: '0 0 15px 0', color: '#388e3c', fontWeight: 'bold', fontSize: '22px' }}>₹{prod.price}</p>
+                            <div><span style={{ backgroundColor: '#2874f0', color: '#fff', padding: '8px 16px', borderRadius: '2px', fontSize: '13px', fontWeight: 'bold' }}>Shop Now</span></div>
+                        </div>
+
+                        {/* Right Side: Product Image */}
+                        <div style={{ flex: 1, padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+                            <img 
+                                src={prod.image || prod.imageUrl} 
+                                alt={prod.name || prod.title} 
+                                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                            />
+                        </div>
+
+                    </div>
                 ))}
             </div>
             {/* Sliding Dots */}
             <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px' }}>
-                {banners.map((_, idx) => (
-                    <div key={idx} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: current === idx ? '#fff' : 'rgba(255,255,255,0.5)', transition: '0.3s' }} />
+                {displayProducts.map((_, idx) => (
+                    <div key={idx} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: current === idx ? '#2874f0' : '#c2c2c2', transition: '0.3s' }} />
                 ))}
             </div>
         </div>
@@ -70,7 +94,6 @@ const Home = () => {
             try {
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/all');
                 
-                // 🟢 BULLETPROOF FETCHING: Catches data no matter how the backend sends it
                 let fetchedData = [];
                 if (Array.isArray(res.data)) fetchedData = res.data;
                 else if (res.data && Array.isArray(res.data.products)) fetchedData = res.data.products;
@@ -87,7 +110,6 @@ const Home = () => {
         fetchProducts();
     }, []);
 
-    // 🟢 SUPER SAFE FILTERING LOGIC
     const filteredProducts = products.filter(product => {
         const safeSearch = searchQuery ? searchQuery.toLowerCase().trim() : '';
         const pName = (product.name || product.title || '').toLowerCase();
@@ -99,7 +121,6 @@ const Home = () => {
                               pBrand.includes(safeSearch) || 
                               pCategory.includes(safeSearch);
 
-        // Smart Category Match (Fixes the issue if DB says "mobile" but button says "Mobiles & Tablets")
         const catButtonText = selectedCategory.toLowerCase();
         const matchesCategory = selectedCategory === 'All' || 
                                 pCategory === catButtonText || 
@@ -132,7 +153,6 @@ const Home = () => {
                             </h1>
                         </div>
                     ) : (
-                        // 🟢 FIXED LAPTOP MENU: Added flexShrink: 0 so it never hides!
                         <div style={{display: 'flex', alignItems: 'center', gap: '15px', minWidth: '150px'}}>
                             <Menu size={28} color="#fff" onClick={() => navigate('/dashboard')} style={{cursor: 'pointer', flexShrink: 0}} />
                             <h1 style={styles.logoText} onClick={() => navigate('/')}>
@@ -197,8 +217,8 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* 🚀 THE NEW SLIDER COMPONENT */}
-            {!searchQuery && selectedCategory === 'All' && <BannerSlider />}
+            {/* 🚀 REAL PRODUCT SLIDER ADVERTISEMENT */}
+            {!searchQuery && selectedCategory === 'All' && <ProductBannerSlider products={products} />}
 
             {/* 📦 MAIN CONTENT */}
             <div style={styles.mainContainer}>
@@ -280,7 +300,8 @@ const styles = {
     mobileSectionTitle: { margin: 0, fontSize: '18px', fontWeight: '500' },
     viewAllBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
     desktopProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '15px' },
-    mobileProductGrid: { display: 'flex', flexDirection: 'column', gap: '15px' },
+    // 🟢 FIXED: Mobile grid is now 2 columns! Fixes "Upload pic is very big" issue.
+    mobileProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' },
     emptyState: { padding: '40px', textAlign: 'center', color: '#212121', fontSize: '16px' },
     loaderContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f1f3f6' },
     spinner: { width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #2874f0', borderRadius: '50%', animation: 'spin 1s linear infinite' },
