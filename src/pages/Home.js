@@ -9,11 +9,9 @@ import { useCart } from '../context/CartContext';
 const CATEGORIES = ['All', 'Top Offers', 'Mobiles & Tablets', 'Electronics', 'TVs & Appliances', 'Fashion', 'Beauty'];
 
 // 🚀 NEW FEATURE: Dynamic Product Auto-Slider
-// Passed 'navigate' down so clicking the banner opens the product
 const ProductBannerSlider = ({ products, navigate }) => {
     const [current, setCurrent] = useState(0);
 
-    // Grab up to 5 random products to use as sliding advertisements
     const displayProducts = useMemo(() => {
         if (!products || products.length === 0) return [];
         return [...products].sort(() => 0.5 - Math.random()).slice(0, 5);
@@ -23,16 +21,39 @@ const ProductBannerSlider = ({ products, navigate }) => {
         if (displayProducts.length <= 1) return;
         const timer = setInterval(() => {
             setCurrent((prev) => (prev + 1) % displayProducts.length);
-        }, 3000); // Slides every 3 seconds
+        }, 3000); 
         return () => clearInterval(timer);
     }, [displayProducts.length]);
 
-    // 🟢 SMART IMAGE EXTRACTOR: Prevents blank images
+    // 🟢 MEGA-ROBUST IMAGE EXTRACTOR: Fixes Database Array/String Bugs
     const getImageUrl = (prod) => {
         if (prod.image) return prod.image;
         if (prod.imageUrl) return prod.imageUrl;
-        if (prod.images && prod.images.length > 0) return prod.images[0]; // If it's an array of images
-        return "https://via.placeholder.com/400?text=No+Image"; // Fallback just in case
+        if (prod.images) {
+            // If it's already a proper array
+            if (Array.isArray(prod.images) && prod.images.length > 0) return prod.images[0];
+            // If the database sent the array as a string block
+            if (typeof prod.images === 'string') {
+                try {
+                    // Try parsing JSON: '["url1.jpg"]'
+                    const parsed = JSON.parse(prod.images);
+                    if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+                } catch(e) {
+                    // Try fixing PostgreSQL array formatting: '{url1.jpg, url2.jpg}'
+                    if (prod.images.startsWith('{') && prod.images.endsWith('}')) {
+                        return prod.images.replace(/^{|}$/g, '').split(',')[0].replace(/^"|"$/g, '');
+                    }
+                    // If it's just a regular URL hiding in a string
+                    if (prod.images.startsWith('http')) return prod.images;
+                }
+            }
+        }
+        return "https://via.placeholder.com/400?text=No+Image"; // Safe Fallback
+    };
+
+    // 🟢 SMART ID EXTRACTOR: Finds the correct ID name from your DB
+    const getSafeId = (prod) => {
+        return prod.id || prod._id || prod.productId || prod.product_id;
     };
 
     if (displayProducts.length === 0) return null;
@@ -40,35 +61,42 @@ const ProductBannerSlider = ({ products, navigate }) => {
     return (
         <div style={{ position: 'relative', width: '100%', maxWidth: '1240px', margin: '10px auto', height: '220px', overflow: 'hidden', borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', transition: 'transform 0.5s ease-in-out', transform: `translateX(-${current * 100}%)`, height: '100%' }}>
-                {displayProducts.map((prod, idx) => (
-                    <div 
-                        key={idx} 
-                        // 🟢 CLICK HANDLER ADDED: Now opens the product page
-                        onClick={() => navigate(`/product/${prod.id || prod._id}`)}
-                        style={{ minWidth: '100%', height: '100%', display: 'flex', backgroundColor: '#fff', cursor: 'pointer' }}
-                    >
-                        
-                        {/* Left Side: Product Info Ad */}
-                        <div style={{ flex: 1, padding: '20px 30px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)' }}>
-                            <p style={{ margin: '0 0 5px 0', color: '#878787', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>FEATURED PRODUCT</p>
-                            <h3 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#212121', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                {prod.name || prod.title}
-                            </h3>
-                            <p style={{ margin: '0 0 15px 0', color: '#388e3c', fontWeight: 'bold', fontSize: '22px' }}>₹{prod.price}</p>
-                            <div><span style={{ backgroundColor: '#2874f0', color: '#fff', padding: '8px 16px', borderRadius: '2px', fontSize: '13px', fontWeight: 'bold' }}>Shop Now</span></div>
-                        </div>
+                {displayProducts.map((prod, idx) => {
+                    const prodId = getSafeId(prod); // Safely extract ID
+                    
+                    return (
+                        <div 
+                            key={idx} 
+                            // 🟢 BULLETPROOF CLICK: Safely navigates now!
+                            onClick={() => {
+                                if (prodId) navigate(`/product/${prodId}`);
+                                else console.error("Missing Product ID:", prod);
+                            }}
+                            style={{ minWidth: '100%', height: '100%', display: 'flex', backgroundColor: '#fff', cursor: 'pointer' }}
+                        >
+                            
+                            {/* Left Side: Product Info Ad */}
+                            <div style={{ flex: 1, padding: '20px 30px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)' }}>
+                                <p style={{ margin: '0 0 5px 0', color: '#878787', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase' }}>FEATURED PRODUCT</p>
+                                <h3 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#212121', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                    {prod.name || prod.title}
+                                </h3>
+                                <p style={{ margin: '0 0 15px 0', color: '#388e3c', fontWeight: 'bold', fontSize: '22px' }}>₹{prod.price}</p>
+                                <div><span style={{ backgroundColor: '#2874f0', color: '#fff', padding: '8px 16px', borderRadius: '2px', fontSize: '13px', fontWeight: 'bold' }}>Shop Now</span></div>
+                            </div>
 
-                        {/* Right Side: Product Image */}
-                        <div style={{ flex: 1, padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
-                            <img 
-                                src={getImageUrl(prod)} 
-                                alt={prod.name || prod.title} 
-                                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
-                            />
-                        </div>
+                            {/* Right Side: Product Image */}
+                            <div style={{ flex: 1, padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+                                <img 
+                                    src={getImageUrl(prod)} 
+                                    alt={prod.name || prod.title || "Product"} 
+                                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                                />
+                            </div>
 
-                    </div>
-                ))}
+                        </div>
+                    );
+                })}
             </div>
             {/* Sliding Dots */}
             <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px' }}>
