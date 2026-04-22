@@ -8,12 +8,45 @@ import { useCart } from '../context/CartContext';
 // 🟢 Categories list
 const CATEGORIES = ['All', 'Top Offers', 'Mobiles & Tablets', 'Electronics', 'TVs & Appliances', 'Fashion', 'Beauty'];
 
+// 🚀 NEW FEATURE: Auto-Sliding Banner Component
+const BannerSlider = () => {
+    // Standard e-commerce placeholder banners (you can replace these URLs with your own later)
+    const banners = [
+        "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&h=300&q=80",
+        "https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&w=1200&h=300&q=80",
+        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&h=300&q=80"
+    ];
+    const [current, setCurrent] = useState(0);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrent((prev) => (prev + 1) % banners.length);
+        }, 3000); // Slides every 3 seconds
+        return () => clearInterval(timer);
+    }, [banners.length]);
+
+    return (
+        <div style={{ position: 'relative', width: '100%', maxWidth: '1240px', margin: '10px auto', height: '220px', overflow: 'hidden', borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', transition: 'transform 0.5s ease-in-out', transform: `translateX(-${current * 100}%)`, height: '100%' }}>
+                {banners.map((img, idx) => (
+                    <img key={idx} src={img} alt={`Banner ${idx}`} style={{ minWidth: '100%', height: '100%', objectFit: 'cover' }} />
+                ))}
+            </div>
+            {/* Sliding Dots */}
+            <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px' }}>
+                {banners.map((_, idx) => (
+                    <div key={idx} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: current === idx ? '#fff' : 'rgba(255,255,255,0.5)', transition: '0.3s' }} />
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const Home = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     
-    // 🟢 State for tracking search and selected category
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -37,13 +70,13 @@ const Home = () => {
             try {
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/all');
                 
-                if (res.data && Array.isArray(res.data.products)) {
-                    setProducts(res.data.products);
-                } else if (Array.isArray(res.data)) {
-                    setProducts(res.data);
-                } else {
-                    setProducts([]);
-                }
+                // 🟢 BULLETPROOF FETCHING: Catches data no matter how the backend sends it
+                let fetchedData = [];
+                if (Array.isArray(res.data)) fetchedData = res.data;
+                else if (res.data && Array.isArray(res.data.products)) fetchedData = res.data.products;
+                else if (res.data && Array.isArray(res.data.data)) fetchedData = res.data.data;
+                
+                setProducts(fetchedData);
             } catch (err) {
                 console.error("Error fetching products:", err);
                 setProducts([]);
@@ -54,23 +87,24 @@ const Home = () => {
         fetchProducts();
     }, []);
 
-    // 🟢 BULLETPROOF FILTERING LOGIC
+    // 🟢 SUPER SAFE FILTERING LOGIC
     const filteredProducts = products.filter(product => {
-        // Make sure it doesn't crash if text is missing
         const safeSearch = searchQuery ? searchQuery.toLowerCase().trim() : '';
         const pName = (product.name || product.title || '').toLowerCase();
         const pBrand = (product.brand || '').toLowerCase();
         const pCategory = (product.category || '').toLowerCase();
 
-        // Check if search matches name, brand, or category
-        const matchesSearch = safeSearch === '' || 
+        const matchesSearch = !safeSearch || 
                               pName.includes(safeSearch) || 
                               pBrand.includes(safeSearch) || 
                               pCategory.includes(safeSearch);
 
-        // Check if category matches exactly (ignoring uppercase/lowercase)
+        // Smart Category Match (Fixes the issue if DB says "mobile" but button says "Mobiles & Tablets")
+        const catButtonText = selectedCategory.toLowerCase();
         const matchesCategory = selectedCategory === 'All' || 
-                                pCategory === selectedCategory.toLowerCase();
+                                pCategory === catButtonText || 
+                                catButtonText.includes(pCategory.split(' ')[0]) || 
+                                pCategory.includes(catButtonText.split(' ')[0]);
 
         return matchesSearch && matchesCategory;
     });
@@ -92,22 +126,21 @@ const Home = () => {
                     
                     {isMobile ? (
                         <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                            <Menu size={24} color="#fff" onClick={() => navigate('/dashboard')} style={{cursor: 'pointer'}} />
+                            <Menu size={24} color="#fff" onClick={() => navigate('/dashboard')} style={{cursor: 'pointer', flexShrink: 0}} />
                             <h1 style={styles.mobileLogoText} onClick={() => navigate('/')}>
                                 Bhavyams <span style={styles.hubText}>Hub</span>
                             </h1>
                         </div>
                     ) : (
-                        // 🟢 FIXED: Menu button now shows on Desktop/Laptop too!
-                        <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                            <Menu size={28} color="#fff" onClick={() => navigate('/dashboard')} style={{cursor: 'pointer'}} />
+                        // 🟢 FIXED LAPTOP MENU: Added flexShrink: 0 so it never hides!
+                        <div style={{display: 'flex', alignItems: 'center', gap: '15px', minWidth: '150px'}}>
+                            <Menu size={28} color="#fff" onClick={() => navigate('/dashboard')} style={{cursor: 'pointer', flexShrink: 0}} />
                             <h1 style={styles.logoText} onClick={() => navigate('/')}>
                                 Bhavyams <span style={styles.hubText}>Hub</span>
                             </h1>
                         </div>
                     )}
                     
-                    {/* 🟢 Search Box Wiring */}
                     <div style={isMobile ? styles.mobileSearchBar : styles.searchBar}>
                         <input 
                             type="text" 
@@ -116,7 +149,6 @@ const Home = () => {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
-                        {/* 🟢 FIXED: Search icon always shows */}
                         <Search size={18} color="#2874f0" style={styles.searchIcon} />
                     </div>
 
@@ -150,7 +182,6 @@ const Home = () => {
             {/* ⚪ CATEGORY STRIP */}
             <div style={styles.categoryStrip}>
                 <div style={styles.catContent}>
-                    {/* 🟢 Dynamic Categories */}
                     {CATEGORIES.map(cat => (
                         <span 
                             key={cat}
@@ -166,11 +197,13 @@ const Home = () => {
                 </div>
             </div>
 
+            {/* 🚀 THE NEW SLIDER COMPONENT */}
+            {!searchQuery && selectedCategory === 'All' && <BannerSlider />}
+
             {/* 📦 MAIN CONTENT */}
             <div style={styles.mainContainer}>
                 <div style={styles.productSection}>
                     <div style={styles.sectionHeader}>
-                        {/* 🟢 Header changes name based on search/category */}
                         <h2 style={isMobile ? styles.mobileSectionTitle : styles.sectionTitle}>
                             {searchQuery 
                                 ? `Searching for "${searchQuery}"` 
@@ -185,10 +218,12 @@ const Home = () => {
                     </div>
 
                     {filteredProducts.length === 0 ? (
-                        <div style={styles.emptyState}>No products found.</div>
+                        <div style={styles.emptyState}>
+                            <h3>No products found!</h3>
+                            <p style={{color: '#878787', fontSize: '14px'}}>Try clearing your search or category filter.</p>
+                        </div>
                     ) : (
                         <div style={isMobile ? styles.mobileProductGrid : styles.desktopProductGrid}>
-                            {/* 🟢 Use filteredProducts instead of products */}
                             {filteredProducts.map(product => (
                                 <ProductCard key={product.id || product._id} product={product} />
                             ))}
@@ -219,20 +254,18 @@ const styles = {
     mobileLogoText: { color: '#fff', fontSize: '16px', fontStyle: 'italic', fontWeight: 'bold', margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', lineHeight: '1' },
     hubText: { color: '#ffe500', fontSize: '11px', letterSpacing: '1px' },
     
-    // 🟢 Added position: relative and alignItems so search icon sits perfectly inside
     searchBar: { flex: 1, maxWidth: '500px', display: 'flex', position: 'relative', alignItems: 'center' },
     mobileSearchBar: { flex: 1, display: 'flex', position: 'relative', alignItems: 'center' },
     
-    // 🟢 Added padding-right (35px) so text doesn't hide behind the magnifying glass
     searchInput: { width: '100%', padding: '8px 35px 8px 12px', borderRadius: '2px', border: 'none', outline: 'none', fontSize: '14px', boxShadow: '0 2px 4px 0 rgba(0,0,0,.23)' },
     searchIcon: { position: 'absolute', right: '10px', cursor: 'pointer' },
     
     navActions: { display: 'flex', alignItems: 'center', gap: '30px' },
     mobileNavActions: { display: 'flex', alignItems: 'center', gap: '10px' },
-    navBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '6px 20px', fontWeight: 'bold', fontSize: '14px', borderRadius: '2px', cursor: 'pointer' },
+    navBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '6px 20px', fontWeight: 'bold', fontSize: '14px', borderRadius: '2px', cursor: 'pointer', whiteSpace: 'nowrap' },
     mobileNavBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '4px 8px', fontWeight: 'bold', fontSize: '12px', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     
-    cartIconWrapper: { color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' },
+    cartIconWrapper: { color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', whiteSpace: 'nowrap' },
     cartBadge: { position: 'absolute', top: '-8px', right: '-10px', background: '#ff9f00', color: '#fff', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px', border: '1px solid #2874f0' },
     cartText: { fontSize: '15px', fontWeight: 'bold' },
     
@@ -248,7 +281,7 @@ const styles = {
     viewAllBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
     desktopProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '15px' },
     mobileProductGrid: { display: 'flex', flexDirection: 'column', gap: '15px' },
-    emptyState: { padding: '40px', textAlign: 'center', color: '#878787', fontSize: '16px' },
+    emptyState: { padding: '40px', textAlign: 'center', color: '#212121', fontSize: '16px' },
     loaderContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f1f3f6' },
     spinner: { width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #2874f0', borderRadius: '50%', animation: 'spin 1s linear infinite' },
     loaderText: { marginTop: '15px', fontWeight: 'bold', color: '#2874f0' },
