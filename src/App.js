@@ -82,13 +82,13 @@ const MaintenanceScreen = () => {
                 <div style={mStyles.imageSection}>
                     <div style={mStyles.imageWrapper}>
                         <img 
-                            // Professional Server/Gears Animated GIF
-                            src="https://media.tenor.com/EwZ8Y6tqN80AAAAC/server-maintenance-server.gif" 
+                            // Highly reliable animated GIF of server gears
+                            src="https://i.pinimg.com/originals/a0/a1/b6/a0a1b65d5690dfab06e78864703a1158.gif" 
                             alt="Server Maintenance Animation" 
                             style={mStyles.image}
                             onError={(e) => { 
                                 // Fallback image just in case the internet blocks GIFs
-                                e.target.src = "https://img.freepik.com/free-vector/server-status-concept-illustration_114360-1285.jpg" 
+                                e.target.src = "https://cdn-icons-png.flaticon.com/512/5113/5113264.png" 
                             }}
                         />
                     </div>
@@ -107,7 +107,10 @@ const MaintenanceScreen = () => {
                             మా సర్వర్ ప్రస్తుతం నిర్వహణ (మెయింటెనెన్స్) మోడ్‌లో ఉంది.
                         </span>
                         <br/><br/>
-                        We are upgrading our systems to serve you better. / మీకు మెరుగైన సేవలు అందించడానికి మేము మా సిస్టమ్‌లను అప్‌గ్రేడ్ చేస్తున్నాము.
+                        We are upgrading our systems to serve you better.<br/>
+                        <span style={{color: '#8c98a9', fontSize: '15px'}}>
+                            మీకు మెరుగైన సేవలు అందించడానికి మేము మా సిస్టమ్‌లను అప్‌గ్రేడ్ చేస్తున్నాము.
+                        </span>
                     </p>
 
                     {/* LIVE TICKING CLOCK & TARGET TIME PANEL */}
