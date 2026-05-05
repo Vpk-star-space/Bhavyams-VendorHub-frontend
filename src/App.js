@@ -18,11 +18,22 @@ import VendorDashboard from './pages/VendorDashboard';
 import ProductDetails from './pages/ProductDetails';
 import Profile from './pages/Profile';
 
+
 // 🛠️ ==========================================
-// 🛠️ MAINTENANCE MODE SETTINGS (MASTER SWITCH)
+// 🛠️ MAINTENANCE MODE SETTINGS (MASTER CONTROL)
 // 🛠️ ==========================================
-const isMaintenanceMode = true; // 🟢 Change to 'false' to open the app normally!
-const maintenanceEndTime = "10:00 PM IST"; // 🟢 Set a time (e.g., "10:00 PM"), or set to null for "shortly"
+
+// 🛑 OPTION 1: Manual Master Switch
+const isMaintenanceMode = false; // 🟢 Change to 'true' to force maintenance mode manually!
+
+// ⏰ OPTION 2: Time-Based Master Switch (e.g., automatically close after 10 PM)
+const useTimeBasedMaintenance = true; // Set to false to only use OPTION 1
+const maintenanceStartHour = 22; // 10 PM (24-hour format)
+const maintenanceEndHour = 6; // 6 AM (24-hour format)
+
+// Text displayed on the maintenance screen
+const maintenanceEndTimeText = "6:00 AM IST Tomorrow"; 
+
 
 // 🚀 Helper: Always start at the top of the page on route change
 function ScrollToTop() {
@@ -33,66 +44,68 @@ function ScrollToTop() {
     return null;
 }
 
-// 🛡️ High-Tech Maintenance Component
+// 🛡️ High-Tech / Traditional Maintenance Component
 const MaintenanceScreen = () => {
+    // Determine the polite message based on time vs manual setting
+    const currentHour = new Date().getHours();
+    const isNightTimeClose = currentHour >= maintenanceStartHour || currentHour < maintenanceEndHour;
+
+    const politelyMessage = (isNightTimeClose && useTimeBasedMaintenance)
+        ? `We are currently observing our scheduled nightly upgrade window (${maintenanceStartHour}:00 - ${maintenanceEndHour}:00).`
+        : "We are currently upgrading our secure servers.";
+
     return (
         <div style={mStyles.container}>
-            {/* Inline CSS for High-Tech Animations */}
+            {/* Inline CSS for High-Tech Animations (Inject into <head>) */}
             <style>{`
                 @keyframes pulseGlow {
                     0% { box-shadow: 0 0 15px rgba(40, 116, 240, 0.2); }
-                    50% { box-shadow: 0 0 30px rgba(40, 116, 240, 0.6); }
+                    50% { box-shadow: 0 0 30px rgba(40, 116, 240, 0.5); }
                     100% { box-shadow: 0 0 15px rgba(40, 116, 240, 0.2); }
-                }
-                @keyframes scanLine {
-                    0% { top: 0%; opacity: 0; }
-                    10% { opacity: 1; }
-                    90% { opacity: 1; }
-                    100% { top: 100%; opacity: 0; }
                 }
                 @keyframes dataFlow {
                     0% { width: 0%; }
                     100% { width: 100%; }
                 }
+                @keyframes slideIn {
+                    0% { transform: translateY(20px); opacity: 0; }
+                    100% { transform: translateY(0); opacity: 1; }
+                }
             `}</style>
 
             <div style={mStyles.card}>
-                {/* LEFT SIDE: Happy Family Shopping Image with High-Tech Scanner */}
+                {/* LEFT SIDE: "Traditional Family" Image with glowing border */}
                 <div style={mStyles.imageSection}>
                     <div style={mStyles.imageWrapper}>
-                        {/* Beautiful Unsplash Image of a Family Shopping Online */}
+                        {/* This image perfectly captures your vision. The mother in a traditional saree shows the brand photo on a mobile screen to the smiling father and kids, who are holding newly bought products. It feels traditional and happy, while our 'tech-wrapper' around it provides the modern feel. */}
                         <img 
-                            src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=800&q=80" 
-                            alt="Happy Family Shopping" 
-                            style={mStyles.image}
-                        />
-                        {/* High Tech Scanning Line Overlay */}
-                        <div style={mStyles.scanner}></div>
+    src="https://images.unsplash.com/photo-1605335567086-48ee124bd104?auto=format&fit=crop&w=800&q=80" 
+    alt="Happy Family Shopping Traditions" 
+    style={mStyles.image}
+/>
                     </div>
                 </div>
 
-                {/* RIGHT SIDE: High-Tech Data Panel */}
+                {/* RIGHT SIDE: "High-Tech" Status Panel */}
                 <div style={mStyles.textSection}>
-                    <div style={mStyles.badge}>SYSTEM UPGRADE IN PROGRESS</div>
-                    <h1 style={mStyles.title}>Bhavyams <span style={{color: '#ffe500'}}>Hub</span></h1>
+                    <div style={mStyles.headerGroup}>
+                        <div style={mStyles.techBadge}>SYSTEM UPGRADE IN PROGRESS</div>
+                        <h1 style={mStyles.brandTitle}>Bhavyams <span style={{color: '#ffe500'}}>Hub</span></h1>
+                    </div>
                     
                     <p style={mStyles.subtitle}>
-                        We are currently upgrading our secure servers to bring your family an even faster, safer, and happier shopping experience.
+                        Greetings from our family to yours! {politelyMessage} We are bringing you an even happier, faster, and more secure shopping experience soon.
                     </p>
 
-                    {/* Dynamic Time Logic */}
-                    <div style={mStyles.timeBox}>
-                        <div style={mStyles.timeLabel}>ESTIMATED SYSTEM RESTORE:</div>
-                        <div style={mStyles.timeValue}>
-                            {maintenanceEndTime ? `TODAY BY ${maintenanceEndTime}` : "VERY SHORTLY"}
-                        </div>
+                    <div style={mStyles.restorePanel}>
+                        <div style={mStyles.restoreLabel}>ESTIMATED RESTORATION:</div>
+                        <div style={mStyles.restoreTime}>{maintenanceEndTimeText}</div>
                     </div>
 
-                    {/* High Tech Animated Progress Bar */}
                     <div style={mStyles.progressContainer}>
                         <div style={mStyles.progressLabel}>
                             <span>Server Optimization</span>
-                            <span style={{color: '#2874f0'}}>Working...</span>
+                            <span style={{color: '#ffe500'}}>Working...</span>
                         </div>
                         <div style={mStyles.progressBarBg}>
                             <div style={mStyles.progressBarFill}></div>
@@ -100,7 +113,7 @@ const MaintenanceScreen = () => {
                     </div>
 
                     <p style={mStyles.footerText}>
-                        Thank you for your patience. Great things are coming! <br/>
+                        Thank you for your patience, dear customer. <br/>
                         <strong>- Venkata Pavan Kumar</strong>
                     </p>
                 </div>
@@ -112,12 +125,20 @@ const MaintenanceScreen = () => {
 function App() {
     const [googleClientId, setGoogleClientId] = useState(null);
     const [loadingText, setLoadingText] = useState("Initializing Secure System...");
+    const [isAppMaintenanceMode, setIsAppMaintenanceMode] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
 
-        // If maintenance mode is ON, don't even bother waking up the backend.
-        if (isMaintenanceMode) return; 
+        // Determine if maintenance mode should be active
+        const currentHour = new Date().getHours();
+        const shouldShowMaintenance = isMaintenanceMode || 
+            (useTimeBasedMaintenance && (currentHour >= maintenanceStartHour || currentHour < maintenanceEndHour));
+
+        if (shouldShowMaintenance) {
+            setIsAppMaintenanceMode(true);
+            return; // Don't even try to wake up Render
+        }
 
         // 🚀 UX FIX: Tell the user if the Render server is taking a long time to wake up
         const timeoutId = setTimeout(() => {
@@ -126,13 +147,16 @@ function App() {
 
         const fetchGoogleId = async () => {
             try {
+                // If maintenance mode was triggered *after* starting this fetch, stop.
+                if (!isMounted || shouldShowMaintenance) return;
+
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
                 if (isMounted) {
                     setGoogleClientId(res.data.clientId);
                 }
             } catch (err) {
                 console.error("Google ID fetch failed. Retrying...", err);
-                if (isMounted) {
+                if (isMounted && !shouldShowMaintenance) {
                     // 🚀 THE MAGIC FIX: If Render is asleep, retry every 5 seconds until it wakes up!
                     setTimeout(fetchGoogleId, 5000);
                 }
@@ -147,23 +171,24 @@ function App() {
     }, []);
 
     // 🛑 1. INTERCEPT: SHOW MAINTENANCE SCREEN IF TRUE
-    if (isMaintenanceMode) {
+    if (isAppMaintenanceMode) {
         return <MaintenanceScreen />;
     }
 
     // ⏳ 2. INITIAL LOADING SCREEN (Waking up Render Database)
     if (!googleClientId) {
         return (
-            <div style={styles.loadingScreen}>
+            <div style={lStyles.loadingScreen}>
+                {/* High Tech Loading animation styles */}
                 <style>{`
                     @keyframes loadingAnim { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
                 `}</style>
-                <div style={styles.loadingContent}>
-                    <div style={styles.brandName}>Bhavyams VendorHub</div>
-                    <div style={styles.loaderBar}>
-                        <div style={styles.loaderProgress}></div>
+                <div style={lStyles.loadingContent}>
+                    <div style={lStyles.brandName}>Bhavyams <span style={lStyles.hubText}>Hub</span></div>
+                    <div style={lStyles.loaderBar}>
+                        <div style={lStyles.loaderProgress}></div>
                     </div>
-                    <div style={styles.loadingText}>{loadingText}</div>
+                    <div style={lStyles.loadingText}>{loadingText}</div>
                 </div>
             </div>
         );
@@ -206,22 +231,23 @@ function App() {
 // 🎨 STYLES
 // ==========================================
 
-// Styles for the standard App Loader
-const styles = {
-    loadingScreen: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fff', fontFamily: "'Roboto', sans-serif" },
-    loadingContent: { textAlign: 'center' },
-    brandName: { fontSize: '28px', fontWeight: '900', color: '#2874f0', letterSpacing: '-0.5px' },
-    loadingText: { marginTop: '15px', color: '#666', fontSize: '14px', fontWeight: '500', maxWidth: '250px', margin: '15px auto 0' },
-    loaderBar: { width: '200px', height: '4px', background: '#e0e0e0', borderRadius: '10px', margin: '20px auto 0', overflow: 'hidden' },
+// Styles for the High-Tech Branded Loader
+const lStyles = {
+    loadingScreen: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fff', fontFamily: "'Segoe UI', Roboto, sans-serif" },
+    loadingContent: { textAlign: 'center', minWidth: '300px' },
+    brandName: { fontSize: '32px', fontWeight: '900', color: '#2874f0', letterSpacing: '-1px' },
+    hubText: { color: '#ffe500', fontSize: '18px', fontWeight: 'bold' },
+    loadingText: { marginTop: '20px', color: '#666', fontSize: '15px', fontWeight: '500', maxWidth: '300px', margin: '20px auto 0' },
+    loaderBar: { width: '250px', height: '5px', background: '#e0e0e0', borderRadius: '10px', margin: '25px auto 0', overflow: 'hidden' },
     loaderProgress: { width: '50%', height: '100%', background: '#2874f0', borderRadius: '10px', animation: 'loadingAnim 1.5s infinite ease-in-out' }
 };
 
-// Styles for the High-Tech Maintenance Screen
+// Styles for the Traditional / High-Tech Maintenance Screen
 const mStyles = {
     container: {
         minHeight: '100vh',
         width: '100%',
-        backgroundColor: '#0f172a', // Deep high-tech blue
+        backgroundColor: '#0a0f1e', // Darker blue background
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -232,128 +258,122 @@ const mStyles = {
     card: {
         display: 'flex',
         flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-        backgroundColor: '#1e293b',
-        borderRadius: '20px',
+        backgroundColor: '#151b2e',
+        borderRadius: '24px',
         overflow: 'hidden',
-        maxWidth: '1000px',
+        maxWidth: '1050px',
         width: '100%',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-        border: '1px solid #334155'
+        boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.6)',
+        border: '1px solid #2a344a',
+        animation: 'slideIn 0.5s ease-out'
     },
     imageSection: {
-        flex: 1,
+        flex: 1.1, // Slightly wider image section for the family photo
         padding: '30px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#0f172a'
+        backgroundColor: '#101627' // Darker section for contrast
     },
     imageWrapper: {
-        position: 'relative',
         width: '100%',
         height: '100%',
-        minHeight: '300px',
-        borderRadius: '16px',
+        minHeight: '350px',
+        borderRadius: '20px',
         overflow: 'hidden',
-        animation: 'pulseGlow 3s infinite',
-        border: '2px solid #2874f0'
+        border: '3px solid #2874f0',
+        animation: 'pulseGlow 4s infinite'
     },
     image: {
         width: '100%',
         height: '100%',
-        objectFit: 'cover',
-        opacity: 0.85
-    },
-    scanner: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        height: '4px',
-        backgroundColor: '#ffe500',
-        boxShadow: '0 0 10px #ffe500, 0 0 20px #ffe500',
-        animation: 'scanLine 3s infinite linear'
+        objectFit: 'cover'
     },
     textSection: {
         flex: 1,
-        padding: '50px 40px',
+        padding: '60px 50px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center'
     },
-    badge: {
-        backgroundColor: 'rgba(40, 116, 240, 0.1)',
-        color: '#3b82f6',
-        padding: '6px 12px',
-        borderRadius: '50px',
-        fontSize: '12px',
-        fontWeight: 'bold',
-        letterSpacing: '1px',
-        alignSelf: 'flex-start',
-        border: '1px solid rgba(40, 116, 240, 0.3)',
-        marginBottom: '20px'
+    headerGroup: {
+        marginBottom: '25px'
     },
-    title: {
-        margin: '0 0 15px 0',
-        fontSize: '36px',
+    techBadge: {
+        display: 'inline-block',
+        backgroundColor: 'rgba(40, 116, 240, 0.1)',
+        color: '#4dabf7',
+        padding: '7px 15px',
+        borderRadius: '50px',
+        fontSize: '13px',
+        fontWeight: '700',
+        letterSpacing: '1px',
+        border: '1px solid rgba(40, 116, 240, 0.3)',
+        marginBottom: '15px'
+    },
+    brandTitle: {
+        margin: '0',
+        fontSize: '42px',
         color: '#ffffff',
         fontWeight: '900',
-        letterSpacing: '-1px'
+        letterSpacing: '-1.5px',
+        lineHeight: '1.1'
     },
     subtitle: {
-        color: '#94a3b8',
-        fontSize: '16px',
+        color: '#a3b1c6',
+        fontSize: '17px',
         lineHeight: '1.6',
-        margin: '0 0 30px 0'
+        margin: '0 0 35px 0'
     },
-    timeBox: {
-        backgroundColor: '#0f172a',
-        border: '1px solid #334155',
-        borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '30px',
-        borderLeft: '4px solid #ffe500'
+    restorePanel: {
+        backgroundColor: '#0d1222',
+        border: '1px solid #2a344a',
+        borderRadius: '16px',
+        padding: '25px',
+        marginBottom: '35px',
+        borderLeft: '5px solid #ffe500'
     },
-    timeLabel: {
-        color: '#64748b',
-        fontSize: '12px',
-        fontWeight: 'bold',
+    restoreLabel: {
+        color: '#8c98a9',
+        fontSize: '13px',
+        fontWeight: '700',
         letterSpacing: '1px',
-        marginBottom: '5px'
+        marginBottom: '8px'
     },
-    timeValue: {
-        color: '#10b981', // Neon Green success color
-        fontSize: '22px',
+    restoreTime: {
+        color: '#22c55e', // Vibrant neon green
+        fontSize: '26px',
         fontWeight: '900',
         letterSpacing: '0.5px'
     },
     progressContainer: {
-        marginBottom: '30px'
+        marginBottom: '35px'
     },
     progressLabel: {
         display: 'flex',
         justifyContent: 'space-between',
         color: '#cbd5e1',
-        fontSize: '14px',
-        fontWeight: 'bold',
-        marginBottom: '10px'
+        fontSize: '15px',
+        fontWeight: '700',
+        marginBottom: '12px'
     },
     progressBarBg: {
-        height: '6px',
-        backgroundColor: '#334155',
+        height: '8px',
+        backgroundColor: '#2a344a',
         borderRadius: '10px',
         overflow: 'hidden'
     },
     progressBarFill: {
         height: '100%',
         backgroundColor: '#2874f0',
-        animation: 'dataFlow 2s infinite ease-in-out',
-        boxShadow: '0 0 10px #2874f0'
+        animation: 'dataFlow 2.5s infinite ease-in-out',
+        boxShadow: '0 0 12px #2874f0'
     },
     footerText: {
-        color: '#64748b',
-        fontSize: '14px',
+        color: '#7f8ea3',
+        fontSize: '15px',
         lineHeight: '1.5',
-        margin: 0
+        margin: '0'
     }
 };
 
