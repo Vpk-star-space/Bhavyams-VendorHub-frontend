@@ -18,22 +18,20 @@ import VendorDashboard from './pages/VendorDashboard';
 import ProductDetails from './pages/ProductDetails';
 import Profile from './pages/Profile';
 
-
 // 🛠️ ==========================================
 // 🛠️ MAINTENANCE MODE SETTINGS (MASTER CONTROL)
 // 🛠️ ==========================================
 
 // 🛑 OPTION 1: Manual Master Switch
-const isMaintenanceMode = false; // 🟢 Change to 'true' to force maintenance mode manually!
+const isMaintenanceMode = true; // 🟢 Change to 'false' to open the app normally!
 
 // ⏰ OPTION 2: Time-Based Master Switch (e.g., automatically close after 10 PM)
-const useTimeBasedMaintenance = true; // Set to false to only use OPTION 1
-const maintenanceStartHour = 22; // 10 PM (24-hour format)
-const maintenanceEndHour = 6; // 6 AM (24-hour format)
+const useTimeBasedMaintenance = true; 
+const maintenanceStartHour = 22; // 10 PM
+const maintenanceEndHour = 6; // 6 AM
 
 // Text displayed on the maintenance screen
 const maintenanceEndTimeText = "6:00 AM IST Tomorrow"; 
-
 
 // 🚀 Helper: Always start at the top of the page on route change
 function ScrollToTop() {
@@ -44,19 +42,21 @@ function ScrollToTop() {
     return null;
 }
 
-// 🛡️ High-Tech / Traditional Maintenance Component
+// 🛡️ High-Tech / Traditional Maintenance Component (Bilingual: English + Telugu)
 const MaintenanceScreen = () => {
-    // Determine the polite message based on time vs manual setting
     const currentHour = new Date().getHours();
     const isNightTimeClose = currentHour >= maintenanceStartHour || currentHour < maintenanceEndHour;
 
-    const politelyMessage = (isNightTimeClose && useTimeBasedMaintenance)
+    const politelyMessageEn = (isNightTimeClose && useTimeBasedMaintenance)
         ? `We are currently observing our scheduled nightly upgrade window (${maintenanceStartHour}:00 - ${maintenanceEndHour}:00).`
         : "We are currently upgrading our secure servers.";
+        
+    const politelyMessageTe = (isNightTimeClose && useTimeBasedMaintenance)
+        ? `మేము ప్రస్తుతం రాత్రిపూట షెడ్యూల్ చేయబడిన అప్‌గ్రేడ్ సమయంలో ఉన్నాము.`
+        : "మేము ప్రస్తుతం మా సర్వర్‌లను అప్‌గ్రేడ్ చేస్తున్నాము.";
 
     return (
         <div style={mStyles.container}>
-            {/* Inline CSS for High-Tech Animations (Inject into <head>) */}
             <style>{`
                 @keyframes pulseGlow {
                     0% { box-shadow: 0 0 15px rgba(40, 116, 240, 0.2); }
@@ -74,38 +74,41 @@ const MaintenanceScreen = () => {
             `}</style>
 
             <div style={mStyles.card}>
-                {/* LEFT SIDE: "Traditional Family" Image with glowing border */}
+                {/* LEFT SIDE: Professional Company-Style Animated GIF */}
                 <div style={mStyles.imageSection}>
                     <div style={mStyles.imageWrapper}>
-                        {/* This image perfectly captures your vision. The mother in a traditional saree shows the brand photo on a mobile screen to the smiling father and kids, who are holding newly bought products. It feels traditional and happy, while our 'tech-wrapper' around it provides the modern feel. */}
                         <img 
-    src="https://images.unsplash.com/photo-1605335567086-48ee124bd104?auto=format&fit=crop&w=800&q=80" 
-    alt="Happy Family Shopping Traditions" 
-    style={mStyles.image}
-/>
+                            src="https://i.pinimg.com/originals/4e/d0/ea/4ed0ea9e8e535e612ed97960eec821bb.gif" 
+                            alt="Brand Animation Shopping Online" 
+                            style={mStyles.image}
+                        />
                     </div>
                 </div>
 
-                {/* RIGHT SIDE: "High-Tech" Status Panel */}
+                {/* RIGHT SIDE: "High-Tech" Status Panel (BILINGUAL) */}
                 <div style={mStyles.textSection}>
                     <div style={mStyles.headerGroup}>
-                        <div style={mStyles.techBadge}>SYSTEM UPGRADE IN PROGRESS</div>
+                        <div style={mStyles.techBadge}>SYSTEM UPGRADE / సిస్టమ్ అప్‌గ్రేడ్</div>
                         <h1 style={mStyles.brandTitle}>Bhavyams <span style={{color: '#ffe500'}}>Hub</span></h1>
                     </div>
                     
                     <p style={mStyles.subtitle}>
-                        Greetings from our family to yours! {politelyMessage} We are bringing you an even happier, faster, and more secure shopping experience soon.
+                        <strong>Greetings from our family to yours! / మా కుటుంబం నుండి మీ కుటుంబానికి నమస్కారాలు!</strong><br/><br/>
+                        {politelyMessageEn} We are bringing you an even happier, faster, and more secure shopping experience soon.<br/><br/>
+                        <span style={{color: '#8c98a9', fontSize: '15px'}}>
+                            {politelyMessageTe} మేము త్వరలో మీకు మరింత సంతోషకరమైన, వేగవంతమైన మరియు సురక్షితమైన షాపింగ్ అనుభవాన్ని తీసుకువస్తున్నాము.
+                        </span>
                     </p>
 
                     <div style={mStyles.restorePanel}>
-                        <div style={mStyles.restoreLabel}>ESTIMATED RESTORATION:</div>
+                        <div style={mStyles.restoreLabel}>ESTIMATED RESTORATION / పునరుద్ధరణ సమయం:</div>
                         <div style={mStyles.restoreTime}>{maintenanceEndTimeText}</div>
                     </div>
 
                     <div style={mStyles.progressContainer}>
                         <div style={mStyles.progressLabel}>
-                            <span>Server Optimization</span>
-                            <span style={{color: '#ffe500'}}>Working...</span>
+                            <span>Server Optimization (సర్వర్ ఆప్టిమైజేషన్)</span>
+                            <span style={{color: '#ffe500'}}>Working... (జరుగుతోంది...)</span>
                         </div>
                         <div style={mStyles.progressBarBg}>
                             <div style={mStyles.progressBarFill}></div>
@@ -114,6 +117,7 @@ const MaintenanceScreen = () => {
 
                     <p style={mStyles.footerText}>
                         Thank you for your patience, dear customer. <br/>
+                        <span style={{fontSize: '13px'}}>(మీ ఓపికకు ధన్యవాదాలు)</span><br/>
                         <strong>- Venkata Pavan Kumar</strong>
                     </p>
                 </div>
@@ -130,34 +134,27 @@ function App() {
     useEffect(() => {
         let isMounted = true;
 
-        // Determine if maintenance mode should be active
         const currentHour = new Date().getHours();
         const shouldShowMaintenance = isMaintenanceMode || 
             (useTimeBasedMaintenance && (currentHour >= maintenanceStartHour || currentHour < maintenanceEndHour));
 
         if (shouldShowMaintenance) {
             setIsAppMaintenanceMode(true);
-            return; // Don't even try to wake up Render
+            return; 
         }
 
-        // 🚀 UX FIX: Tell the user if the Render server is taking a long time to wake up
         const timeoutId = setTimeout(() => {
             if (isMounted) setLoadingText("Waking up secure server. This can take up to a minute...");
         }, 5000);
 
         const fetchGoogleId = async () => {
             try {
-                // If maintenance mode was triggered *after* starting this fetch, stop.
                 if (!isMounted || shouldShowMaintenance) return;
-
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
-                if (isMounted) {
-                    setGoogleClientId(res.data.clientId);
-                }
+                if (isMounted) setGoogleClientId(res.data.clientId);
             } catch (err) {
                 console.error("Google ID fetch failed. Retrying...", err);
                 if (isMounted && !shouldShowMaintenance) {
-                    // 🚀 THE MAGIC FIX: If Render is asleep, retry every 5 seconds until it wakes up!
                     setTimeout(fetchGoogleId, 5000);
                 }
             }
@@ -170,16 +167,11 @@ function App() {
         };
     }, []);
 
-    // 🛑 1. INTERCEPT: SHOW MAINTENANCE SCREEN IF TRUE
-    if (isAppMaintenanceMode) {
-        return <MaintenanceScreen />;
-    }
+    if (isAppMaintenanceMode) return <MaintenanceScreen />;
 
-    // ⏳ 2. INITIAL LOADING SCREEN (Waking up Render Database)
     if (!googleClientId) {
         return (
             <div style={lStyles.loadingScreen}>
-                {/* High Tech Loading animation styles */}
                 <style>{`
                     @keyframes loadingAnim { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
                 `}</style>
@@ -194,15 +186,14 @@ function App() {
         );
     }
 
-    // ✅ 3. MAIN APPLICATION RUNS NORMALLY
     return (
         <GoogleOAuthProvider clientId={googleClientId}>
             <CartProvider>
                 <Router>
-                    <ScrollToTop /> {/* 🚀 Ensures pro navigation */}
+                    <ScrollToTop />
                     <ToastContainer 
                         theme="colored" 
-                        position="top-center" // Better for Mobile
+                        position="top-center"
                         autoClose={1500} 
                         hideProgressBar={true}
                     />
@@ -231,7 +222,6 @@ function App() {
 // 🎨 STYLES
 // ==========================================
 
-// Styles for the High-Tech Branded Loader
 const lStyles = {
     loadingScreen: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fff', fontFamily: "'Segoe UI', Roboto, sans-serif" },
     loadingContent: { textAlign: 'center', minWidth: '300px' },
@@ -242,12 +232,11 @@ const lStyles = {
     loaderProgress: { width: '50%', height: '100%', background: '#2874f0', borderRadius: '10px', animation: 'loadingAnim 1.5s infinite ease-in-out' }
 };
 
-// Styles for the Traditional / High-Tech Maintenance Screen
 const mStyles = {
     container: {
         minHeight: '100vh',
         width: '100%',
-        backgroundColor: '#0a0f1e', // Darker blue background
+        backgroundColor: '#0a0f1e', 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -268,12 +257,12 @@ const mStyles = {
         animation: 'slideIn 0.5s ease-out'
     },
     imageSection: {
-        flex: 1.1, // Slightly wider image section for the family photo
+        flex: 1.1, 
         padding: '30px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#101627' // Darker section for contrast
+        backgroundColor: '#ffffff' // White background to make the e-commerce GIF pop!
     },
     imageWrapper: {
         width: '100%',
@@ -341,7 +330,7 @@ const mStyles = {
         marginBottom: '8px'
     },
     restoreTime: {
-        color: '#22c55e', // Vibrant neon green
+        color: '#22c55e', 
         fontSize: '26px',
         fontWeight: '900',
         letterSpacing: '0.5px'
