@@ -38,12 +38,10 @@ function ScrollToTop() {
     return null;
 }
 
-// 🛡️ High-Tech Maintenance Component with LIVE TICKING CLOCK (Bilingual)
+// 🛡️ Compact & Professional Maintenance Component
 const MaintenanceScreen = () => {
-    // State to hold the live running time
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Effect to update the clock every single second
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
@@ -51,7 +49,6 @@ const MaintenanceScreen = () => {
         return () => clearInterval(timer);
     }, []);
 
-    // Format the live time to look like "10:45:30 AM"
     const liveTimeString = currentTime.toLocaleTimeString('en-US', { 
         hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
     });
@@ -59,11 +56,6 @@ const MaintenanceScreen = () => {
     return (
         <div style={mStyles.container}>
             <style>{`
-                @keyframes pulseGlow {
-                    0% { box-shadow: 0 0 15px rgba(40, 116, 240, 0.2); border-color: #2874f0; }
-                    50% { box-shadow: 0 0 35px rgba(40, 116, 240, 0.6); border-color: #4dabf7; }
-                    100% { box-shadow: 0 0 15px rgba(40, 116, 240, 0.2); border-color: #2874f0; }
-                }
                 @keyframes dataFlow {
                     0% { width: 0%; }
                     100% { width: 100%; }
@@ -73,78 +65,53 @@ const MaintenanceScreen = () => {
                     100% { transform: translateY(0); opacity: 1; }
                 }
                 .clock-text {
-                    font-variant-numeric: tabular-nums; /* Keeps numbers from shifting */
+                    font-variant-numeric: tabular-nums;
                 }
             `}</style>
 
             <div style={mStyles.card}>
-                {/* LEFT SIDE: Animated Server Maintenance GIF */}
-                <div style={mStyles.imageSection}>
-                    <div style={mStyles.imageWrapper}>
-                        <img 
-                            // Highly reliable animated GIF of server gears
-                            src="https://i.pinimg.com/originals/a0/a1/b6/a0a1b65d5690dfab06e78864703a1158.gif" 
-                            alt="Server Maintenance Animation" 
-                            style={mStyles.image}
-                            onError={(e) => { 
-                                // Fallback image just in case the internet blocks GIFs
-                                e.target.src = "https://cdn-icons-png.flaticon.com/512/5113/5113264.png" 
-                            }}
-                        />
+                
+                {/* 1. BRAND & HEADER */}
+                <h1 style={mStyles.brandTitle}>Bhavyams <span style={{color: '#ffe500'}}>Hub</span></h1>
+                <div style={mStyles.techBadge}>MAINTENANCE MODE / నిర్వహణ మోడ్</div>
+                
+                {/* 2. SIMPLE MESSAGE */}
+                <p style={mStyles.subtitle}>
+                    <strong>Our server is currently in maintenance mode.</strong><br/>
+                    <span style={{color: '#8c98a9', fontSize: '15px'}}>మా సర్వర్ ప్రస్తుతం నిర్వహణ మోడ్‌లో ఉంది.</span>
+                </p>
+
+                {/* 3. TIME PANELS (Side by Side) */}
+                <div style={mStyles.timePanelContainer}>
+                    <div style={mStyles.liveTimeBox}>
+                        <div style={mStyles.timeLabel}>PRESENT TIME / ప్రస్తుత సమయం</div>
+                        <div className="clock-text" style={mStyles.liveTimeValue}>
+                            {liveTimeString}
+                        </div>
+                    </div>
+
+                    <div style={mStyles.restorePanel}>
+                        <div style={mStyles.timeLabel}>TARGET RESTORE TIME / లక్ష్యం</div>
+                        <div style={mStyles.restoreTime}>{targetRestoreTime}</div>
                     </div>
                 </div>
 
-                {/* RIGHT SIDE: High-Tech Status Panel (BILINGUAL & LIVE CLOCK) */}
-                <div style={mStyles.textSection}>
-                    <div style={mStyles.headerGroup}>
-                        <div style={mStyles.techBadge}>MAINTENANCE MODE / నిర్వహణ మోడ్</div>
-                        <h1 style={mStyles.brandTitle}>Bhavyams <span style={{color: '#ffe500'}}>Hub</span></h1>
+                {/* 4. PROGRESS BAR */}
+                <div style={mStyles.progressContainer}>
+                    <div style={mStyles.progressLabel}>
+                        <span>Server Upgrading (సర్వర్ అప్‌గ్రేడ్)</span>
+                        <span style={{color: '#ffe500'}}>In Progress...</span>
                     </div>
-                    
-                    <p style={mStyles.subtitle}>
-                        <strong>Our server is currently in maintenance mode.</strong><br/>
-                        <span style={{color: '#8c98a9', fontSize: '15px'}}>
-                            మా సర్వర్ ప్రస్తుతం నిర్వహణ (మెయింటెనెన్స్) మోడ్‌లో ఉంది.
-                        </span>
-                        <br/><br/>
-                        We are upgrading our systems to serve you better.<br/>
-                        <span style={{color: '#8c98a9', fontSize: '15px'}}>
-                            మీకు మెరుగైన సేవలు అందించడానికి మేము మా సిస్టమ్‌లను అప్‌గ్రేడ్ చేస్తున్నాము.
-                        </span>
-                    </p>
-
-                    {/* LIVE TICKING CLOCK & TARGET TIME PANEL */}
-                    <div style={mStyles.timePanelContainer}>
-                        {/* Current Live Time Box */}
-                        <div style={mStyles.liveTimeBox}>
-                            <div style={mStyles.timeLabel}>PRESENT TIME / ప్రస్తుత సమయం:</div>
-                            <div className="clock-text" style={mStyles.liveTimeValue}>
-                                {liveTimeString}
-                            </div>
-                        </div>
-
-                        {/* Target Restore Time Box */}
-                        <div style={mStyles.restorePanel}>
-                            <div style={mStyles.timeLabel}>TARGET RESTORE TIME / పునరుద్ధరణ లక్ష్యం:</div>
-                            <div style={mStyles.restoreTime}>{targetRestoreTime}</div>
-                        </div>
+                    <div style={mStyles.progressBarBg}>
+                        <div style={mStyles.progressBarFill}></div>
                     </div>
-
-                    <div style={mStyles.progressContainer}>
-                        <div style={mStyles.progressLabel}>
-                            <span>Server Upgrading (సర్వర్ అప్‌గ్రేడ్)</span>
-                            <span style={{color: '#ffe500'}}>In Progress... (జరుగుతోంది...)</span>
-                        </div>
-                        <div style={mStyles.progressBarBg}>
-                            <div style={mStyles.progressBarFill}></div>
-                        </div>
-                    </div>
-
-                    <p style={mStyles.footerText}>
-                        Thank you for your patience. <span style={{fontSize: '13px'}}>(మీ ఓపికకు ధన్యవాదాలు)</span><br/>
-                        <strong>- Venkata Pavan Kumar</strong>
-                    </p>
                 </div>
+
+                {/* 5. FOOTER */}
+                <p style={mStyles.footerText}>
+                    Thank you for your patience. <span style={{fontSize: '13px'}}>(మీ ఓపికకు ధన్యవాదాలు)</span><br/><br/>
+                    <strong>- Venkata Pavan Kumar</strong>
+                </p>
             </div>
         </div>
     );
@@ -157,7 +124,6 @@ function App() {
     useEffect(() => {
         let isMounted = true;
 
-        // If maintenance is ON, instantly stop trying to connect to the backend
         if (isMaintenanceMode) return; 
 
         const timeoutId = setTimeout(() => {
@@ -184,12 +150,10 @@ function App() {
         };
     }, []);
 
-    // 🛑 1. SHOW MAINTENANCE SCREEN IF MASTER SWITCH IS TRUE
     if (isMaintenanceMode) {
         return <MaintenanceScreen />;
     }
 
-    // ⏳ 2. INITIAL LOADING SCREEN (Waking up Render Database)
     if (!googleClientId) {
         return (
             <div style={lStyles.loadingScreen}>
@@ -207,7 +171,6 @@ function App() {
         );
     }
 
-    // ✅ 3. MAIN APPLICATION RUNS NORMALLY
     return (
         <GoogleOAuthProvider clientId={googleClientId}>
             <CartProvider>
@@ -268,146 +231,114 @@ const mStyles = {
     },
     card: {
         display: 'flex',
-        flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-        backgroundColor: '#151b2e',
-        borderRadius: '24px',
-        overflow: 'hidden',
-        maxWidth: '1050px',
-        width: '100%',
-        boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.6)',
-        border: '1px solid #2a344a',
-        animation: 'slideIn 0.5s ease-out'
-    },
-    imageSection: {
-        flex: 1, 
-        padding: '30px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#0d1222' 
-    },
-    imageWrapper: {
-        width: '100%',
-        height: '100%',
-        minHeight: '300px',
-        maxHeight: '400px',
-        borderRadius: '20px',
-        overflow: 'hidden',
-        border: '3px solid #2874f0',
-        animation: 'pulseGlow 4s infinite',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#ffffff'
-    },
-    image: {
-        width: '100%',
-        height: '100%',
-        objectFit: 'contain',
-        padding: '20px'
-    },
-    textSection: {
-        flex: 1.2,
-        padding: '50px 45px',
-        display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center'
+        alignItems: 'center',
+        textAlign: 'center',
+        backgroundColor: '#151b2e',
+        borderRadius: '16px',
+        padding: '40px',
+        maxWidth: '550px',
+        width: '100%',
+        boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.5)',
+        border: '1px solid #2a344a',
+        animation: 'slideIn 0.4s ease-out'
     },
-    headerGroup: {
-        marginBottom: '20px'
+    brandTitle: {
+        margin: '0 0 15px 0',
+        fontSize: '38px',
+        color: '#ffffff',
+        fontWeight: '900',
+        letterSpacing: '-1px'
     },
     techBadge: {
         display: 'inline-block',
         backgroundColor: 'rgba(255, 68, 68, 0.15)',
         color: '#ff4444',
-        padding: '7px 15px',
+        padding: '6px 14px',
         borderRadius: '50px',
-        fontSize: '13px',
+        fontSize: '12px',
         fontWeight: '700',
         letterSpacing: '1px',
         border: '1px solid rgba(255, 68, 68, 0.3)',
-        marginBottom: '15px'
-    },
-    brandTitle: {
-        margin: '0',
-        fontSize: '42px',
-        color: '#ffffff',
-        fontWeight: '900',
-        letterSpacing: '-1px',
-        lineHeight: '1.1'
+        marginBottom: '25px'
     },
     subtitle: {
         color: '#a3b1c6',
         fontSize: '16px',
         lineHeight: '1.6',
-        margin: '0 0 25px 0'
+        margin: '0 0 30px 0'
     },
     timePanelContainer: {
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: window.innerWidth < 500 ? 'column' : 'row',
+        width: '100%',
         gap: '15px',
-        marginBottom: '35px'
+        marginBottom: '30px'
     },
     liveTimeBox: {
+        flex: 1,
         backgroundColor: '#0d1222',
         border: '1px solid #2a344a',
-        borderRadius: '12px',
-        padding: '18px 25px',
-        borderLeft: '5px solid #4dabf7' // Blue accent for current time
+        borderRadius: '10px',
+        padding: '15px',
+        borderTop: '4px solid #4dabf7' 
     },
     restorePanel: {
+        flex: 1,
         backgroundColor: '#0d1222',
         border: '1px solid #2a344a',
-        borderRadius: '12px',
-        padding: '18px 25px',
-        borderLeft: '5px solid #22c55e' // Green accent for target time
+        borderRadius: '10px',
+        padding: '15px',
+        borderTop: '4px solid #22c55e' 
     },
     timeLabel: {
         color: '#8c98a9',
-        fontSize: '12px',
+        fontSize: '11px',
         fontWeight: '700',
         letterSpacing: '1px',
-        marginBottom: '5px'
+        marginBottom: '8px'
     },
     liveTimeValue: {
-        color: '#4dabf7', // High-tech blue
-        fontSize: '24px',
+        color: '#4dabf7', 
+        fontSize: '20px',
         fontWeight: '900',
-        letterSpacing: '2px'
+        letterSpacing: '1px'
     },
     restoreTime: {
-        color: '#22c55e', // Neon green
-        fontSize: '22px',
+        color: '#22c55e', 
+        fontSize: '20px',
         fontWeight: '900',
         letterSpacing: '0.5px'
     },
     progressContainer: {
-        marginBottom: '35px'
+        width: '100%',
+        marginBottom: '30px'
     },
     progressLabel: {
         display: 'flex',
         justifyContent: 'space-between',
         color: '#cbd5e1',
-        fontSize: '15px',
+        fontSize: '13px',
         fontWeight: '700',
-        marginBottom: '12px'
+        marginBottom: '10px'
     },
     progressBarBg: {
-        height: '8px',
+        width: '100%',
+        height: '6px',
         backgroundColor: '#2a344a',
         borderRadius: '10px',
         overflow: 'hidden'
     },
     progressBarFill: {
         height: '100%',
-        backgroundColor: '#ffe500', // Yellow caution color for maintenance
-        animation: 'dataFlow 2.5s infinite linear',
-        boxShadow: '0 0 12px #ffe500'
+        backgroundColor: '#ffe500', 
+        animation: 'dataFlow 2s infinite linear',
+        boxShadow: '0 0 10px #ffe500'
     },
     footerText: {
         color: '#7f8ea3',
-        fontSize: '15px',
-        lineHeight: '1.5',
+        fontSize: '14px',
+        lineHeight: '1.6',
         margin: '0'
     }
 };
