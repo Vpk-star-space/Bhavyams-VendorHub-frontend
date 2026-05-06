@@ -84,7 +84,7 @@ const MaintenanceScreen = () => {
                 {/* 3. TIME PANELS (Side by Side) */}
                 <div style={mStyles.timePanelContainer}>
                     <div style={mStyles.liveTimeBox}>
-                        <div style={mStyles.timeLabel}>PRESENT TIME / ప్రస్తుత సమయం</div>
+                        <div style={mStyles.timeLabel}>            MAINTENANCE / నిర్వహణ సమయం</div>
                         <div className="clock-text" style={mStyles.liveTimeValue}>
                             {liveTimeString}
                         </div>
