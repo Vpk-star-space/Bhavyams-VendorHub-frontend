@@ -26,7 +26,7 @@ import Profile from './pages/Profile';
 const isMaintenanceMode = true; // 🟢 Change to 'false' to open your app!
 
 // 🎯 2. TARGET TIME: Tell users when you will be back online
-const targetRestoreTime = "null"; 
+const targetRestoreTime = ""; 
 
 
 // 🚀 Helper: Always start at the top of the page on route change
