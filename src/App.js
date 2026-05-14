@@ -26,7 +26,7 @@ import Profile from './pages/Profile';
 const isMaintenanceMode = false; // 🟢 Change to 'false' to open your app!
 
 // 🎯 2. TARGET TIME: Tell users when you will be back online
-const targetRestoreTime = "Today at 10:00 AM"; 
+const targetRestoreTime = "Update coming soon..."; 
 
 
 // 🚀 Helper: Always start at the top of the page on route change
@@ -84,7 +84,7 @@ const MaintenanceScreen = () => {
                 {/* 3. TIME PANELS (Side by Side) */}
                 <div style={mStyles.timePanelContainer}>
                     <div style={mStyles.liveTimeBox}>
-                        <div style={mStyles.timeLabel}>PRESENT TIME / ప్రస్తుత సమయం</div>
+                        <div style={mStyles.timeLabel}>            MAINTENANCE / నిర్వహణ సమయం</div>
                         <div className="clock-text" style={mStyles.liveTimeValue}>
                             {liveTimeString}
                         </div>
