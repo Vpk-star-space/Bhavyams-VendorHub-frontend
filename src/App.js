@@ -23,7 +23,7 @@ import Profile from './pages/Profile';
 // 🛠️ ==========================================
 
 // 🛑 1. MASTER SWITCH: Turn Maintenance Mode ON or OFF
-const isMaintenanceMode = true; // 🟢 Change to 'false' to open your app!
+const isMaintenanceMode = false; // 🟢 Change to 'false' to open your app!
 
 // 🎯 2. TARGET TIME: Tell users when you will be back online
 const targetRestoreTime = "Today at 10:00 AM"; 
