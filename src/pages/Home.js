@@ -292,7 +292,7 @@ const Home = () => {
             <footer style={styles.footer}>
                 <p style={styles.footerText}>System Engineered by <strong>Venkata Pavan Kumar</strong></p>
                 <p style={styles.footerContact}>
-                    Contact: <a href="mailto:pavanvenkat63@gmail.com" style={styles.footerLink}>venkatapavankumar36@gmail.com</a>
+                    Contact: <a href="mailto:venkatapavankumar36@gmail.com" style={styles.footerLink}>venkatapavankumar36@gmail.com</a>
                 </p>
                 <p style={styles.footerContact}>
                     Check out our other app: <a href="https://subhams-vpk.vercel.app/" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>Subhams </a>
