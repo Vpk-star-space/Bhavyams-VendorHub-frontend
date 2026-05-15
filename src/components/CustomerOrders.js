@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, CheckCircle, ChevronRight } from 'lucide-react';
+import { MapPin, CheckCircle, ChevronRight, Sparkles } from 'lucide-react';
 
 const CustomerOrders = ({ orders }) => {
-    // 📱 Add responsive screen size state
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
     useEffect(() => {
@@ -23,20 +22,28 @@ const CustomerOrders = ({ orders }) => {
         return `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
     };
 
-    // 🎯 FLIPKART TRACKING LOGIC
+    // 🎯 SMART TRACKING STATUS MATCHER
     const getTrackingStatus = (status) => {
-        const safeStatus = (status || 'Ordered').toLowerCase();
+        const safeStatus = (status || '').toLowerCase();
         
         if (safeStatus.includes('deliver')) return 3; // Step 4: Delivered
         if (safeStatus.includes('out') || safeStatus.includes('transit')) return 2; // Step 3: Out for Delivery
-        if (safeStatus.includes('ship') || safeStatus.includes('dispatch')) return 1; // Step 2: Shipped
-        return 0; // Step 1: Ordered / Confirmed
+        // 🟢 FIX: Included 'confirm' so your Confirmed orders light up the second dot!
+        if (safeStatus.includes('ship') || safeStatus.includes('dispatch') || safeStatus.includes('confirm')) return 1; // Step 2: Confirmed/Shipped
+        return 0; // Step 1: Ordered
     };
 
-    const trackingSteps = ['Ordered', 'Shipped', 'Out for Delivery', 'Delivered'];
+    const trackingSteps = ['Ordered', 'Confirmed', 'Out for Delivery', 'Delivered'];
 
     return (
         <div style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
+            
+            {/* 🏷️ DIAGNOSTIC BADGE: If you don't see this on your screen, you are editing the wrong file path! */}
+            <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '10px 15px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 'bold' }}>
+                <Sparkles size={16} />
+                <span>🔄 Flipkart Tracking UI Active (If you see this, the file path is correct!)</span>
+            </div>
+
             {orders.map((order) => {
                 const isDelivered = order.status === 'Delivered';
                 const currentStepIndex = getTrackingStatus(order.status);
@@ -65,7 +72,7 @@ const CustomerOrders = ({ orders }) => {
 
                         {/* 🛤️ RESPONSIVE TRACKING TIMELINE */}
                         {isMobile ? (
-                            /* 📱 MOBILE VIEW: VERTICAL STEPPER TIMELINE */
+                            /* 📱 MOBILE VIEW: VERTICAL TIMELINE */
                             <div style={styles.mobileTimelineContainer}>
                                 {trackingSteps.map((step, index) => {
                                     const isCompleted = index <= currentStepIndex;
@@ -150,7 +157,7 @@ const CustomerOrders = ({ orders }) => {
                                     <div style={{ fontSize: '12px', color: '#878787', marginTop: '2px' }}>
                                         {isDelivered 
                                             ? 'Package handed to resident' 
-                                            : (currentStepIndex === 0 ? 'Your order is confirmed and moving toward Konanki.' : `ETA: ${order.delivery_minutes || 6} mins`)
+                                            : (order.status === 'Confirmed' ? 'Your order is confirmed and moving toward Konanki.' : `ETA: ${order.delivery_minutes || 6} mins`)
                                         }
                                     </div>
                                 </div>
@@ -177,14 +184,12 @@ const styles = {
     sellerText: { fontSize: '12px', color: '#878787', marginBottom: '6px' },
     priceText: { fontSize: '16px', fontWeight: 'bold', color: '#212121' },
     
-    // Desktop Timeline Layout Styles
     timelineContainer: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '30px 40px 10px 40px' },
     stepWrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 2, width: '60px' },
     dot: { width: '12px', height: '12px', borderRadius: '50%', background: '#fff', zIndex: 2 },
     stepLabel: { fontSize: '11px', marginTop: '8px', textAlign: 'center', width: '80px' },
     connectorLine: { flex: 1, height: '3px', marginTop: '5px', marginLeft: '-20px', marginRight: '-20px', zIndex: 1 },
     
-    // 📱 Mobile Vertical Stepper Styles
     mobileTimelineContainer: { display: 'flex', flexDirection: 'column', padding: '20px 25px', gap: '0px' },
     mobileStepRow: { display: 'flex', alignItems: 'flex-start', gap: '15px', height: '45px' },
     mobileIndicatorColumn: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '12px', height: '100%' },
