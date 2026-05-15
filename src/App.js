@@ -127,7 +127,7 @@ function App() {
         if (isMaintenanceMode) return; 
 
         const timeoutId = setTimeout(() => {
-            if (isMounted) setLoadingText("Waking up secure server. This can take up to a minute...");
+            if (isMounted) setLoadingText("Waking up secure server. This can take up to a few seconds...");
         }, 5000);
 
         const fetchGoogleId = async () => {
