@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, CheckCircle, ChevronRight } from 'lucide-react';
 
 const CustomerOrders = ({ orders }) => {
+    // 📱 Add responsive screen size state
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     if (!orders || orders.length === 0) return <p style={{textAlign: 'center', color: '#64748b', padding: '40px'}}>No orders yet. Start shopping!</p>;
 
     // 🌐 SMART IMAGE LOGIC
@@ -54,41 +63,75 @@ const CustomerOrders = ({ orders }) => {
                             </div>
                         </div>
 
-                        {/* 🛤️ FLIPKART-STYLE VISUAL TRACKING TIMELINE */}
-                        <div style={styles.timelineContainer}>
-                            {trackingSteps.map((step, index) => {
-                                const isCompleted = index <= currentStepIndex;
-                                const isLast = index === trackingSteps.length - 1;
+                        {/* 🛤️ RESPONSIVE TRACKING TIMELINE */}
+                        {isMobile ? (
+                            /* 📱 MOBILE VIEW: VERTICAL STEPPER TIMELINE */
+                            <div style={styles.mobileTimelineContainer}>
+                                {trackingSteps.map((step, index) => {
+                                    const isCompleted = index <= currentStepIndex;
+                                    const isLast = index === trackingSteps.length - 1;
 
-                                return (
-                                    <React.Fragment key={step}>
-                                        {/* The Dot & Label */}
-                                        <div style={styles.stepWrapper}>
-                                            <div style={{
-                                                ...styles.dot, 
-                                                backgroundColor: isCompleted ? '#26a541' : '#e0e0e0',
-                                                border: isCompleted ? '2px solid #26a541' : '2px solid #e0e0e0'
-                                            }} />
+                                    return (
+                                        <div key={step} style={styles.mobileStepRow}>
+                                            <div style={styles.mobileIndicatorColumn}>
+                                                <div style={{
+                                                    ...styles.dot,
+                                                    backgroundColor: isCompleted ? '#26a541' : '#e0e0e0',
+                                                    border: isCompleted ? '2px solid #26a541' : '2px solid #e0e0e0'
+                                                }} />
+                                                {!isLast && (
+                                                    <div style={{
+                                                        ...styles.mobileVerticalLine,
+                                                        backgroundColor: index < currentStepIndex ? '#26a541' : '#e0e0e0'
+                                                    }} />
+                                                )}
+                                            </div>
                                             <span style={{
-                                                ...styles.stepLabel, 
+                                                ...styles.mobileStepLabel,
                                                 color: isCompleted ? '#212121' : '#878787',
                                                 fontWeight: isCompleted ? '600' : 'normal'
                                             }}>
                                                 {step}
                                             </span>
                                         </div>
-                                        
-                                        {/* The Connecting Line */}
-                                        {!isLast && (
-                                            <div style={{
-                                                ...styles.connectorLine, 
-                                                backgroundColor: index < currentStepIndex ? '#26a541' : '#e0e0e0'
-                                            }} />
-                                        )}
-                                    </React.Fragment>
-                                );
-                            })}
-                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            /* 💻 DESKTOP VIEW: HORIZONTAL TIMELINE */
+                            <div style={styles.timelineContainer}>
+                                {trackingSteps.map((step, index) => {
+                                    const isCompleted = index <= currentStepIndex;
+                                    const isLast = index === trackingSteps.length - 1;
+
+                                    return (
+                                        <React.Fragment key={step}>
+                                            <div style={styles.stepWrapper}>
+                                                <div style={{
+                                                    ...styles.dot, 
+                                                    backgroundColor: isCompleted ? '#26a541' : '#e0e0e0',
+                                                    border: isCompleted ? '2px solid #26a541' : '2px solid #e0e0e0'
+                                                }} />
+                                                <span style={{
+                                                    ...styles.stepLabel, 
+                                                    color: isCompleted ? '#212121' : '#878787',
+                                                    fontWeight: isCompleted ? '600' : 'normal'
+                                                }}>
+                                                    {step}
+                                                </span>
+                                            </div>
+                                            
+                                            {!isLast && (
+                                                <div style={{
+                                                    ...styles.connectorLine, 
+                                                    backgroundColor: index < currentStepIndex ? '#26a541' : '#e0e0e0'
+                                                }} />
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </div>
+                        )}
 
                         <hr style={styles.divider} />
 
@@ -134,12 +177,20 @@ const styles = {
     sellerText: { fontSize: '12px', color: '#878787', marginBottom: '6px' },
     priceText: { fontSize: '16px', fontWeight: 'bold', color: '#212121' },
     
+    // Desktop Timeline Layout Styles
     timelineContainer: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '30px 40px 10px 40px' },
     stepWrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 2, width: '60px' },
     dot: { width: '12px', height: '12px', borderRadius: '50%', background: '#fff', zIndex: 2 },
     stepLabel: { fontSize: '11px', marginTop: '8px', textAlign: 'center', width: '80px' },
     connectorLine: { flex: 1, height: '3px', marginTop: '5px', marginLeft: '-20px', marginRight: '-20px', zIndex: 1 },
     
+    // 📱 Mobile Vertical Stepper Styles
+    mobileTimelineContainer: { display: 'flex', flexDirection: 'column', padding: '20px 25px', gap: '0px' },
+    mobileStepRow: { display: 'flex', alignItems: 'flex-start', gap: '15px', height: '45px' },
+    mobileIndicatorColumn: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '12px', height: '100%' },
+    mobileVerticalLine: { width: '3px', flex: 1, marginTop: '2px', marginBottom: '2px' },
+    mobileStepLabel: { fontSize: '13px', lineHeight: '14px' },
+
     divider: { border: 'none', borderTop: '1px solid #f0f0f0', margin: '15px 0 0 0' },
     deliveryFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: '#fafafa' },
     trackBtn: { background: 'transparent', border: 'none', color: '#2874f0', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }
