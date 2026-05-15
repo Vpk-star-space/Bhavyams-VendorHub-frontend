@@ -97,64 +97,71 @@ const Cart = () => {
     };
 
     const handleCheckout = async () => {
-        const token = localStorage.getItem('token');
-        if (!token) return navigate('/login');
+    const token = localStorage.getItem('token');
+    if (!token) return navigate('/login');
+    
+    if (hasOutofStock) return toast.error("Please remove Out of Stock items before checking out!");
+
+    setIsCheckingOut(true);
+    try {
+        const { data: freshUser } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        localStorage.setItem('user', JSON.stringify(freshUser));
         
-        if (hasOutofStock) return toast.error("Please remove Out of Stock items before checking out!");
-
-        setIsCheckingOut(true);
-        try {
-            const { data: freshUser } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            localStorage.setItem('user', JSON.stringify(freshUser));
-            
-            if (!freshUser.address || freshUser.address.length < 5) {
-                toast.error("❌ Add your address in 'My Profile' first!");
-                navigate('/dashboard'); 
-                setIsCheckingOut(false);
-                return;
-            }
-
-            const { data: keyData } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/orders/get-razorpay-key', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            const { data: orderData } = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/orders/checkout', 
-                { cartItems: liveCart, finalTotal: total }, { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            const options = {
-                key: keyData.key, 
-                amount: orderData.razorpayOrder.amount, 
-                currency: "INR",
-                name: "Bhavyams VendorHub",
-                description: "Secure Payment",
-                order_id: orderData.razorpayOrder.id,
-                handler: async function (response) {
-                    try {
-                        const verifyRes = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/orders/verify-payment', 
-                            { ...response, cartItems: liveCart }, { headers: { Authorization: `Bearer ${token}` } }
-                        );
-                        if (verifyRes.data.status === 'success') {
-                            clearCart();
-                            setOrderPlaced(true);
-                        }
-                    } catch (err) {
-                        toast.error(err.response?.data?.message || "Payment Verification Failed");
-                    }
-                },
-                prefill: { name: freshUser.username, email: freshUser.email },
-                theme: { color: "#2874f0" },
-                modal: { ondismiss: () => setIsCheckingOut(false) }
-            };
-            new window.Razorpay(options).open();
-        } catch (err) { 
-            toast.error(err.response?.data?.message || "Item is out of stock or error occurred."); 
-        } finally { 
-            setIsCheckingOut(false); 
+        if (!freshUser.address || freshUser.address.length < 5) {
+            toast.error("❌ Add your address in 'My Profile' first!");
+            navigate('/dashboard'); 
+            setIsCheckingOut(false);
+            return;
         }
-    };
+
+        const { data: keyData } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/orders/get-razorpay-key', {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const { data: orderData } = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/orders/checkout', 
+            { cartItems: liveCart, finalTotal: total }, { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const options = {
+            key: keyData.key, 
+            amount: orderData.razorpayOrder.amount, 
+            currency: "INR",
+            name: "Bhavyams VendorHub",
+            description: "Secure Payment",
+            order_id: orderData.razorpayOrder.id,
+            handler: async function (response) {
+                try {
+                    // 🚀 FIXED: Pass 'finalTotal: total' inside the request payload body!
+                    const verifyRes = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/orders/verify-payment', 
+                        { 
+                            ...response, 
+                            cartItems: liveCart,
+                            finalTotal: total // 👈 This maps your local total summary state to the backend route
+                        }, 
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    if (verifyRes.data.status === 'success') {
+                        clearCart();
+                        setOrderPlaced(true);
+                    }
+                } catch (err) {
+                    toast.error(err.response?.data?.message || "Payment Verification Failed");
+                }
+            },
+            prefill: { name: freshUser.username, email: freshUser.email },
+            theme: { color: "#2874f0" },
+            modal: { ondismiss: () => setIsCheckingOut(false) }
+        };
+        new window.Razorpay(options).open();
+    } catch (err) { 
+        toast.error(err.response?.data?.message || "Item is out of stock or error occurred."); 
+    } finally { 
+        setIsCheckingOut(false); 
+    }
+};
+
 
     // 🟢 PROFESSIONAL SUCCESS SCREEN
     if (orderPlaced) return (
