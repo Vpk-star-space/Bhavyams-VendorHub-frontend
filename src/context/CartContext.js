@@ -1,88 +1,99 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
+import axios from 'axios';
 
-// 1. Create the Context
 const CartContext = createContext();
 
-// 2. Custom Hook to use the cart easily
 export const useCart = () => useContext(CartContext);
 
-// 3. The Provider Component
 export const CartProvider = ({ children }) => {
+    const [cart, setCart] = useState([]);
     
-    // 🟢 FLIPKART FIX: Get a unique cart name for Account A vs Account B
-    const getCartKey = () => {
+    // Function to figure out the local storage key based on who is logged in
+    const getCartKey = useCallback(() => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
             try {
                 const user = JSON.parse(userStr);
-                // Creates a unique bucket: e.g., "bhavyams_cart_pavan"
                 return `bhavyams_cart_${user.username || user.email || user._id}`;
             } catch (e) {
                 return 'bhavyams_cart_guest';
             }
         }
         return 'bhavyams_cart_guest';
-    };
+    }, []);
 
     const [cartKey, setCartKey] = useState(getCartKey());
 
-    // Load the correct cart for whoever is currently logged in
-    const [cart, setCart] = useState(() => {
-        const savedCart = localStorage.getItem(getCartKey());
-        return savedCart ? JSON.parse(savedCart) : [];
-    });
-
-    // 🟢 FLIPKART FIX: Automatically watch for Login / Logout
-    // If Account A logs out and Account B logs in, this instantly swaps the cart memory!
+    // 1. INITIAL LOAD & USER SWITCH LISTENER
     useEffect(() => {
         const checkUserInterval = setInterval(() => {
             const currentKey = getCartKey();
+            
+            // If the user changed (e.g., Logged out, or Account B logged in)
             if (currentKey !== cartKey) {
-                setCartKey(currentKey); // Switch to the new user's bucket
+                setCartKey(currentKey); 
+                
+                // Load the new user's specific saved cart from local storage
                 const savedCart = localStorage.getItem(currentKey);
-                setCart(savedCart ? JSON.parse(savedCart) : []); // Load their specific items
+                setCart(savedCart ? JSON.parse(savedCart) : []); 
             }
-        }, 1000); // Checks every 1 second silently in the background
+        }, 500); // Check frequently
         
         return () => clearInterval(checkUserInterval);
-    }, [cartKey]);
+    }, [cartKey, getCartKey]);
 
-    // Automatically save to the SPECIFIC USER'S bucket whenever they add/remove an item
+    // 2. SAVE TO LOCAL STORAGE ON EVERY CHANGE
     useEffect(() => {
-        localStorage.setItem(cartKey, JSON.stringify(cart));
+        // Only save if we actually have a cart initialized, to prevent overwriting with empties on first render
+        if (cart !== undefined) {
+             localStorage.setItem(cartKey, JSON.stringify(cart));
+        }
     }, [cart, cartKey]);
 
-    const addToCart = (product) => {
+
+    // 3. ACTIONS
+    const addToCart = async (product) => {
+        // Update Frontend State Immediately
         setCart((prevCart) => {
             const existingItem = prevCart.find(item => item.id === product.id);
-            
-            // If item is already in cart, just increase the quantity
             if (existingItem) {
                 toast.info(`Increased quantity of ${product.name}`);
                 return prevCart.map(item => 
                     item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
                 );
             }
-            
-            // If new item, add it with quantity 1
             toast.success(`${product.name} added to cart!`);
             return [...prevCart, { ...product, quantity: 1 }];
         });
+
+        // 🟢 If user is logged in, ALSO save to Neon DB
+        const token = localStorage.getItem('token');
+        if (token) {
+             try {
+                 await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/cart/add', 
+                    { productId: product.id, quantity: 1 }, 
+                    { headers: { Authorization: `Bearer ${token}` } }
+                 );
+             } catch (err) {
+                 console.error("Failed to sync cart to database", err);
+             }
+        }
     };
 
     const removeFromCart = (productId) => {
         setCart(cart.filter(item => item.id !== productId));
+        // Note: You should also add an axios.delete call here to remove from Neon DB
     };
 
-    // This is now only used AFTER successful payment to empty their current cart
+    // ONLY call this after a successful order!
     const clearCart = () => {
         setCart([]);
         localStorage.removeItem(cartKey);
     };
 
     return (
-        <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart }}>
+        <CartContext.Provider value={{ cart, setCart, addToCart, removeFromCart, clearCart }}>
             {children}
         </CartContext.Provider>
     );
