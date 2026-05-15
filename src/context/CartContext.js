@@ -9,16 +9,49 @@ export const useCart = () => useContext(CartContext);
 
 // 3. The Provider Component
 export const CartProvider = ({ children }) => {
-    // Load cart from local storage when the app starts
+    
+    // 🟢 FLIPKART FIX: Get a unique cart name for Account A vs Account B
+    const getCartKey = () => {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr);
+                // Creates a unique bucket: e.g., "bhavyams_cart_pavan"
+                return `bhavyams_cart_${user.username || user.email || user._id}`;
+            } catch (e) {
+                return 'bhavyams_cart_guest';
+            }
+        }
+        return 'bhavyams_cart_guest';
+    };
+
+    const [cartKey, setCartKey] = useState(getCartKey());
+
+    // Load the correct cart for whoever is currently logged in
     const [cart, setCart] = useState(() => {
-        const savedCart = localStorage.getItem('bhavyams_cart');
+        const savedCart = localStorage.getItem(getCartKey());
         return savedCart ? JSON.parse(savedCart) : [];
     });
 
-    // Automatically save to local storage whenever the cart changes
+    // 🟢 FLIPKART FIX: Automatically watch for Login / Logout
+    // If Account A logs out and Account B logs in, this instantly swaps the cart memory!
     useEffect(() => {
-        localStorage.setItem('bhavyams_cart', JSON.stringify(cart));
-    }, [cart]);
+        const checkUserInterval = setInterval(() => {
+            const currentKey = getCartKey();
+            if (currentKey !== cartKey) {
+                setCartKey(currentKey); // Switch to the new user's bucket
+                const savedCart = localStorage.getItem(currentKey);
+                setCart(savedCart ? JSON.parse(savedCart) : []); // Load their specific items
+            }
+        }, 1000); // Checks every 1 second silently in the background
+        
+        return () => clearInterval(checkUserInterval);
+    }, [cartKey]);
+
+    // Automatically save to the SPECIFIC USER'S bucket whenever they add/remove an item
+    useEffect(() => {
+        localStorage.setItem(cartKey, JSON.stringify(cart));
+    }, [cart, cartKey]);
 
     const addToCart = (product) => {
         setCart((prevCart) => {
@@ -42,9 +75,10 @@ export const CartProvider = ({ children }) => {
         setCart(cart.filter(item => item.id !== productId));
     };
 
+    // This is now only used AFTER successful payment to empty their current cart
     const clearCart = () => {
         setCart([]);
-        localStorage.removeItem('bhavyams_cart');
+        localStorage.removeItem(cartKey);
     };
 
     return (
