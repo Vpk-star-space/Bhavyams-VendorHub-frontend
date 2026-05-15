@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
@@ -7,68 +7,75 @@ const CartContext = createContext();
 export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
-    
-    const getCartKey = useCallback(() => {
+
+    // 1. Figure out EXACTLY who is logged in right now
+    const getCurrentUser = () => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
             try {
                 const user = JSON.parse(userStr);
-                return `bhavyams_cart_${user.username || user.email || user._id}`;
+                return user.email || user.username || 'guest';
             } catch (e) {
-                return 'bhavyams_cart_guest';
+                return 'guest';
             }
         }
-        return 'bhavyams_cart_guest';
-    }, []);
-
-    const [cartKey, setCartKey] = useState(getCartKey());
-    
-    const [cart, setCart] = useState(() => {
-        const savedCart = localStorage.getItem(getCartKey());
-        return savedCart ? JSON.parse(savedCart) : [];
-    });
-
-    // 1. SAFELY LISTEN FOR LOGIN/LOGOUT (No auto-saving here!)
-    useEffect(() => {
-        const checkUserInterval = setInterval(() => {
-            const currentKey = getCartKey();
-            if (currentKey !== cartKey) {
-                setCartKey(currentKey); // Switch bucket
-                const savedCart = localStorage.getItem(currentKey); // Load their items
-                setCart(savedCart ? JSON.parse(savedCart) : []); 
-            }
-        }, 500); 
-        
-        return () => clearInterval(checkUserInterval);
-    }, [cartKey, getCartKey]);
-
-    // 🟢 THE FIX: A manual save function that prevents accidental overwriting
-    const saveToLocal = (newCart) => {
-        localStorage.setItem(getCartKey(), JSON.stringify(newCart));
+        return 'guest';
     };
 
-    // 2. ACTIONS
-    const addToCart = async (product) => {
-        setCart((prevCart) => {
-            let updatedCart;
-            const existingItem = prevCart.find(item => item.id === product.id);
-            
-            if (existingItem) {
-                toast.info(`Increased quantity of ${product.name}`);
-                updatedCart = prevCart.map(item => 
-                    item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-                );
-            } else {
-                toast.success(`${product.name} added to cart!`);
-                updatedCart = [...prevCart, { ...product, quantity: 1 }];
+    const [currentUser, setCurrentUser] = useState(getCurrentUser());
+    const [cart, setCart] = useState([]);
+
+    // 2. The background watcher: Detects Login/Logout instantly
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const activeUser = getCurrentUser();
+            if (activeUser !== currentUser) {
+                setCurrentUser(activeUser); // User just logged in or logged out!
             }
+        }, 500);
+        return () => clearInterval(interval);
+    }, [currentUser]);
 
-            // ONLY save to memory when a user actually clicks "Add"
-            saveToLocal(updatedCart);
-            return updatedCart;
-        });
+    // 3. Load the correct cart whenever the user changes
+    useEffect(() => {
+        // We use ONE master file to hold everyone's carts safely
+        const masterCartDb = JSON.parse(localStorage.getItem('bhavyams_master_cart_db')) || {};
+        const userCart = masterCartDb[currentUser] || [];
+        setCart(userCart);
+    }, [currentUser]);
 
-        // Sync to Neon DB in the background
+    // 4. The un-deletable Save function
+    const saveToMasterCart = (newCartArray) => {
+        const masterCartDb = JSON.parse(localStorage.getItem('bhavyams_master_cart_db')) || {};
+        
+        // Save their items safely under their specific name
+        masterCartDb[currentUser] = newCartArray; 
+        
+        // Lock the master file back into the browser
+        localStorage.setItem('bhavyams_master_cart_db', JSON.stringify(masterCartDb));
+        
+        // Update the screen
+        setCart(newCartArray);
+    };
+
+    const addToCart = async (product) => {
+        const existingItem = cart.find(item => item.id === product.id);
+        let updatedCart;
+
+        if (existingItem) {
+            toast.info(`Increased quantity of ${product.name}`);
+            updatedCart = cart.map(item => 
+                item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+            );
+        } else {
+            toast.success(`${product.name} added to cart!`);
+            updatedCart = [...cart, { ...product, quantity: 1 }];
+        }
+
+        // Save immediately to the Master DB
+        saveToMasterCart(updatedCart);
+
+        // Sync with Neon DB if logged in
         const token = localStorage.getItem('token');
         if (token) {
              try {
@@ -77,28 +84,22 @@ export const CartProvider = ({ children }) => {
                     { headers: { Authorization: `Bearer ${token}` } }
                  );
              } catch (err) {
-                 console.error("Failed to sync cart to database", err);
+                 console.error("Failed to sync cart to database");
              }
         }
     };
 
     const removeFromCart = (productId) => {
-        setCart((prevCart) => {
-            const updatedCart = prevCart.filter(item => item.id !== productId);
-            
-            // ONLY save to memory when a user actually clicks "Remove"
-            saveToLocal(updatedCart);
-            return updatedCart;
-        });
+        const updatedCart = cart.filter(item => item.id !== productId);
+        saveToMasterCart(updatedCart);
     };
 
     const clearCart = () => {
-        setCart([]);
-        localStorage.removeItem(getCartKey());
+        saveToMasterCart([]); // Only empties the current user's cart, completely safe!
     };
 
     return (
-        <CartContext.Provider value={{ cart, setCart, addToCart, removeFromCart, clearCart }}>
+        <CartContext.Provider value={{ cart, addToCart, removeFromCart, clearCart }}>
             {children}
         </CartContext.Provider>
     );
