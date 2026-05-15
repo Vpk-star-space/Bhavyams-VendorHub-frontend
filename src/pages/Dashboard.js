@@ -2,120 +2,26 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'react-toastify';
 import { 
     ShoppingBag, PlusCircle, History, Store, LogOut,
     Shield, User, Users, ArrowLeft,  
-    Star, Sparkles, Package, Home, ListOrdered, BarChart3, IndianRupee,
-    AlertTriangle // 🚀 ADDED: For the Test Mode Warning
+    Sparkles, Package, Home, ListOrdered, BarChart3, IndianRupee,
+    AlertTriangle 
 } from 'lucide-react';
-
+import { useLocation } from 'react-router-dom';
 import ProductList from '../components/ProductList';
 import AdminUserList from '../components/AdminUserList';
 import AdminProductList from '../components/AdminProductList';
 import AdminPaymentList from '../components/AdminPaymentList'; 
 import Profile from './Profile'; 
 
-const OrderStatus = ({ order, role }) => {
-    const [showReviewForm, setShowReviewForm] = useState(false);
-    const [rating, setRating] = useState(order.existing_rating || 5);
-    const [comment, setComment] = useState(order.existing_comment || "");
-    const [isReviewed, setIsReviewed] = useState(!!order.existing_rating); 
-    const isDelivered = order.status === 'Delivered';
-
-    const getProductImg = (url) => {
-        if (!url) return 'https://via.placeholder.com/150?text=No+Image';
-        return url.startsWith('http') ? url : `https://bhavyams-vendorhub-backend.onrender.com${url}`;
-    };
-
-    const submitReview = async () => {
-        const pId = order.product_id || order.productId || order.p_id;
-        const oId = order.id || order.order_id;
-        if (!pId) return toast.error("Error: Product ID missing");
-        try {
-            const token = localStorage.getItem('token');
-            await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/orders/add-review', {
-                orderId: oId, productId: pId, rating: parseInt(rating), comment: comment
-            }, { headers: { Authorization: `Bearer ${token}` } });
-            toast.success("Review submitted!");
-            setShowReviewForm(false);
-            setIsReviewed(true); 
-        } catch (err) { toast.error("Failed to post review"); }
-    };
-    
-    return (
-        <motion.div layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={styles.statusBox}>
-            
-            {/* 📦 UPGRADED ORDER CARD HEADER */}
-            <div style={styles.orderTopStrip}>
-                <div style={styles.orderIdBlock}>
-                    <span style={styles.orderLabel}>ORDER ID</span>
-                    <span style={styles.orderValue}>#{order.order_id || order.id}</span>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                    <span style={isDelivered ? styles.badgeSuccess : styles.badgeInfo}>
-                        {order.status?.toUpperCase() || 'CONFIRMED'}
-                    </span>
-                </div>
-            </div>
-
-            <div style={styles.orderHeader}>
-                <div style={styles.imageWrapper}>
-                    <img src={getProductImg(order.image_url)} alt="product" style={styles.orderImg} />
-                </div>
-                <div style={{flex: 1}}>
-                    <h4 style={styles.orderTitle}>{order.product_name || "Bhavyams Product"}</h4>
-                    <div style={styles.orderSub}>
-                        {role?.toLowerCase() === 'admin' && `Customer: ${order.customer_name}`}
-                        {role?.toLowerCase() === 'vendor' && `Revenue: ₹${Number(order.total_price).toLocaleString('en-IN')}`}
-                        {role?.toLowerCase() === 'customer' && `Total: ₹${Number(order.total_price).toLocaleString('en-IN')}`}
-                    </div>
-                </div>
-            </div>
-
-            {/* 🔵 PROGRESS BAR */}
-            <div style={{ padding: '0 15px 15px 15px' }}>
-                <div style={styles.progressBar}>
-                    <motion.div initial={{ width: 0 }} animate={{ width: isDelivered ? '100%' : '50%' }}
-                        transition={{ duration: 1.2 }} style={{ background: isDelivered ? '#26a541' : '#2874f0', height: '100%', borderRadius: '8px' }}
-                    />
-                </div>
-                <p style={styles.progressText}>
-                    {isDelivered ? 'Item has been delivered successfully.' : 'Order is confirmed and preparing for dispatch.'}
-                </p>
-            </div>
-
-            {isDelivered && role?.toLowerCase() === 'customer' && (
-                <div style={styles.reviewSection}>
-                    <AnimatePresence mode="wait">
-                        {isReviewed ? (
-                            <motion.div layout style={styles.reviewedBox}>
-                                <div style={styles.reviewLabelRow}><Star size={16} fill="#2874f0" color="#2874f0"/> Rating: {rating}/5</div>
-                                {comment && <div style={styles.reviewText}>"{comment}"</div>}
-                            </motion.div>
-                        ) : !showReviewForm ? (
-                            <button onClick={() => setShowReviewForm(true)} style={styles.reviewBtn}>★ RATE & REVIEW PRODUCT</button>
-                        ) : (
-                            <motion.div layout style={styles.reviewForm}>
-                                <select value={rating} onChange={(e) => setRating(e.target.value)} style={styles.select}>
-                                    {[5,4,3,2,1].map(num => <option key={num} value={num}>{num} Stars - {num === 5 ? 'Excellent' : num === 1 ? 'Poor' : 'Good'}</option>)}
-                                </select>
-                                <textarea placeholder="Write a review..." value={comment} onChange={(e) => setComment(e.target.value)} style={styles.textarea} />
-                                <div style={{display:'flex', gap:'10px'}}>
-                                    <button onClick={submitReview} style={styles.submitReviewBtn}>SUBMIT</button>
-                                    <button onClick={() => setShowReviewForm(false)} style={styles.cancelBtn}>CANCEL</button>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            )}
-        </motion.div>
-    );
-};
+// 🟢 THE FIX: We import your separate component files here!
+import CustomerOrders from '../components/CustomerOrders';
+import VendorOrders from '../components/VendorOrders';
 
 const Dashboard = () => {
-    const [activeTab, setActiveTab] = useState('overview');
+    const location = useLocation();
+   const [activeTab, setActiveTab] = useState(location.state?.activeTab || localStorage.getItem('dashboardTargetTab') || 'overview');
     const [adminView, setAdminView] = useState('stats'); 
     const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')));
     const [ordersList, setOrdersList] = useState([]);
@@ -224,7 +130,6 @@ const Dashboard = () => {
 
             <main style={{...styles.main, marginLeft: isMobile ? 0 : '260px', paddingBottom: isMobile ? '80px' : '40px'}}>
                 
-                {/* 🚨 TEST MODE WARNING ALERT 🚨 */}
                 <div style={styles.testModeAlert}>
                     <AlertTriangle size={20} style={{ minWidth: '20px' }} />
                     <span style={{ fontSize: '13px', fontWeight: '600' }}>
@@ -259,7 +164,6 @@ const Dashboard = () => {
                                         <div style={styles.statCard} onClick={() => {setActiveTab('admin'); setAdminView('payments')}}><BarChart3 size={32} color="#f59e0b"/><br/>PAYMENTS</div>
                                     </div>
                                 ) : (
-                                    // 🛍️ PREMIUM CUSTOMER BANNER
                                     <div style={styles.premiumBanner}>
                                         <div style={styles.bannerText}>
                                             <h2 style={{ margin: '0 0 10px 0', fontSize: '22px' }}>Welcome to Bhavyams Hub</h2>
@@ -277,10 +181,18 @@ const Dashboard = () => {
 
                             {activeTab === 'profile' && <Profile />}
                             
+                            {/* 🟢 THE FIX: Conditionally load the separate files! */}
                             {activeTab === 'orders' && (
                                 <div style={styles.ordersGrid}>
                                     <h3 style={styles.sectionTitle}>{currentUser?.role?.toLowerCase() === 'vendor' ? 'Sales History' : 'Your Orders'}</h3>
-                                    {ordersList.length === 0 ? <div style={styles.noData}>No records found.</div> : ordersList.map(o => <OrderStatus key={o.id} order={o} role={currentUser?.role} />)}
+                                    
+                                    {ordersList.length === 0 ? (
+                                        <div style={styles.noData}>No records found.</div>
+                                    ) : (
+                                        currentUser?.role?.toLowerCase() === 'vendor' 
+                                            ? <VendorOrders orders={ordersList} /> 
+                                            : <CustomerOrders orders={ordersList} />
+                                    )}
                                 </div>
                             )}
 
@@ -302,10 +214,7 @@ const Dashboard = () => {
 
 const styles = {
     dashboard: { display: 'flex', minHeight: '100vh', background: '#f1f3f6', fontFamily: 'Roboto, Arial, sans-serif' },
-    
-    // 🚨 TEST MODE ALERT
     testModeAlert: { background: '#fee2e2', color: '#b91c1c', padding: '10px 15px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #fca5a5' },
-    
     sidebar: { width: '260px', background: '#0f172a', padding: '30px 20px', position: 'fixed', height: '100vh', color: '#fff', zIndex: 100 },
     logoSection: { marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px' },
     logo: { fontSize: '20px', fontStyle: 'italic', fontWeight: 'bold', margin: 0, color: '#fff' },
@@ -322,49 +231,18 @@ const styles = {
     welcomeHeading: { margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#212121' },
     roleBadge: { background: '#e0e7ff', color: '#2874f0', padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', marginTop: '4px', display: 'inline-block', letterSpacing: '0.5px' },
     body: { padding: '15px' },
-    
-    // 🛍️ UPGRADED PREMIUM BANNER
     premiumBanner: { background: 'linear-gradient(135deg, #2874f0 0%, #1e40af 100%)', padding: '30px', borderRadius: '8px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
     bannerText: { flex: 1 },
     premiumShopBtn: { background: '#fff', color: '#2874f0', border: 'none', padding: '10px 20px', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
-    
     vendorStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '15px' },
     statCard: { background: '#fff', padding: '20px', borderRadius: '8px', textAlign: 'center', border: '1px solid #e0e0e0', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
     statLabel: { fontSize: '11px', color: '#878787', fontWeight: 'bold', marginTop: '10px', letterSpacing: '0.5px' },
     statValue: { fontSize: '20px', fontWeight: 'bold', color: '#212121', marginTop: '5px' },
-    
-    // 📦 UPGRADED ORDER CARD
-    statusBox: { background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0', marginBottom: '15px', overflow: 'hidden', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
-    orderTopStrip: { background: '#f8fafc', padding: '12px 15px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e0e0e0', fontSize: '12px' },
-    orderIdBlock: { display: 'flex', flexDirection: 'column', gap: '2px' },
-    orderLabel: { color: '#878787', fontWeight: '500', fontSize: '10px', letterSpacing: '0.5px' },
-    orderValue: { color: '#212121', fontWeight: 'bold' },
-    orderHeader: { display: 'flex', gap: '15px', alignItems: 'center', padding: '15px' },
-    imageWrapper: { width: '70px', height: '70px', background: '#f1f3f6', borderRadius: '4px', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '5px' },
-    orderImg: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
-    orderTitle: { margin: '0 0 5px 0', fontSize: '15px', fontWeight: '500', color: '#212121' },
-    orderSub: { fontSize: '13px', color: '#878787', fontWeight: '500' },
-    progressBar: { background: '#f1f3f6', height: '6px', borderRadius: '10px', overflow: 'hidden' },
-    progressText: { fontSize: '11px', color: '#388e3c', fontWeight: 'bold', marginTop: '8px', margin: '8px 0 0 0' },
-    
-    badgeSuccess: { background: '#388e3c', color: '#fff', padding: '4px 10px', borderRadius: '2px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px' },
-    badgeInfo: { background: '#2874f0', color: '#fff', padding: '4px 10px', borderRadius: '2px', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px' },
-    
-    reviewSection: { padding: '15px', borderTop: '1px solid #f0f0f0', background: '#fafafa' },
-    reviewBtn: { background: '#fff', color: '#2874f0', border: '1px solid #2874f0', padding: '8px 15px', borderRadius: '2px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', width: '100%' },
-    reviewForm: { background: '#fff', padding: '15px', borderRadius: '4px', border: '1px solid #e0e0e0' },
-    select: { width: '100%', padding: '10px', borderRadius: '2px', border: '1px solid #e0e0e0', marginBottom: '10px', outline: 'none' },
-    textarea: { width: '100%', height: '80px', padding: '10px', borderRadius: '2px', border: '1px solid #e0e0e0', marginBottom: '10px', outline: 'none', fontFamily: 'inherit' },
-    submitReviewBtn: { background: '#2874f0', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', flex: 1 },
-    cancelBtn: { background: '#fff', color: '#212121', border: '1px solid #e0e0e0', padding: '8px 20px', borderRadius: '2px', cursor: 'pointer', fontWeight: 'bold' },
     sectionTitle: { fontSize: '18px', fontWeight: 'bold', margin: '10px 0 15px 0', color: '#212121', borderBottom: '2px solid #e0e0e0', paddingBottom: '10px' },
     adminStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px' },
     backBtn: { background: 'none', border: 'none', color: '#2874f0', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' },
     noData: { textAlign: 'center', padding: '40px', color: '#878787', fontSize: '14px', background: '#fff', borderRadius: '4px', border: '1px solid #e0e0e0' },
-    ordersGrid: { display: 'flex', flexDirection: 'column' },
-    reviewedBox: { padding: '12px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '4px' },
-    reviewLabelRow: { fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', color: '#212121' },
-    reviewText: { fontSize: '13px', color: '#878787', marginTop: '8px', fontStyle: 'italic' }
+    ordersGrid: { display: 'flex', flexDirection: 'column' }
 };
 
 export default Dashboard;
