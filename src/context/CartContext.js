@@ -7,9 +7,7 @@ const CartContext = createContext();
 export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
-    const [cart, setCart] = useState([]);
     
-    // Function to figure out the local storage key based on who is logged in
     const getCartKey = useCallback(() => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
@@ -24,50 +22,53 @@ export const CartProvider = ({ children }) => {
     }, []);
 
     const [cartKey, setCartKey] = useState(getCartKey());
+    
+    const [cart, setCart] = useState(() => {
+        const savedCart = localStorage.getItem(getCartKey());
+        return savedCart ? JSON.parse(savedCart) : [];
+    });
 
-    // 1. INITIAL LOAD & USER SWITCH LISTENER
+    // 1. SAFELY LISTEN FOR LOGIN/LOGOUT (No auto-saving here!)
     useEffect(() => {
         const checkUserInterval = setInterval(() => {
             const currentKey = getCartKey();
-            
-            // If the user changed (e.g., Logged out, or Account B logged in)
             if (currentKey !== cartKey) {
-                setCartKey(currentKey); 
-                
-                // Load the new user's specific saved cart from local storage
-                const savedCart = localStorage.getItem(currentKey);
+                setCartKey(currentKey); // Switch bucket
+                const savedCart = localStorage.getItem(currentKey); // Load their items
                 setCart(savedCart ? JSON.parse(savedCart) : []); 
             }
-        }, 500); // Check frequently
+        }, 500); 
         
         return () => clearInterval(checkUserInterval);
     }, [cartKey, getCartKey]);
 
-    // 2. SAVE TO LOCAL STORAGE ON EVERY CHANGE
-    useEffect(() => {
-        // Only save if we actually have a cart initialized, to prevent overwriting with empties on first render
-        if (cart !== undefined) {
-             localStorage.setItem(cartKey, JSON.stringify(cart));
-        }
-    }, [cart, cartKey]);
+    // 🟢 THE FIX: A manual save function that prevents accidental overwriting
+    const saveToLocal = (newCart) => {
+        localStorage.setItem(getCartKey(), JSON.stringify(newCart));
+    };
 
-
-    // 3. ACTIONS
+    // 2. ACTIONS
     const addToCart = async (product) => {
-        // Update Frontend State Immediately
         setCart((prevCart) => {
+            let updatedCart;
             const existingItem = prevCart.find(item => item.id === product.id);
+            
             if (existingItem) {
                 toast.info(`Increased quantity of ${product.name}`);
-                return prevCart.map(item => 
+                updatedCart = prevCart.map(item => 
                     item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
                 );
+            } else {
+                toast.success(`${product.name} added to cart!`);
+                updatedCart = [...prevCart, { ...product, quantity: 1 }];
             }
-            toast.success(`${product.name} added to cart!`);
-            return [...prevCart, { ...product, quantity: 1 }];
+
+            // ONLY save to memory when a user actually clicks "Add"
+            saveToLocal(updatedCart);
+            return updatedCart;
         });
 
-        // 🟢 If user is logged in, ALSO save to Neon DB
+        // Sync to Neon DB in the background
         const token = localStorage.getItem('token');
         if (token) {
              try {
@@ -82,14 +83,18 @@ export const CartProvider = ({ children }) => {
     };
 
     const removeFromCart = (productId) => {
-        setCart(cart.filter(item => item.id !== productId));
-        // Note: You should also add an axios.delete call here to remove from Neon DB
+        setCart((prevCart) => {
+            const updatedCart = prevCart.filter(item => item.id !== productId);
+            
+            // ONLY save to memory when a user actually clicks "Remove"
+            saveToLocal(updatedCart);
+            return updatedCart;
+        });
     };
 
-    // ONLY call this after a successful order!
     const clearCart = () => {
         setCart([]);
-        localStorage.removeItem(cartKey);
+        localStorage.removeItem(getCartKey());
     };
 
     return (
