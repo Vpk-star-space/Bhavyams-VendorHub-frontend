@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Star, Download, ChevronRight,  } from 'lucide-react';
+import { Search, Star, Download, ChevronRight } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import OrderChat from './OrderChat'; // 🤖 AI Chat Imported
 
 const CustomerOrders = ({ orders }) => {
     // 👤 Get current user's REAL details from local storage
@@ -23,7 +24,7 @@ const CustomerOrders = ({ orders }) => {
     const [rating, setRating] = useState(5);
     const [comment, setComment] = useState("");
     const [showReviewForm, setShowReviewForm] = useState(false);
-    const [newlyReviewed, setNewlyReviewed] = useState({}); // Tracks reviews made in this session
+    const [newlyReviewed, setNewlyReviewed] = useState({}); 
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -116,7 +117,6 @@ const CustomerOrders = ({ orders }) => {
         doc.text("Billed To:", 14, 60);
         doc.setFontSize(10);
         doc.setTextColor(100, 100, 100);
-        // 🟢 REAL USER DATA
         doc.text(customerName, 14, 66); 
         doc.text(`Phone: ${customerPhone}`, 14, 72);
         
@@ -283,9 +283,15 @@ const CustomerOrders = ({ orders }) => {
                                 );
                             })}
                         </div>
+
+                        {/* 🤖 THIS IS WHERE THE CHAT BUTTON ACTUALLY LIVES! */}
+                        <div style={{ padding: '0 20px 20px 20px', borderTop: '1px solid #f0f0f0', paddingTop: '20px' }}>
+                           <OrderChat order={selectedOrder} />
+                        </div>
+
                     </div>
 
-                    {/* 🟢 REAL REVIEW LOGIC */}
+                    {/* ⭐ BOTTOM LEFT CARD: REVIEW LOGIC */}
                     {isDelivered && (
                         <div style={styles.detailsMainCard}>
                             <h3 style={{ fontSize: '16px', margin: '0 0 15px 0' }}>Rate your experience</h3>
@@ -327,7 +333,6 @@ const CustomerOrders = ({ orders }) => {
                     
                     <div style={styles.sideCard}>
                         <h3 style={{ fontSize: '16px', borderBottom: '1px solid #f0f0f0', paddingBottom: '15px', margin: '0 0 15px 0' }}>Delivery details</h3>
-                        {/* 🟢 DYNAMIC PROFILE DATA */}
                         <div style={{ fontSize: '14px', color: '#212121', fontWeight: '500', marginBottom: '8px' }}>{customerName}</div>
                         <div style={{ fontSize: '14px', color: '#212121', lineHeight: '1.5', marginBottom: '15px' }}>
                             {selectedOrder.delivery_address || currentUser.address || 'Address not provided'}
@@ -360,7 +365,7 @@ const CustomerOrders = ({ orders }) => {
                         <button 
                             style={{
                                 ...styles.invoiceBtn, 
-                                opacity: isDelivered ? 1 : 0.7, // Slightly fade the button if it's not delivered yet
+                                opacity: isDelivered ? 1 : 0.7, 
                                 cursor: 'pointer'
                             }} 
                             onClick={() => {
