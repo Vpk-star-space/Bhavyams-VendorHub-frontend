@@ -108,6 +108,15 @@ const Home = () => {
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     
+    // 🧠 SMART LOADER STATE
+    const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
+    const loadingPhrases = [
+        "Handpicking the best products for you...",
+        "Unpacking the latest deals...",
+        "Arranging the store shelves...",
+        "Good things take a little time! Preparing Bhavyams Hub..."
+    ];
+    
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -125,6 +134,17 @@ const Home = () => {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // 🧠 SMART LOADER EFFECT: Cycles text every 4 seconds while loading
+    useEffect(() => {
+        if (!loading) return;
+        const interval = setInterval(() => {
+            setLoadingMsgIndex((prevIndex) => 
+                prevIndex + 1 < loadingPhrases.length ? prevIndex + 1 : prevIndex
+            );
+        }, 4000); 
+        return () => clearInterval(interval);
+    }, [loading, loadingPhrases.length]);
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -171,7 +191,7 @@ const Home = () => {
         return (
             <div style={styles.loaderContainer}>
                 <div style={styles.spinner}></div>
-                <div style={styles.loaderText}>Loading Products...</div>
+                <div style={styles.loaderText}>{loadingPhrases[loadingMsgIndex]}</div>
             </div>
         );
     }
@@ -292,7 +312,7 @@ const Home = () => {
             <footer style={styles.footer}>
                 <p style={styles.footerText}>System Engineered by <strong>Venkata Pavan Kumar</strong></p>
                 <p style={styles.footerContact}>
-                    Contact: <a href="mailto:venkatapavankumar36@gmail.com" style={styles.footerLink}>venkatapavankumar36@gmail.com</a>
+                    Contact: <a href="mailto:pavanvenkat63@gmail.com" style={styles.footerLink}>pavanvenkat63@gmail.com</a>
                 </p>
                 <p style={styles.footerContact}>
                     Check out our other app: <a href="https://subhams-vpk.vercel.app/" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>Subhams </a>
@@ -339,14 +359,21 @@ const styles = {
     desktopProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '15px' },
     mobileProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' },
     emptyState: { padding: '40px', textAlign: 'center', color: '#212121', fontSize: '16px' },
-    loaderContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f1f3f6' },
-    spinner: { width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #2874f0', borderRadius: '50%', animation: 'spin 1s linear infinite' },
-    loaderText: { marginTop: '15px', fontWeight: 'bold', color: '#2874f0' },
+    loaderContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f1f3f6', textAlign: 'center', padding: '0 20px' },
+    spinner: { width: '40px', height: '40px', border: '4px solid #e0e0e0', borderTop: '4px solid #2874f0', borderRadius: '50%', animation: 'spin 1s linear infinite' },
+    loaderText: { marginTop: '15px', fontWeight: 'bold', color: '#2874f0', fontSize: '16px', transition: 'opacity 0.5s ease' },
 
     footer: { background: '#ffffff', padding: '25px 20px', textAlign: 'center', borderTop: '1px solid #e0e0e0', marginTop: '40px', boxShadow: '0 -1px 3px rgba(0,0,0,0.05)' },
     footerText: { margin: '0 0 8px 0', fontSize: '15px', color: '#212121' },
     footerContact: { margin: '0 0 8px 0', fontSize: '14px', color: '#64748b' },
     footerLink: { color: '#2874f0', textDecoration: 'none', fontWeight: 'bold' }
 };
+
+// Add CSS animation for spinner
+const styleSheet = document.createElement("style");
+styleSheet.innerText = `
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+`;
+document.head.appendChild(styleSheet);
 
 export default Home;
