@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, ShieldCheck, ChevronRight, Bot } from 'lucide-react';
+import axios from 'axios';
+import { Send, X, ShieldCheck, ChevronRight, Bot, RotateCcw } from 'lucide-react';
 
 const OrderChat = ({ order }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -14,10 +15,9 @@ const OrderChat = ({ order }) => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const productName = order?.product_name || "your item";
-    const price = order?.total_price || "0";
-    const status = order?.status || "Processing";
-    const orderId = order?.id || order?.order_id || "Unknown";
+    // Extract details or fallback to Global Mode
+    const productName = order?.product_name || null;
+    const orderId = order?.id || order?.order_id || null;
 
     const getCurrentTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
@@ -28,30 +28,37 @@ const OrderChat = ({ order }) => {
         return 'Good Evening';
     };
 
-    // 🟢 INITIAL CHAT STATE: The first message contains the vertical menu
-    const [messages, setMessages] = useState([
-        { 
-            sender: 'bot', 
-            text: `👋 ${getGreeting()}!\n\nI am **Subhams Support AI**. I have pulled up your order details for the **${productName}**. Please select a query from the menu below, or type your question.`,
-            time: getCurrentTime(),
-            isMenu: true,
-            menuDisabled: false
-        }
-    ]);
-    
+    const [messages, setMessages] = useState([]);
     const chatEndRef = useRef(null);
 
-    // 🟢 FLIPKART STYLE STACKED MENU
+    // 🟢 BUG FIX: Auto-Reset Chat when the user switches to a different order!
+    useEffect(() => {
+        const initialGreeting = orderId 
+            ? `👋 ${getGreeting()}!\n\nI am **Subhams Support AI**. I have pulled up your order details for the **${productName}**. Please select a query from the menu below, or type your question.`
+            : `👋 ${getGreeting()}!\n\nI am **Subhams Support AI**.\n\nDo you need help with a specific order? Please navigate to the **My Orders** section and click on an order to get started!`;
+
+        setMessages([
+            { 
+                sender: 'bot', 
+                text: initialGreeting,
+                time: getCurrentTime(),
+                isMenu: !!orderId, 
+                menuDisabled: false
+            }
+        ]);
+    }, [orderId, productName]); // This array ensures it resets when order changes
+
+    // Flipkart-style Options
     const quickOptions = [
         "Track Order Status",
         "Where is my Invoice?",
         "Cancel this Order",
         "Return / Replace Item",
         "Delivery is Delayed",
-        "Contact Human Admin"
+        "Contact Human Admin",
+        "Our Other Projects"
     ];
 
-    // Auto-scroll logic
     useEffect(() => {
         if (isOpen) {
             setTimeout(() => {
@@ -60,52 +67,14 @@ const OrderChat = ({ order }) => {
         }
     }, [messages, isOpen, loading]);
 
-    // 🧠 STRICT HYBRID AI ENGINE
-    const generateSmartResponse = (userMessage) => {
-        const msg = userMessage.toLowerCase().trim();
-
-        if (msg === "track order status" || msg.includes("track") || msg.includes("where is my order")) {
-            const isDelivered = status.toLowerCase() === 'delivered';
-            return `**Live Tracking Update:**\n\n📦 Ordered  ➔  🚚 Shipped  ➔  ${isDelivered ? '✅ **Delivered**' : '⏳ **Pending**'}\n\nCurrent Status: **[${status.toUpperCase()}]**\n\nOur logistics system shows everything is on track!`;
-        }
-        else if (msg === "where is my invoice?" || msg.includes("invoice") || msg.includes("bill") || msg.includes("price")) {
-            return `Your total payment for this order was **₹${price}**.\n\n💳 **Need the official receipt?**\nYou can securely download your GST Tax Invoice by closing this chat and clicking the blue "Download Invoice" button on the main page.`;
-        }
-        else if (msg === "cancel this order" || msg.includes("cancel") || msg.includes("stop order")) {
-            if (status.toLowerCase() === 'delivered') {
-                return `**Action Denied:**\nBecause this order is already delivered, it cannot be cancelled. \n\nHowever, you are eligible for a return! Please select the Return Policy option for the next steps.`;
-            } else {
-                return `**Cancellation Policy:**\nYou are eligible to cancel this order before it leaves our warehouse. If you proceed, an automated refund of **₹${price}** will be credited to your bank account within 3-5 business days.`;
-            }
-        }
-        else if (msg === "return / replace item" || msg.includes("return") || msg.includes("refund") || msg.includes("damage")) {
-            return `🛡️ **Bhavyams Assured Guarantee:**\n\nIf your item is damaged, defective, or incorrect, you can request a hassle-free return or replacement within **7 days** of delivery. \n\nYour refund of ₹${price} is fully secured by our system.`;
-        }
-        else if (msg === "delivery is delayed" || msg.includes("delay") || msg.includes("late")) {
-            if (status.toLowerCase() === 'delivered') {
-                return `Our system shows this item was already handed over to you! If you haven't received it, please verify with your security desk or neighbors immediately.`;
-            } else {
-                return `I apologize for the wait! 🚚💨\n\nSometimes our delivery agents face local routing delays. I have automatically escalated Order **#${orderId}** to our high-priority dispatch queue.`;
-            }
-        }
-        else if (msg === "contact human admin" || msg.includes("admin") || msg.includes("human") || msg.includes("mail") || msg.includes("support")) {
-            return `I understand you need to speak with our human support team. 🎧\n\nPlease click the button below to email our administration. **Our admin team will contact you back within a few hours!**\n\n<a href="mailto:venkatapavankumar36@gmail.com?subject=Support%20Request%20for%20Order%20%23${orderId}" style="display: block; margin: 12px 0; padding: 12px 16px; background-color: #fb641b; color: #fff; text-decoration: none; border-radius: 4px; font-weight: bold; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✉️ CLICK TO CONTACT ADMIN</a>\n\n*(Your Order ID **#${orderId}** will automatically be included in your email)*`;
-        }
-        else if (msg === "hi" || msg === "hello" || msg === "help") {
-            return `Hello again! How else can I assist you with Order **#${orderId}** today?`;
-        }
-        else {
-            return `I'm sorry, I didn't quite catch that. As a Virtual Assistant, I am still learning! \n\nPlease select one of the specific options from the menu, or tap **Contact Human Admin** to email our human team.`;
-        }
-    };
-
-    const handleSendMessage = (text = input) => {
+    // 🚀 FULL-STACK API CALL 
+    const handleSendMessage = async (text = input) => {
         if (!text.trim() || loading) return;
 
-        // 1. Disable all previous menus in the chat history so it locks cleanly
+        // Lock previous menus so they can't be clicked again
         setMessages(prev => prev.map(m => ({ ...m, menuDisabled: true })));
 
-        // If they click "View Main Menu", generate a new menu message
+        // If they click "View Main Menu", generate a new menu message instantly
         if (text === "View Main Menu") {
             setMessages(prev => [...prev, { sender: 'user', text: text, time: getCurrentTime() }]);
             setLoading(true);
@@ -118,41 +87,63 @@ const OrderChat = ({ order }) => {
             return;
         }
         
-        // 2. Add normal user message
+        // Add User Message UI
         setMessages(prev => [...prev, { sender: 'user', text: text.trim(), time: getCurrentTime() }]);
         setInput(""); 
         setLoading(true);
 
-        // 3. Bot responds and adds "Sub Menu" for follow-up actions
-        setTimeout(() => {
-            const botReply = generateSmartResponse(text);
+        try {
+            const token = localStorage.getItem('token');
+            
+            // 🌐 CALL YOUR SECURE BACKEND BRAIN
+            const response = await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/support/chat', { 
+                message: text, 
+                orderId: orderId 
+            }, { 
+                headers: { Authorization: `Bearer ${token}` } 
+            });
+
+            // Handle the UI rendering of the backend reply
             setMessages(prev => [...prev, { 
                 sender: 'bot', 
-                text: botReply, 
+                text: response.data.reply, 
                 time: getCurrentTime(),
-                isSubMenu: true,
+                isSubMenu: !!orderId, // Show follow-up chips
                 menuDisabled: false
             }]);
+
+        } catch (error) {
+            console.error("Chat Error:", error);
+            setMessages(prev => [...prev, { 
+                sender: 'bot', 
+                text: "⚠️ Connection Error: I am having trouble reaching the server. Please try again or check your internet connection.", 
+                time: getCurrentTime() 
+            }]);
+        } finally {
             setLoading(false);
-        }, 1500);
+        }
     };
 
+    // 🟢 FLOATING BUTTON (With Pulse Animation)
     if (!isOpen) return (
         <div style={styles.helpContainer}>
-            <span style={styles.helpText}>Need help with this order?</span>
+            <span style={styles.helpText}>Need help with {orderId ? 'this order?' : 'an order?'}</span>
             <button onClick={() => setIsOpen(true)} style={styles.floatBtn}>
                 <ShieldCheck size={18} /> Chat with Subhams AI <ChevronRight size={16} />
             </button>
         </div>
     );
 
+    // 📱 DYNAMIC STYLES: Fullscreen for Mobile (100dvh fixes browser bar issues), Floating for Laptop
     const dynamicChatWindowStyle = isMobile ? {
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%',
-        backgroundColor: '#f1f3f6', zIndex: 999999, display: 'flex', flexDirection: 'column'
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100dvh',
+        backgroundColor: '#f1f3f6', zIndex: 999999, display: 'flex', flexDirection: 'column',
+        animation: 'slideUp 0.3s ease-out forwards'
     } : {
         position: 'fixed', bottom: '20px', right: '20px', width: '380px', height: '620px',
         backgroundColor: '#f1f3f6', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-        display: 'flex', flexDirection: 'column', zIndex: 9999, border: '1px solid #d7d7d7', overflow: 'hidden'
+        display: 'flex', flexDirection: 'column', zIndex: 9999, border: '1px solid #d7d7d7', overflow: 'hidden',
+        animation: 'slideUp 0.3s ease-out forwards'
     };
 
     return (
@@ -170,13 +161,23 @@ const OrderChat = ({ order }) => {
                         </div>
                     </div>
                 </div>
-                <X size={24} onClick={() => setIsOpen(false)} style={{cursor:'pointer', color:'#fff', padding: '4px'}} />
+                <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                    {/* Clear Chat Button */}
+                    <RotateCcw 
+                        size={18} 
+                        color="#fff" 
+                        style={{cursor: 'pointer', opacity: 0.8}} 
+                        onClick={() => setMessages([messages[0]])} 
+                        title="Restart Chat"
+                    />
+                    <X size={26} onClick={() => setIsOpen(false)} style={{cursor:'pointer', color:'#fff'}} />
+                </div>
             </div>
 
-            {/* ⚪ CHAT BODY (Scrollable) */}
+            {/* ⚪ CHAT BODY */}
             <div style={styles.body}>
                 <div style={styles.systemNote}>
-                    <ShieldCheck size={14} /> Secure Chat Environment • Order #${orderId}
+                    <ShieldCheck size={14} /> Secure Chat Environment {orderId && `• Order #${orderId}`}
                 </div>
                 
                 {messages.map((msg, index) => (
@@ -184,20 +185,19 @@ const OrderChat = ({ order }) => {
                         ...styles.row, 
                         justifyContent: msg.sender === 'user' ? 'flex-end' : 'flex-start'
                     }}>
-                        {msg.sender === 'bot' && <Bot size={16} color="#878787" style={{marginTop: '10px', marginRight: '8px'}} />}
+                        {msg.sender === 'bot' && <Bot size={16} color="#878787" style={{marginTop: '10px', marginRight: '8px', flexShrink: 0}} />}
                         
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
                             
-                            {/* The Chat Bubble */}
                             <div style={msg.sender === 'bot' ? styles.botBubble : styles.userBubble}>
                                 <span dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') }} />
                             </div>
 
-                            {/* 🟢 THE FLIPKART VERTICAL MENU (Attaches directly to the bot bubble!) */}
+                            {/* 🟢 THE FLIPKART VERTICAL MENU */}
                             {msg.isMenu && (
                                 <div style={{
                                     ...styles.botMenuCard, 
-                                    opacity: msg.menuDisabled ? 0.6 : 1, 
+                                    opacity: msg.menuDisabled ? 0.5 : 1, 
                                     pointerEvents: msg.menuDisabled ? 'none' : 'auto'
                                 }}>
                                     {quickOptions.map((option, idx) => (
@@ -215,7 +215,7 @@ const OrderChat = ({ order }) => {
                                 </div>
                             )}
 
-                            {/* 🔵 FOLLOW-UP CHIPS (View Main Menu / Close Chat) */}
+                            {/* 🔵 FOLLOW-UP CHIPS */}
                             {msg.isSubMenu && !msg.menuDisabled && (
                                 <div style={styles.chipsWrapper}>
                                     <button onClick={() => handleSendMessage("View Main Menu")} style={styles.chipBtn}>View Main Menu</button>
@@ -269,9 +269,9 @@ const styles = {
     helpText: { fontSize: '13px', color: '#878787', fontWeight: '500' },
     floatBtn: {
         backgroundColor: '#fff', color: '#2874f0', border: '1px solid #e0e0e0',
-        padding: '12px 20px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        fontSize: '14px', fontWeight: 'bold', width: '100%', maxWidth: '300px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-        transition: 'all 0.2s ease'
+        padding: '12px 20px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        fontSize: '14px', fontWeight: 'bold', width: '100%', maxWidth: '300px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+        animation: 'pulseBtn 2s infinite', transition: 'all 0.2s ease'
     },
     header: {
         padding: '16px 20px', backgroundColor: '#2874f0', color: '#fff',
@@ -294,11 +294,11 @@ const styles = {
     row: { display: 'flex', marginBottom: '15px' },
     botBubble: {
         backgroundColor: '#fff', color: '#212121', padding: '12px 16px', borderRadius: '0 12px 12px 12px',
-        fontSize: '14px', lineHeight: '1.5', border: '1px solid #e0e0e0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+        fontSize: '14px', lineHeight: '1.5', border: '1px solid #e0e0e0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', wordBreak: 'break-word'
     },
     userBubble: {
         backgroundColor: '#2874f0', color: '#fff', padding: '12px 16px', borderRadius: '12px 0 12px 12px',
-        fontSize: '14px', lineHeight: '1.5', boxShadow: '0 2px 4px rgba(40,116,240,0.2)'
+        fontSize: '14px', lineHeight: '1.5', boxShadow: '0 2px 4px rgba(40,116,240,0.2)', wordBreak: 'break-word'
     },
     timestamp: {
         fontSize: '11px', color: '#878787', marginTop: '6px', padding: '0 4px'
@@ -310,18 +310,16 @@ const styles = {
     typingDot: {
         fontSize: '24px', lineHeight: '10px', color: '#878787', animation: 'blink 1.4s infinite both'
     },
-    // 🟢 THE VERTICAL MENU CARD STYLES
     botMenuCard: {
         backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0',
         marginTop: '8px', overflow: 'hidden', boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-        width: '100%', maxWidth: '280px', transition: 'opacity 0.3s'
+        width: '100%', maxWidth: '280px', transition: 'all 0.3s'
     },
     menuItem: {
         padding: '14px 16px', fontSize: '13px', fontWeight: '600', color: '#212121',
         cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         backgroundColor: '#fff'
     },
-    // 🔵 FOLLOW UP CHIPS STYLES
     chipsWrapper: {
         display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap'
     },
@@ -347,10 +345,15 @@ const styles = {
     }
 };
 
-const styleSheet = document.createElement("style");
-styleSheet.innerText = `
-@keyframes blink { 0% { opacity: 0.2; } 20% { opacity: 1; } 100% { opacity: 0.2; } }
-`;
-document.head.appendChild(styleSheet);
+// Insert animations to Document Head securely
+if (typeof document !== 'undefined') {
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = `
+    @keyframes blink { 0% { opacity: 0.2; } 20% { opacity: 1; } 100% { opacity: 0.2; } }
+    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes pulseBtn { 0% { box-shadow: 0 0 0 0 rgba(40, 116, 240, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(40, 116, 240, 0); } 100% { box-shadow: 0 0 0 0 rgba(40, 116, 240, 0); } }
+    `;
+    document.head.appendChild(styleSheet);
+}
 
 export default OrderChat;
