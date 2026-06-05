@@ -318,6 +318,63 @@ const Home = () => {
                     Check out our other app: <a href="https://subhams-vpk.vercel.app/" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>Subhams </a>
                 </p>
             </footer>
+            {/* 🟢 ULTRA-PREMIUM ANIMATED FOOTER (For all your projects) */}
+      <div style={{ textAlign: 'center', marginTop: '40px', paddingBottom: '25px', position: 'relative' }}>
+        <style>
+          {`
+            /* 1. Sweeping Gradient Shine for the SUBHAMS text */
+            @keyframes premium-shine {
+              0% { background-position: -200% center; }
+              100% { background-position: 200% center; }
+            }
+            
+            /* 2. Floating and Glowing Animation for the Sparks */
+            @keyframes float-sparkle {
+              0%, 100% { transform: translateY(0px) scale(0.8); opacity: 0.4; }
+              50% { transform: translateY(-4px) scale(1.2); opacity: 1; filter: drop-shadow(0 0 6px #fbbf24); }
+            }
+            
+            /* 3. The Breathing Underline Glow */
+            @keyframes line-breathe {
+              0%, 100% { width: 30px; opacity: 0.3; }
+              50% { width: 60px; opacity: 0.8; box-shadow: 0 0 10px #3b82f6; }
+            }
+
+            .subhams-brand-text {
+              background: linear-gradient(90deg, #3b82f6, #a855f7, #ec4899, #3b82f6);
+              background-size: 200% auto;
+              color: transparent;
+              -webkit-background-clip: text;
+              background-clip: text;
+              animation: premium-shine 3.5s linear infinite;
+              font-weight: 900;
+              font-size: 14px;
+              letter-spacing: 2px;
+            }
+          `}
+        </style>
+        
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          {/* Left Sparkle (Animates instantly) */}
+          <span style={{ animation: 'float-sparkle 2s ease-in-out infinite', fontSize: '13px' }}>✨</span>
+          
+          <p style={{ fontSize: '10px', color: '#64748b', fontWeight: '800', margin: 0, letterSpacing: '1.5px' }}>
+            POWERED BY <span className="subhams-brand-text">SUBHAMS</span>
+          </p>
+          
+          {/* Right Sparkle (Delayed by 1s so they twinkle back and forth) */}
+          <span style={{ animation: 'float-sparkle 2s ease-in-out infinite 1s', fontSize: '13px' }}>✨</span>
+        </div>
+
+        {/* Beautiful Animated Glowing Underline */}
+        <div style={{ 
+            height: '3px', 
+            background: 'linear-gradient(90deg, transparent, #3b82f6, #a855f7, transparent)', 
+            margin: '8px auto 0 auto', 
+            borderRadius: '10px',
+            animation: 'line-breathe 3s ease-in-out infinite' 
+        }}></div>
+      </div>
         </div>
     );
 };
