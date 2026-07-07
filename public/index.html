@@ -2,22 +2,81 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Bhavyams VendorHub</title>
-    
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#2874f0" /> <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#2874f0" /> 
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     
+    <!-- 1. STRICT SEARCH ENGINE TITLES, KEYWORDS & BRAND DESCRIPTION -->
+    <title>Bhavyams VendorHub | Venkata Pavan Kumar Amarthaluri</title>
+    <meta name="description" content="Bhavyams VendorHub - A full-stack multi-vendor marketplace engineered by Venkata Pavan Kumar Amarthaluri under the Subhams Networks ecosystem." />
+    <!-- Notice the strict keyword combo here -->
+    <meta name="keywords" content="bhavyams, subhams, subhams networks, Venkata Pavan Kumar Amarthaluri, multi-vendor marketplace, logistics, e-commerce" />
+    <meta name="author" content="Venkata Pavan Kumar Amarthaluri" />
+
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="description" content="Bhavyams VendorHub - A full-stack multi-vendor marketplace engineered by Venkata Pavan Kumar" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <!-- Razorpay Integration -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+    <!-- 2. STICKY ECOSYSTEM SCHEMA (FULL SOCIAL COMBO FOR GOOGLE) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://bhavyams.subhamsnetworks.in/#application",
+          "name": "Bhavyams VendorHub",
+          "url": "https://bhavyams.subhamsnetworks.in",
+          "applicationCategory": "BusinessApplication",
+          "description": "A scalable multi-vendor marketplace and e-commerce ecosystem engine.",
+          "publisher": {
+            "@id": "https://subhamsnetworks.in/#organization"
+          },
+          "author": {
+            "@id": "https://subhamsnetworks.in/#person"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://subhamsnetworks.in/#organization",
+          "name": "Subhams Networks",
+          "alternateName": "subhams",
+          "url": "https://subhamsnetworks.in",
+          "sameAs": [
+            "https://subhamsnetworks.in",
+            "https://agent.subhamsnetworks.in",
+            "https://pmms.subhamsnetworks.in",
+            "https://www.instagram.com/subhamsnetworks?igsh=cW9mYXBibzA3cGZp",
+            "https://x.com/subhamsnetworks",
+            "https://youtube.com/@subhamsnetworks?si=zzI2p8uHbOFkW-3D"
+          ]
+        },
+        {
+          "@type": "Person",
+          "@id": "https://subhamsnetworks.in/#person",
+          "name": "Venkata Pavan Kumar Amarthaluri",
+          "url": "https://subhamsnetworks.in",
+          "email": "subhamsnetworks@gmail.com",
+          "sameAs": [
+            "https://www.linkedin.com/in/venkata-pavan-kumar-server",
+            "https://github.com/Vpk-star-space",
+            "https://www.instagram.com/subhamsnetworks?igsh=cW9mYXBibzA3cGZp",
+            "https://x.com/subhamsnetworks",
+            "https://youtube.com/@subhamsnetworks?si=zzI2p8uHbOFkW-3D"
+          ]
+        }
+      ]
+    }
+    </script>
 
     <style>
       /* 🚀 Global UX Fixes */
@@ -36,19 +95,10 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-  </body>
-</html>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+    
     <!--
       This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
       The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
     -->
   </body>
 </html>
