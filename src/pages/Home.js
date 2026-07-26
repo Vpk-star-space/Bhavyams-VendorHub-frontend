@@ -163,7 +163,7 @@ const handleRegisterSubmit = async (e) => {
             await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/register-interest', formData);
 
             // Show success message
-            alert(`Thanks ${regName}! We have recorded your interest. Our team will contact you at ${regPhone} very soon.`);
+            alert(`Thanks ${regName}! We have recorded your interest ${regProducts} . Our team will contact you at email ${regEmail} OR ${regPhone} very soon.`);
             
             // Clear the form
             setRegName('');
@@ -379,7 +379,7 @@ const handleRegisterSubmit = async (e) => {
                                 />
                                 <input 
                                     type="text" 
-                                    placeholder="Products or Services (e.g. Vegetables, Catering)" 
+                                    placeholder="Products or Services (e.g., Vegetables, Sarees / Home Foods, Electronics, Mechanics, Promotions )" 
                                     style={styles.glassInput} 
                                     value={regProducts}
                                     onChange={(e) => setRegProducts(e.target.value)}
