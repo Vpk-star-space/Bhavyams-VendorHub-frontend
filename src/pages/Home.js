@@ -87,7 +87,7 @@ const Home = () => {
     const [regProducts, setRegProducts] = useState('');
     const [regLocation, setRegLocation] = useState('');
     const [regEmail, setRegEmail] = useState('');
-    const [regBusiness, setRegBusiness] = useState('vegetables');
+
     const [showDemoBanner, setShowDemoBanner] = useState(true);
 
     const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
