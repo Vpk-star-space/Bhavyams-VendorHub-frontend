@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -95,8 +95,7 @@ function App() {
     const [isAppReady, setIsAppReady] = useState(false);
     const [serverResponded, setServerResponded] = useState(false); 
     
-    // 🟢 THE FIX: We use a Ref to track the timeout silently.
-    // Vercel's strict ESLint rules ignore Refs, keeping the build 100% clean and loop-free!
+    // 🟢 The Ref that fixes the Vercel ESLint strict rules
     const hasRespondedRef = useRef(false);
 
     useEffect(() => {
@@ -135,7 +134,7 @@ function App() {
             isMounted = false; 
             clearTimeout(safetyTimeout);
         };
-    }, []); // 🟢 Array is empty. ESLint is happy. Build will pass!
+    }, []); // Empty array ensures zero Vercel warnings.
 
     const handleAppReady = useCallback(() => {
         setIsAppReady(true);
