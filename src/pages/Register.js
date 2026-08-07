@@ -28,7 +28,7 @@ const Register = () => {
             });
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('user', JSON.stringify(res.data.user));
-            toast.success("Welcome to Bhavyams Hub!");
+            toast.success("Welcome to Subhams-Hub!");
             navigate('/dashboard'); 
         } catch (err) {
             toast.error("Google Registration Failed");
@@ -72,7 +72,7 @@ const Register = () => {
                     <div style={styles.sidebar}>
                         <div style={styles.sidebarContent}>
                             <h2 style={styles.sideTitle}>Looks like you're new here!</h2>
-                            <div style={styles.sideSub}>Sign up with your details to get started with Bhavyams VendorHub</div>
+                            <div style={styles.sideSub}>Sign up with your details to get started with Subhams-Hub</div>
                         </div>
                         <ShoppingBag size={100} style={styles.sideIcon} />
                     </div>
@@ -112,7 +112,7 @@ const Register = () => {
     </select>
 </div>
                                 <div style={styles.termsText}>
-                                    By continuing, you agree to Bhavyams's <span>Terms of Use</span> and <span>Privacy Policy</span>.
+                                    By continuing, you agree to Subhams-Hub's <span>Terms of Use</span> and <span>Privacy Policy</span>.
                                 </div>
 
                                 <button type="submit" style={styles.primaryBtn} disabled={loading}>

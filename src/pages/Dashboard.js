@@ -77,7 +77,7 @@ const Dashboard = () => {
         <div style={styles.dashboard}>
             {!isMobile && (
                 <aside style={styles.sidebar}>
-                    <div style={styles.logoSection}><h2 style={styles.logo}>Bhavyams</h2><h2 style={styles.logo}>Hub</h2></div>
+                    <div style={styles.logoSection}><h2 style={styles.logo}>Subhams-Hub</h2><h2 style={styles.logo}>Hub</h2></div>
                     <nav style={styles.nav}>
                         <div onClick={() => setActiveTab('overview')} style={activeTab === 'overview' ? styles.activeNavItem : styles.navItem}><Home size={20}/> Home</div>
                         <div onClick={() => setActiveTab('profile')} style={activeTab === 'profile' ? styles.activeNavItem : styles.navItem}><User size={20}/> Profile</div>
@@ -168,7 +168,7 @@ const Dashboard = () => {
                                 ) : (
                                     <div style={styles.premiumBanner}>
                                         <div style={styles.bannerText}>
-                                            <h2 style={{ margin: '0 0 10px 0', fontSize: '22px' }}>Welcome to Bhavyams Hub</h2>
+                                            <h2 style={{ margin: '0 0 10px 0', fontSize: '22px' }}>Welcome to Subhams-hub</h2>
                                             <p style={{ margin: '0 0 20px 0', fontSize: '14px', opacity: 0.9 }}>Get top-quality electronics and fashion delivered directly from verified vendors.</p>
                                             <button onClick={() => navigate('/')} style={styles.premiumShopBtn}>
                                                 <ShoppingBag size={16} /> BROWSE STORE

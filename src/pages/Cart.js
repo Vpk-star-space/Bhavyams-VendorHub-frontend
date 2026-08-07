@@ -79,7 +79,7 @@ const Cart = () => {
         // 2. Tell DB in background
         try {
             const token = localStorage.getItem('token');
-            await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/cart/add', 
+            await axios.post('https://subhams-hub-vendorhub-backend.onrender.com/api/cart/add', 
                 { productId: item.id, quantity: -1 }, 
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -104,7 +104,7 @@ const Cart = () => {
 
         setIsCheckingOut(true);
         try {
-            const { data: freshUser } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', {
+            const { data: freshUser } = await axios.get('https://subhams-hub-vendorhub-backend.onrender.com/api/auth/me', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             localStorage.setItem('user', JSON.stringify(freshUser));
@@ -116,7 +116,7 @@ const Cart = () => {
                 return;
             }
 
-            const { data: keyData } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/orders/get-razorpay-key', {
+            const { data: keyData } = await axios.get('https://subhams-hub-vendorhub-backend.onrender.com/api/orders/get-razorpay-key', {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -128,7 +128,7 @@ const Cart = () => {
                 key: keyData.key, 
                 amount: orderData.razorpayOrder.amount, 
                 currency: "INR",
-                name: "Bhavyams VendorHub",
+                name: "Subhams-hub",
                 description: "Secure Payment",
                 order_id: orderData.razorpayOrder.id,
                 handler: async function (response) {
@@ -176,7 +176,7 @@ const Cart = () => {
         <div style={styles.successScreen}>
             <CheckCircle size={84} color="#26a541" style={{marginBottom: '15px'}} />
             <h1 style={{fontSize: '26px', margin: '0 0 10px 0', color: '#212121'}}>Order Placed Successfully!</h1>
-            <p style={{fontSize: '15px', color: '#878787', marginBottom: '30px'}}>Thank you for shopping with Bhavyams Vendor Hub.</p>
+            <p style={{fontSize: '15px', color: '#878787', marginBottom: '30px'}}>Thank you for shopping with Subhams-hub.</p>
             <div style={{display: 'flex', gap: '15px', justifyContent: 'center', flexDirection: isMobile ? 'column' : 'row'}}>
                 
                 {/* 🟢 SURGICAL FIX: Reset orderPlaced to false when leaving so it doesn't get stuck! */}
@@ -294,11 +294,11 @@ const Cart = () => {
 
                                             <div style={styles.details}>
                                                 <div style={styles.itemName}>{item.name}</div>
-                                                <div style={styles.sellerText}>Seller: Bhavyams Vendor Hub</div>
+                                                <div style={styles.sellerText}>Seller: Subhams-hub</div>
                                                 
                                                 <div style={{display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px'}}>
                                                     <Award size={14} color="#2874f0" />
-                                                    <span style={{fontSize: '11px', fontWeight: 'bold', fontStyle: 'italic', color: '#2874f0'}}>Bhavyams Assured</span>
+                                                    <span style={{fontSize: '11px', fontWeight: 'bold', fontStyle: 'italic', color: '#2874f0'}}>subhams-hub Assured</span>
                                                 </div>
 
                                                 <div style={{display: 'flex', alignItems: 'center', gap: '10px', margin: '12px 0'}}>

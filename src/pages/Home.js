@@ -95,7 +95,7 @@ const Home = () => {
         "Handpicking the best products for you...",
         "Unpacking the latest deals...",
         "Arranging the store shelves...",
-        "Good things take a little time! Preparing Bhavyams Hub..."
+        "Good things take a little time! Preparing Subhams-Hub..."
     ];
     
     const [searchQuery, setSearchQuery] = useState('');
@@ -246,7 +246,7 @@ const handleRegisterSubmit = async (e) => {
                         <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
                             <Menu size={24} color="#fff" onClick={() => navigate('/dashboard')} style={{cursor: 'pointer', flexShrink: 0}} />
                           <h1 style={styles.mobileLogoText} onClick={() => navigate('/')}>
-                                <span className="glowing-green-logo">Bhavyams</span>
+                                <span className="glowing-green-logo">Subhams</span>
                                 <span style={styles.hubText}>Hub</span>
                             </h1>
                         </div>
@@ -254,7 +254,7 @@ const handleRegisterSubmit = async (e) => {
                         <div style={{display: 'flex', alignItems: 'center', gap: '15px', minWidth: '150px'}}>
                             <Menu size={28} color="#fff" onClick={() => navigate('/dashboard')} style={{cursor: 'pointer', flexShrink: 0}} />
                           <h1 style={styles.mobileLogoText} onClick={() => navigate('/')}>
-                                <span className="glowing-green-logo">Bhavyams</span>
+                                <span className="glowing-green-logo">Subhams</span>
                                 <span style={styles.hubText}>Hub</span>
                             </h1>
                         </div>
@@ -359,7 +359,7 @@ const handleRegisterSubmit = async (e) => {
                         <div style={styles.glassHeader}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                 <span style={{ fontSize: '22px' }}>🏪</span>
-                                <span>Bhavyams VendorHub</span>
+                                <span>Subhams-Hub</span>
                             </div>
                             <div style={styles.glassBadge}>
                                 <span style={styles.pulseDot}></span>
@@ -574,7 +574,7 @@ const styles = {
     logoText: { margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', lineHeight: '1', fontSize: '26px' },
     mobileLogoText: { margin: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', lineHeight: '1', fontSize: '22px' },
     
-    // Made 'Hub' clean white so the gold 'Bhavyams' pops even more
+    // Made 'Hub' clean white so the gold 'Subhams' pops even more
     hubText: { color: '#ffffff', fontSize: '11px', letterSpacing: '2px', fontWeight: 'bold', marginTop: '2px' },
     
     searchBar: { flex: 1, maxWidth: '500px', display: 'flex', position: 'relative', alignItems: 'center' },

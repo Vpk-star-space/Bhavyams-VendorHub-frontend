@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -18,100 +18,65 @@ import VendorDashboard from './pages/VendorDashboard';
 import ProductDetails from './pages/ProductDetails';
 import Profile from './pages/Profile';
 
-// 🛠️ ==========================================
-// 🛠️ MAINTENANCE MODE SETTINGS (MASTER CONTROL)
-// 🛠️ ==========================================
+const isMaintenanceMode = false; 
 
-// 🛑 1. MASTER SWITCH: Turn Maintenance Mode ON or OFF
-const isMaintenanceMode = false; // 🟢 Change to 'false' to open your app!
-
-// 🎯 2. TARGET TIME: Tell users when you will be back online
-const targetRestoreTime = "Update coming soon..."; 
-
-
-// 🚀 Helper: Always start at the top of the page on route change
 function ScrollToTop() {
     const { pathname } = useLocation();
-    useEffect(() => {
-        window.scrollTo(0, 0);
-    }, [pathname]);
+    useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
     return null;
 }
 
-// 🛡️ Compact & Professional Maintenance Component
-const MaintenanceScreen = () => {
-    const [currentTime, setCurrentTime] = useState(new Date());
+// 🛡️ STABLE, PROFESSIONAL LOADING SCREEN
+const StableLoader = ({ onComplete }) => {
+    const [fadeOut, setFadeOut] = useState(false);
+    const wakeLockRef = useRef(null);
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrentTime(new Date());
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
+        let isMounted = true;
 
-    const liveTimeString = currentTime.toLocaleTimeString('en-US', { 
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
-    });
+        // 1. Official WakeLock API (Standard, safe way to keep screen awake)
+        const requestWakeLock = async () => {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLockRef.current = await navigator.wakeLock.request('screen');
+                    console.log("Screen locked awake.");
+                }
+            } catch (err) {
+                console.log("WakeLock API blocked or unsupported by this browser.");
+            }
+        };
+        requestWakeLock();
+
+        // 2. Simple, fast 3-second loading timeline
+        const timer1 = setTimeout(() => {
+            if (isMounted) setFadeOut(true); // Start fade to black
+        }, 2500);
+
+        const timer2 = setTimeout(() => {
+            if (isMounted) {
+                // Release screen lock when entering the app to save battery
+                if (wakeLockRef.current) wakeLockRef.current.release();
+                onComplete(); 
+            }
+        }, 3000); // Enter app at 3 seconds
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timer1);
+            clearTimeout(timer2);
+            if (wakeLockRef.current) wakeLockRef.current.release();
+        };
+    }, [onComplete]);
 
     return (
-        <div style={mStyles.container}>
-            <style>{`
-                @keyframes dataFlow {
-                    0% { width: 0%; }
-                    100% { width: 100%; }
-                }
-                @keyframes slideIn {
-                    0% { transform: translateY(20px); opacity: 0; }
-                    100% { transform: translateY(0); opacity: 1; }
-                }
-                .clock-text {
-                    font-variant-numeric: tabular-nums;
-                }
-            `}</style>
-
-            <div style={mStyles.card}>
+        <div style={{...sStyles.wrapper, opacity: fadeOut ? 0 : 1}}>
+            <div style={sStyles.container}>
+                {/* Premium Brand Display */}
+                <h1 style={sStyles.brandName}>Subhams</h1>
+                <h2 style={sStyles.hubText}>HUB</h2>
                 
-                {/* 1. BRAND & HEADER */}
-                <h1 style={mStyles.brandTitle}>Bhavyams <span style={{color: '#ffe500'}}>Hub</span></h1>
-                <div style={mStyles.techBadge}>MAINTENANCE MODE / నిర్వహణ మోడ్</div>
-                
-                {/* 2. SIMPLE MESSAGE */}
-                <p style={mStyles.subtitle}>
-                    <strong>Our server is currently in maintenance mode.</strong><br/>
-                    <span style={{color: '#8c98a9', fontSize: '15px'}}>మా సర్వర్ ప్రస్తుతం నిర్వహణ మోడ్‌లో ఉంది.</span>
-                </p>
-
-                {/* 3. TIME PANELS (Side by Side) */}
-                <div style={mStyles.timePanelContainer}>
-                    <div style={mStyles.liveTimeBox}>
-                        <div style={mStyles.timeLabel}>            MAINTENANCE / నిర్వహణ సమయం</div>
-                        <div className="clock-text" style={mStyles.liveTimeValue}>
-                            {liveTimeString}
-                        </div>
-                    </div>
-
-                    <div style={mStyles.restorePanel}>
-                        <div style={mStyles.timeLabel}>TARGET RESTORE TIME / లక్ష్యం</div>
-                        <div style={mStyles.restoreTime}>{targetRestoreTime}</div>
-                    </div>
-                </div>
-
-                {/* 4. PROGRESS BAR */}
-                <div style={mStyles.progressContainer}>
-                    <div style={mStyles.progressLabel}>
-                        <span>Server Upgrading (సర్వర్ అప్‌గ్రేడ్)</span>
-                        <span style={{color: '#ffe500'}}>In Progress...</span>
-                    </div>
-                    <div style={mStyles.progressBarBg}>
-                        <div style={mStyles.progressBarFill}></div>
-                    </div>
-                </div>
-
-                {/* 5. FOOTER */}
-                <p style={mStyles.footerText}>
-                    Thank you for your patience. <span style={{fontSize: '13px'}}>(మీ ఓపికకు ధన్యవాదాలు)</span><br/><br/>
-                    <strong>- Venkata Pavan Kumar</strong>
-                </p>
+                {/* Clean Loading Spinner */}
+                <div className="stable-spinner" style={sStyles.spinnerBox}></div>
             </div>
         </div>
     );
@@ -119,69 +84,57 @@ const MaintenanceScreen = () => {
 
 function App() {
     const [googleClientId, setGoogleClientId] = useState(null);
-    const [loadingText, setLoadingText] = useState("Initializing Secure System...");
+    const [showSplash, setShowSplash] = useState(false);
+    const [isAppReady, setIsAppReady] = useState(false);
 
+    // ⏱️ THE 1-MINUTE TESTING LOGIC REMAINS INTACT
     useEffect(() => {
         let isMounted = true;
+        
+        const lastVisit = localStorage.getItem('lastVisitTime');
+        const now = Date.now();
+        const ONE_MINUTE = 1 * 60 * 1000; 
 
-        if (isMaintenanceMode) return; 
-
-        const timeoutId = setTimeout(() => {
-            if (isMounted) setLoadingText("Waking up secure server. This can take up to a few seconds...");
-        }, 5000);
+        if (!lastVisit || (now - parseInt(lastVisit)) > ONE_MINUTE) {
+            setShowSplash(true); 
+        } else {
+            setIsAppReady(true); 
+        }
 
         const fetchGoogleId = async () => {
             try {
-                if (!isMounted || isMaintenanceMode) return;
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
                 if (isMounted) setGoogleClientId(res.data.clientId);
             } catch (err) {
-                console.error("Google ID fetch failed. Retrying...", err);
-                if (isMounted && !isMaintenanceMode) {
-                    setTimeout(fetchGoogleId, 5000);
-                }
+                console.error("Failed to fetch Google ID");
             }
         };
         fetchGoogleId();
 
-        return () => {
-            isMounted = false;
-            clearTimeout(timeoutId);
-        };
+        return () => { isMounted = false; };
     }, []);
 
-    if (isMaintenanceMode) {
-        return <MaintenanceScreen />;
+    const handleIntroComplete = () => {
+        setShowSplash(false);
+        setIsAppReady(true);
+        localStorage.setItem('lastVisitTime', Date.now().toString());
+    };
+
+    if (isMaintenanceMode) return <div style={{textAlign: 'center', marginTop: '20%'}}>Maintenance Mode Active</div>;
+
+    // Show the stable loading screen
+    if (showSplash) {
+        return <StableLoader onComplete={handleIntroComplete} />;
     }
 
-    if (!googleClientId) {
-        return (
-            <div style={lStyles.loadingScreen}>
-                <style>{`
-                    @keyframes loadingAnim { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
-                `}</style>
-                <div style={lStyles.loadingContent}>
-                    <div style={lStyles.brandName}>Bhavyams <span style={lStyles.hubText}>Hub</span></div>
-                    <div style={lStyles.loaderBar}>
-                        <div style={lStyles.loaderProgress}></div>
-                    </div>
-                    <div style={lStyles.loadingText}>{loadingText}</div>
-                </div>
-            </div>
-        );
-    }
+    if (!isAppReady || !googleClientId) return null; 
 
     return (
         <GoogleOAuthProvider clientId={googleClientId}>
             <CartProvider>
                 <Router>
                     <ScrollToTop />
-                    <ToastContainer 
-                        theme="colored" 
-                        position="top-center"
-                        autoClose={1500} 
-                        hideProgressBar={true}
-                    />
+                    <ToastContainer theme="colored" position="top-center" autoClose={1500} hideProgressBar={true} />
                     <div style={{ minHeight: '100vh', background: '#f1f3f6' }}>
                         <Routes>
                             <Route path="/" element={<Home />} />
@@ -204,143 +157,57 @@ function App() {
 }
 
 // ==========================================
-// 🎨 STYLES
+// 🎨 STABLE, CLEAN STYLES
 // ==========================================
-
-const lStyles = {
-    loadingScreen: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fff', fontFamily: "'Segoe UI', Roboto, sans-serif" },
-    loadingContent: { textAlign: 'center', minWidth: '300px' },
-    brandName: { fontSize: '32px', fontWeight: '900', color: '#2874f0', letterSpacing: '-1px' },
-    hubText: { color: '#ffe500', fontSize: '18px', fontWeight: 'bold' },
-    loadingText: { marginTop: '20px', color: '#666', fontSize: '15px', fontWeight: '500', maxWidth: '300px', margin: '20px auto 0' },
-    loaderBar: { width: '250px', height: '5px', background: '#e0e0e0', borderRadius: '10px', margin: '25px auto 0', overflow: 'hidden' },
-    loaderProgress: { width: '50%', height: '100%', background: '#2874f0', borderRadius: '10px', animation: 'loadingAnim 1.5s infinite ease-in-out' }
-};
-
-const mStyles = {
+const sStyles = {
+    wrapper: {
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh',
+        backgroundColor: '#020617', // Very dark, professional blue/black
+        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+        zIndex: 99999, fontFamily: "'Inter', 'Segoe UI', sans-serif",
+        transition: 'opacity 0.5s ease-in-out'
+    },
     container: {
-        minHeight: '100vh',
-        width: '100%',
-        backgroundColor: '#0a0f1e', 
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        boxSizing: 'border-box',
-        fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        display: 'flex', flexDirection: 'column', alignItems: 'center'
     },
-    card: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        textAlign: 'center',
-        backgroundColor: '#151b2e',
-        borderRadius: '16px',
-        padding: '40px',
-        maxWidth: '550px',
-        width: '100%',
-        boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.5)',
-        border: '1px solid #2a344a',
-        animation: 'slideIn 0.4s ease-out'
+    brandName: { 
+        fontSize: 'clamp(40px, 8vw, 80px)', 
+        color: '#ffffff', 
+        fontStyle: 'italic', 
+        fontWeight: '900', 
+        margin: 0,
+        textShadow: '0 0 20px rgba(59,130,246,0.5)'
     },
-    brandTitle: {
-        margin: '0 0 15px 0',
-        fontSize: '38px',
-        color: '#ffffff',
-        fontWeight: '900',
-        letterSpacing: '-1px'
+    hubText: { 
+        fontSize: 'clamp(24px, 5vw, 40px)', 
+        color: '#fbbf24', // Premium Gold
+        letterSpacing: '10px', 
+        fontWeight: '800', 
+        textTransform: 'uppercase', 
+        margin: '5px 0 30px 0' 
     },
-    techBadge: {
-        display: 'inline-block',
-        backgroundColor: 'rgba(255, 68, 68, 0.15)',
-        color: '#ff4444',
-        padding: '6px 14px',
-        borderRadius: '50px',
-        fontSize: '12px',
-        fontWeight: '700',
-        letterSpacing: '1px',
-        border: '1px solid rgba(255, 68, 68, 0.3)',
-        marginBottom: '25px'
-    },
-    subtitle: {
-        color: '#a3b1c6',
-        fontSize: '16px',
-        lineHeight: '1.6',
-        margin: '0 0 30px 0'
-    },
-    timePanelContainer: {
-        display: 'flex',
-        flexDirection: window.innerWidth < 500 ? 'column' : 'row',
-        width: '100%',
-        gap: '15px',
-        marginBottom: '30px'
-    },
-    liveTimeBox: {
-        flex: 1,
-        backgroundColor: '#0d1222',
-        border: '1px solid #2a344a',
-        borderRadius: '10px',
-        padding: '15px',
-        borderTop: '4px solid #4dabf7' 
-    },
-    restorePanel: {
-        flex: 1,
-        backgroundColor: '#0d1222',
-        border: '1px solid #2a344a',
-        borderRadius: '10px',
-        padding: '15px',
-        borderTop: '4px solid #22c55e' 
-    },
-    timeLabel: {
-        color: '#8c98a9',
-        fontSize: '11px',
-        fontWeight: '700',
-        letterSpacing: '1px',
-        marginBottom: '8px'
-    },
-    liveTimeValue: {
-        color: '#4dabf7', 
-        fontSize: '20px',
-        fontWeight: '900',
-        letterSpacing: '1px'
-    },
-    restoreTime: {
-        color: '#22c55e', 
-        fontSize: '20px',
-        fontWeight: '900',
-        letterSpacing: '0.5px'
-    },
-    progressContainer: {
-        width: '100%',
-        marginBottom: '30px'
-    },
-    progressLabel: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        color: '#cbd5e1',
-        fontSize: '13px',
-        fontWeight: '700',
-        marginBottom: '10px'
-    },
-    progressBarBg: {
-        width: '100%',
-        height: '6px',
-        backgroundColor: '#2a344a',
-        borderRadius: '10px',
-        overflow: 'hidden'
-    },
-    progressBarFill: {
-        height: '100%',
-        backgroundColor: '#ffe500', 
-        animation: 'dataFlow 2s infinite linear',
-        boxShadow: '0 0 10px #ffe500'
-    },
-    footerText: {
-        color: '#7f8ea3',
-        fontSize: '14px',
-        lineHeight: '1.6',
-        margin: '0'
+    spinnerBox: {
+        width: '40px',
+        height: '40px',
+        border: '4px solid rgba(255, 255, 255, 0.1)',
+        borderTop: '4px solid #3b82f6', // Blue accent
+        borderRadius: '50%',
     }
 };
+
+// 🌍 GLOBAL CSS FOR SPINNER
+if (typeof document !== 'undefined') {
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .stable-spinner {
+            animation: spinFast 1s linear infinite;
+        }
+        @keyframes spinFast {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
+}
 
 export default App;

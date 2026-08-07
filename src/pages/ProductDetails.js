@@ -105,7 +105,7 @@ const ProductDetails = () => {
                 fireCelebration();
                 setTimeout(() => navigate('/cart'), 1200);
             } else {
-                toast.success("🛒 Added to Bhavyams Cart!");
+                toast.success("🛒 Added to Subhams Cart!");
                 fireCelebration();
             }
         }, 10);

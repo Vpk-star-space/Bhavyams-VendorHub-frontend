@@ -117,7 +117,7 @@ const handleLogin = async (e) => {
                         </div>
 
                         <div style={styles.termsText}>
-                            By continuing, you agree to Bhavyams's <span>Terms of Use</span> and <span>Privacy Policy</span>.
+                            By continuing, you agree to Subhams-Hub's <span>Terms of Use</span> and <span>Privacy Policy</span>.
                         </div>
 
                         <button type="submit" style={styles.primaryBtn} disabled={loading}>
@@ -138,7 +138,7 @@ const handleLogin = async (e) => {
                     </div>
 
                     <div style={styles.footerLink}>
-                        New to Bhavyams? <Link to="/register" style={styles.linkBold}>Create an account</Link>
+                        New to Subhams-Hub? <Link to="/register" style={styles.linkBold}>Create an account</Link>
                     </div>
                 </div>
             </div>

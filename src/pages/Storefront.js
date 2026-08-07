@@ -46,7 +46,7 @@ const Storefront = () => {
                     transition={{ duration: 0.5 }}
                     style={styles.title}
                 >
-                    Welcome to <span style={styles.brandHighlight}>Bhavyams Hub</span>
+                    Welcome to <span style={styles.brandHighlight}>Subhams-Hub</span>
                 </motion.h2>
                 <motion.p 
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://bhavyams.subhamsnetworks.in/sitemap.xml
+Sitemap: https://hub.subhamsnetworks.in/sitemap.xml
