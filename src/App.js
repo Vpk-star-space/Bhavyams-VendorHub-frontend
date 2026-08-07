@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -41,16 +41,20 @@ const PremiumLoader = ({ isDataReady, forceSplash, onComplete }) => {
             } catch (err) {}
         };
         requestWakeLock();
+    }, []);
 
-        // 1. Minimum Splash Enforcer
+    useEffect(() => {
+        // 1. THE BUG FIX: Safely enforce minimum splash screen without deadlocking
         if (forceSplash) {
             const minTimer = setTimeout(() => setMinTimeMet(true), 2500);
             return () => clearTimeout(minTimer);
+        } else {
+            setMinTimeMet(true); // Ensure it unlocks immediately if skipped
         }
     }, [forceSplash]);
 
     useEffect(() => {
-        // 2. Smart UX: If the backend takes more than 4 seconds, change the text so they don't panic!
+        // 2. Smart UX: If the backend takes more than 4 seconds
         const slowServerTimer = setTimeout(() => {
             if (!isDataReady) {
                 setStatusText("Waking Cloud Servers... (Please wait a moment)");
@@ -108,39 +112,36 @@ const PremiumLoader = ({ isDataReady, forceSplash, onComplete }) => {
         </div>
     );
 };
+
 function App() {
     const [googleClientId, setGoogleClientId] = useState(null);
     const [isAppReady, setIsAppReady] = useState(false);
-    const [forceSplash, setForceSplash] = useState(true);
-    
-    // 🟢 1. NEW STATE: Tracks if the server answered (success OR fail)
     const [serverResponded, setServerResponded] = useState(false); 
+
+    // 🟢 THE BUG FIX: Calculate the 1-minute rule SYNCHRONOUSLY before the app even renders
+    const [forceSplash, setForceSplash] = useState(() => {
+        const lastVisit = localStorage.getItem('lastVisitTime');
+        const now = Date.now();
+        if (lastVisit && (now - parseInt(lastVisit)) < 60000) {
+            return false; // Less than 1 minute ago, skip splash
+        }
+        return true;
+    });
 
     useEffect(() => {
         let isMounted = true;
         
-        // ⏱️ Check 1-Minute Rule
-        const lastVisit = localStorage.getItem('lastVisitTime');
-        const now = Date.now();
-        const ONE_MINUTE = 1 * 60 * 1000; 
-
-        if (lastVisit && (now - parseInt(lastVisit)) < ONE_MINUTE) {
-            setForceSplash(false); 
-        }
-
         // 🌐 Fetch Google ID & Wake Up Backend
         const fetchGoogleId = async () => {
             try {
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
                 if (isMounted) {
                     setGoogleClientId(res.data.clientId);
-                    setServerResponded(true); // 🟢 SUCCESS: Tell loader to finish!
+                    setServerResponded(true); 
                 }
             } catch (err) {
                 console.error("Failed to fetch Google ID - Server might be offline.");
                 if (isMounted) {
-                    // 🟢 THE FIX: If the server crashes or is offline, force the app to open anyway!
-                    // We give it a dummy ID so the app doesn't break, and unlock the loading screen.
                     setGoogleClientId("offline-mode.apps.googleusercontent.com");
                     setServerResponded(true); 
                 }
@@ -148,9 +149,9 @@ function App() {
         };
         fetchGoogleId();
 
-        // 🟢 SAFETY NET: If the server completely hangs and doesn't answer after 10 seconds, force open!
+        // 🟢 SAFETY NET: 10-second absolute override
         const safetyTimeout = setTimeout(() => {
-            if (isMounted) {
+            if (isMounted && !serverResponded) {
                 setGoogleClientId("timeout-mode.apps.googleusercontent.com");
                 setServerResponded(true);
             }
@@ -160,19 +161,19 @@ function App() {
             isMounted = false; 
             clearTimeout(safetyTimeout);
         };
-    }, []);
+    }, [serverResponded]);
 
-    const handleAppReady = () => {
+    // 🟢 THE BUG FIX: useCallback prevents the loader from constantly re-rendering and resetting its timers
+    const handleAppReady = useCallback(() => {
         localStorage.setItem('lastVisitTime', Date.now().toString());
         setIsAppReady(true);
-    };
+    }, []);
 
     if (isMaintenanceMode) return <div style={{textAlign: 'center', marginTop: '20%', fontSize: '24px', fontWeight: 'bold'}}>Maintenance Mode Active</div>;
 
     if (!isAppReady) {
         return (
             <PremiumLoader 
-                // 🟢 2. Use the bulletproof state here instead of the Google ID
                 isDataReady={serverResponded} 
                 forceSplash={forceSplash} 
                 onComplete={handleAppReady} 
