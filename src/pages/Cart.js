@@ -104,7 +104,7 @@ const Cart = () => {
 
         setIsCheckingOut(true);
         try {
-            const { data: freshUser } = await axios.get('https://subhams-hub-vendorhub-backend.onrender.com/api/auth/me', {
+            const { data: freshUser } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             localStorage.setItem('user', JSON.stringify(freshUser));
@@ -116,7 +116,7 @@ const Cart = () => {
                 return;
             }
 
-            const { data: keyData } = await axios.get('https://bhavyams-vendorhub-vendorhub-backend.onrender.com/api/orders/get-razorpay-key', {
+            const { data: keyData } = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/orders/get-razorpay-key', {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
