@@ -108,11 +108,13 @@ const PremiumLoader = ({ isDataReady, forceSplash, onComplete }) => {
         </div>
     );
 };
-
 function App() {
     const [googleClientId, setGoogleClientId] = useState(null);
     const [isAppReady, setIsAppReady] = useState(false);
     const [forceSplash, setForceSplash] = useState(true);
+    
+    // 🟢 1. NEW STATE: Tracks if the server answered (success OR fail)
+    const [serverResponded, setServerResponded] = useState(false); 
 
     useEffect(() => {
         let isMounted = true;
@@ -123,22 +125,41 @@ function App() {
         const ONE_MINUTE = 1 * 60 * 1000; 
 
         if (lastVisit && (now - parseInt(lastVisit)) < ONE_MINUTE) {
-            setForceSplash(false); // Visited recently? Skip the minimum 2.5s wait.
+            setForceSplash(false); 
         }
 
         // 🌐 Fetch Google ID & Wake Up Backend
         const fetchGoogleId = async () => {
             try {
-                // If the server is asleep, this is the exact line that will take 40 seconds to finish.
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
-                if (isMounted) setGoogleClientId(res.data.clientId);
+                if (isMounted) {
+                    setGoogleClientId(res.data.clientId);
+                    setServerResponded(true); // 🟢 SUCCESS: Tell loader to finish!
+                }
             } catch (err) {
                 console.error("Failed to fetch Google ID - Server might be offline.");
+                if (isMounted) {
+                    // 🟢 THE FIX: If the server crashes or is offline, force the app to open anyway!
+                    // We give it a dummy ID so the app doesn't break, and unlock the loading screen.
+                    setGoogleClientId("offline-mode.apps.googleusercontent.com");
+                    setServerResponded(true); 
+                }
             }
         };
         fetchGoogleId();
 
-        return () => { isMounted = false; };
+        // 🟢 SAFETY NET: If the server completely hangs and doesn't answer after 10 seconds, force open!
+        const safetyTimeout = setTimeout(() => {
+            if (isMounted) {
+                setGoogleClientId("timeout-mode.apps.googleusercontent.com");
+                setServerResponded(true);
+            }
+        }, 10000);
+
+        return () => { 
+            isMounted = false; 
+            clearTimeout(safetyTimeout);
+        };
     }, []);
 
     const handleAppReady = () => {
@@ -148,12 +169,11 @@ function App() {
 
     if (isMaintenanceMode) return <div style={{textAlign: 'center', marginTop: '20%', fontSize: '24px', fontWeight: 'bold'}}>Maintenance Mode Active</div>;
 
-    // 🟢 THE FIX: We NEVER return 'null'. 
-    // The PremiumLoader stays mounted until `googleClientId` is fully loaded!
     if (!isAppReady) {
         return (
             <PremiumLoader 
-                isDataReady={!!googleClientId} 
+                // 🟢 2. Use the bulletproof state here instead of the Google ID
+                isDataReady={serverResponded} 
                 forceSplash={forceSplash} 
                 onComplete={handleAppReady} 
             />
@@ -186,6 +206,7 @@ function App() {
         </GoogleOAuthProvider>
     );
 }
+
 
 // ==========================================
 // 🎨 ULTRA-PREMIUM LOADER STYLES
