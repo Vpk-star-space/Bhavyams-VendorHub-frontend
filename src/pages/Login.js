@@ -74,7 +74,7 @@ const handleLogin = async (e) => {
 
                 {/* ⚪ RIGHT SIDE: FORM */}
                 <div style={{...styles.formContainer, width: isMobile ? '100%' : '65%', padding: isMobile ? '30px 20px' : '50px 60px'}}>
-                    <h2 style={{...styles.formTitle, display: isMobile ? 'block' : 'none'}}>Login to Bhavyams</h2>
+                    <h2 style={{...styles.formTitle, display: isMobile ? 'block' : 'none'}}>Login to Subhams-Hub</h2>
                     
                     <form onSubmit={handleLogin} style={styles.form}>
                         <div style={styles.inputBox}>
