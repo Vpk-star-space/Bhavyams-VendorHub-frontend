@@ -116,7 +116,7 @@ const Cart = () => {
                 return;
             }
 
-            const { data: keyData } = await axios.get('https://subhams-hub-vendorhub-backend.onrender.com/api/orders/get-razorpay-key', {
+            const { data: keyData } = await axios.get('https://bhavyams-vendorhub-vendorhub-backend.onrender.com/api/orders/get-razorpay-key', {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
