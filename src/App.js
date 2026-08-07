@@ -94,6 +94,10 @@ function App() {
     const [googleClientId, setGoogleClientId] = useState(null);
     const [isAppReady, setIsAppReady] = useState(false);
     const [serverResponded, setServerResponded] = useState(false); 
+    
+    // 🟢 THE FIX: We use a Ref to track the timeout silently.
+    // Vercel's strict ESLint rules ignore Refs, keeping the build 100% clean and loop-free!
+    const hasRespondedRef = useRef(false);
 
     useEffect(() => {
         let isMounted = true;
@@ -103,12 +107,14 @@ function App() {
             try {
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
                 if (isMounted) {
+                    hasRespondedRef.current = true;
                     setGoogleClientId(res.data.clientId);
                     setServerResponded(true); 
                 }
             } catch (err) {
                 console.error("Failed to connect to backend.");
                 if (isMounted) {
+                    hasRespondedRef.current = true;
                     setGoogleClientId("offline-mode.apps.googleusercontent.com");
                     setServerResponded(true); 
                 }
@@ -116,9 +122,10 @@ function App() {
         };
         fetchGoogleId();
 
-        // 🟢 SAFETY NET: If Render takes an absurdly long time (more than 45 seconds), force the app open anyway.
+        // 🟢 SAFETY NET: If Render takes an absurdly long time
         const safetyTimeout = setTimeout(() => {
-            if (isMounted && !serverResponded) {
+            if (isMounted && !hasRespondedRef.current) {
+                hasRespondedRef.current = true;
                 setGoogleClientId("timeout-mode.apps.googleusercontent.com");
                 setServerResponded(true);
             }
@@ -128,7 +135,7 @@ function App() {
             isMounted = false; 
             clearTimeout(safetyTimeout);
         };
-    }, []); // 🟢 FIXED: This array is absolutely empty now. No more infinite loops.
+    }, []); // 🟢 Array is empty. ESLint is happy. Build will pass!
 
     const handleAppReady = useCallback(() => {
         setIsAppReady(true);
