@@ -79,7 +79,7 @@ const Cart = () => {
         // 2. Tell DB in background
         try {
             const token = localStorage.getItem('token');
-            await axios.post('https://subhams-hub-vendorhub-backend.onrender.com/api/cart/add', 
+            await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/cart/add', 
                 { productId: item.id, quantity: -1 }, 
                 { headers: { Authorization: `Bearer ${token}` } }
             );
