@@ -38,7 +38,7 @@ const SetPasswordModal = ({ user, onClose }) => {
             <div style={styles.modalCard}>
                 <div style={styles.iconBox}><ShieldCheck size={40} color="#3b82f6"/></div>
                 <h3 style={styles.title}>Secure Your Account</h3>
-                <p style={styles.text}>Since you joined via Google, please set a login password for Bhavyams Hub.</p>
+                <p style={styles.text}>Since you joined via Google, please set a login password for Subhams-Hub.</p>
                 
                 <div style={styles.inputGroup}>
                     <Lock size={18} color="#64748b"/>

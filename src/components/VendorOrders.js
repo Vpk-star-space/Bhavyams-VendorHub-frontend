@@ -40,7 +40,7 @@ const VendorOrders = () => {
             <div style={styles.revenueCard}>
                 <div>
                     <h3 style={{ margin: '0 0 5px 0', color: '#1e293b', fontWeight: '900' }}>Earnings Overview</h3>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>Net revenue from Bhavyams Marketplace</p>
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>Net revenue from Subhams-Hub Marketplace</p>
                 </div>
                 <div style={styles.revenueAmount}>
                     <TrendingUp size={28} color="#10b981" />
@@ -74,7 +74,7 @@ const VendorOrders = () => {
                                         onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Error'; }}
                                     />
                                     <div style={{flex: 1}}>
-                                        <h4 style={styles.pName}>{order.product_name || "Bhavyams Product"}</h4>
+                                        <h4 style={styles.pName}>{order.product_name || "Subhams-Hub Product"}</h4>
                                         <div style={styles.orderIdText}>Order ID: #{order.order_id || order.id} • {orderDate}</div>
                                     </div>
                                     <div style={{textAlign: 'right'}}>

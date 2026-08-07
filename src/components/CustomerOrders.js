@@ -101,7 +101,7 @@ const CustomerOrders = ({ orders }) => {
         
         doc.setFontSize(22);
         doc.setTextColor(40, 116, 240); 
-        doc.text("Bhavyams Vendor Hub", 14, 22);
+        doc.text("Subhams-Hub", 14, 22);
         
         doc.setFontSize(16);
         doc.setTextColor(33, 33, 33);
@@ -127,7 +127,7 @@ const CustomerOrders = ({ orders }) => {
             startY: 105,
             head: [['Product Description', 'Qty', 'Unit Price', 'Total Amount']],
             body: [
-                [order.product_name || 'Bhavyams Product', '1', `Rs. ${order.total_price}`, `Rs. ${order.total_price}`]
+                [order.product_name || 'Subhams-Hub Product', '1', `Rs. ${order.total_price}`, `Rs. ${order.total_price}`]
             ],
             theme: 'grid',
             headStyles: { fillColor: [40, 116, 240], textColor: [255, 255, 255] },
@@ -257,7 +257,7 @@ const CustomerOrders = ({ orders }) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f0f0f0', paddingBottom: '20px' }}>
                             <div>
                                 <h2 style={{ margin: '0 0 10px 0', fontSize: '18px', color: '#212121', fontWeight: '500' }}>{selectedOrder.product_name}</h2>
-                                <div style={{ fontSize: '12px', color: '#878787', marginBottom: '10px' }}>Seller: Bhavyams Vendor Hub</div>
+                                <div style={{ fontSize: '12px', color: '#878787', marginBottom: '10px' }}>Seller: Subhams-Hub</div>
                                 <div style={{ fontSize: '24px', fontWeight: '500', color: '#212121' }}>₹{selectedOrder.total_price}</div>
                             </div>
                             <img src={getProductImg(selectedOrder)} alt="Product" style={{ width: '100px', height: '100px', objectFit: 'contain' }} />

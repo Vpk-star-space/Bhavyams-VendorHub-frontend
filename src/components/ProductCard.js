@@ -10,7 +10,7 @@ const ProductCard = ({ product }) => {
     const cleanUrl = rawUrl.replace(/["\\]/g, ''); 
     const imageSrc = cleanUrl 
         ? (cleanUrl.startsWith('http') ? cleanUrl : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`)
-        : 'https://via.placeholder.com/150?text=Bhavyams';
+        : 'https://via.placeholder.com/150?text=Subhams-Hub';
 
     // 🚀 FIX 2: Correct Naming & Out of Stock Logic
     const stockAvailable = Number(product.stock_count ?? product.stock ?? 0);
@@ -31,7 +31,7 @@ const ProductCard = ({ product }) => {
                     src={imageSrc} 
                     alt={product.name} 
                     style={styles.image} 
-                    onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Bhavyams'; }}
+                    onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=subhams'; }}
                 />
                 
                 {/* 🔴 RED OVERLAY FOR OUT OF STOCK */}
