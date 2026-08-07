@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -27,53 +27,30 @@ function ScrollToTop() {
 }
 
 // 🛡️ ULTRA-PREMIUM, SMART SERVER-AWARE LOADING SCREEN
-const PremiumLoader = ({ isDataReady, forceSplash, onComplete }) => {
+const PremiumLoader = ({ isDataReady, onComplete }) => {
     const [fadeOut, setFadeOut] = useState(false);
-    const [minTimeMet, setMinTimeMet] = useState(!forceSplash);
     const [statusText, setStatusText] = useState("Establishing Secure Connection...");
-    const wakeLockRef = useRef(null);
 
     useEffect(() => {
-        // Keep mobile screens awake while waiting for server
-        const requestWakeLock = async () => {
-            try {
-                if ('wakeLock' in navigator) wakeLockRef.current = await navigator.wakeLock.request('screen');
-            } catch (err) {}
-        };
-        requestWakeLock();
-    }, []);
-
-    useEffect(() => {
-        // 1. THE BUG FIX: Safely enforce minimum splash screen without deadlocking
-        if (forceSplash) {
-            const minTimer = setTimeout(() => setMinTimeMet(true), 2500);
-            return () => clearTimeout(minTimer);
-        } else {
-            setMinTimeMet(true); // Ensure it unlocks immediately if skipped
-        }
-    }, [forceSplash]);
-
-    useEffect(() => {
-        // 2. Smart UX: If the backend takes more than 4 seconds
+        // Smart UX: If backend takes more than 3 seconds (asleep), change the text
         const slowServerTimer = setTimeout(() => {
             if (!isDataReady) {
                 setStatusText("Waking Cloud Servers... (Please wait a moment)");
             }
-        }, 4000);
+        }, 3000);
         return () => clearTimeout(slowServerTimer);
     }, [isDataReady]);
 
     useEffect(() => {
-        // 3. Perfect Exit: Only fade out when BOTH the minimum time is met AND the server sent data
-        if (isDataReady && minTimeMet) {
+        // Perfect Exit: As soon as data is ready, fade out immediately. No forced waiting.
+        if (isDataReady) {
             setFadeOut(true);
             const exitTimer = setTimeout(() => {
-                if (wakeLockRef.current) wakeLockRef.current.release();
                 onComplete(); 
             }, 600); // 600ms smooth fade transition
             return () => clearTimeout(exitTimer);
         }
-    }, [isDataReady, minTimeMet, onComplete]);
+    }, [isDataReady, onComplete]);
 
     return (
         <div style={{...sStyles.wrapper, opacity: fadeOut ? 0 : 1, visibility: fadeOut ? 'hidden' : 'visible'}}>
@@ -118,16 +95,6 @@ function App() {
     const [isAppReady, setIsAppReady] = useState(false);
     const [serverResponded, setServerResponded] = useState(false); 
 
-    // 🟢 THE BUG FIX: Calculate the 1-minute rule SYNCHRONOUSLY before the app even renders
-    const [forceSplash, setForceSplash] = useState(() => {
-        const lastVisit = localStorage.getItem('lastVisitTime');
-        const now = Date.now();
-        if (lastVisit && (now - parseInt(lastVisit)) < 60000) {
-            return false; // Less than 1 minute ago, skip splash
-        }
-        return true;
-    });
-
     useEffect(() => {
         let isMounted = true;
         
@@ -140,7 +107,7 @@ function App() {
                     setServerResponded(true); 
                 }
             } catch (err) {
-                console.error("Failed to fetch Google ID - Server might be offline.");
+                console.error("Failed to connect to backend.");
                 if (isMounted) {
                     setGoogleClientId("offline-mode.apps.googleusercontent.com");
                     setServerResponded(true); 
@@ -149,36 +116,28 @@ function App() {
         };
         fetchGoogleId();
 
-        // 🟢 SAFETY NET: 10-second absolute override
+        // 🟢 SAFETY NET: If Render takes an absurdly long time (more than 45 seconds), force the app open anyway.
         const safetyTimeout = setTimeout(() => {
             if (isMounted && !serverResponded) {
                 setGoogleClientId("timeout-mode.apps.googleusercontent.com");
                 setServerResponded(true);
             }
-        }, 10000);
+        }, 45000);
 
         return () => { 
             isMounted = false; 
             clearTimeout(safetyTimeout);
         };
-    }, [serverResponded]);
+    }, []); // 🟢 FIXED: This array is absolutely empty now. No more infinite loops.
 
-    // 🟢 THE BUG FIX: useCallback prevents the loader from constantly re-rendering and resetting its timers
     const handleAppReady = useCallback(() => {
-        localStorage.setItem('lastVisitTime', Date.now().toString());
         setIsAppReady(true);
     }, []);
 
     if (isMaintenanceMode) return <div style={{textAlign: 'center', marginTop: '20%', fontSize: '24px', fontWeight: 'bold'}}>Maintenance Mode Active</div>;
 
     if (!isAppReady) {
-        return (
-            <PremiumLoader 
-                isDataReady={serverResponded} 
-                forceSplash={forceSplash} 
-                onComplete={handleAppReady} 
-            />
-        );
+        return <PremiumLoader isDataReady={serverResponded} onComplete={handleAppReady} />;
     }
 
     return (
@@ -207,7 +166,6 @@ function App() {
         </GoogleOAuthProvider>
     );
 }
-
 
 // ==========================================
 // 🎨 ULTRA-PREMIUM LOADER STYLES
