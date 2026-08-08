@@ -110,9 +110,11 @@ function App() {
     const [googleClientId, setGoogleClientId] = useState(null);
     const [isAppReady, setIsAppReady] = useState(false);
     const [serverResponded, setServerResponded] = useState(false); 
-    
-    // 🟢 The Ref that fixes the Vercel ESLint strict rules
     const hasRespondedRef = useRef(false);
+
+    // 🟢 1. NEW: PWA INSTALLATION STATE
+    const [deferredPrompt, setDeferredPrompt] = useState(null);
+    const [isInstallable, setIsInstallable] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
@@ -137,6 +139,14 @@ function App() {
         };
         fetchGoogleId();
 
+        // 🟢 2. NEW: CAPTURE THE INSTALL PROMPT SAFELY
+        const handleBeforeInstallPrompt = (e) => {
+            e.preventDefault(); // Stops Chrome from throwing automatic popup errors
+            setDeferredPrompt(e); // Saves the event in memory
+            setIsInstallable(true); // Shows our beautiful banner
+        };
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
         // 🟢 SAFETY NET: If Render takes an absurdly long time
         const safetyTimeout = setTimeout(() => {
             if (isMounted && !hasRespondedRef.current) {
@@ -149,12 +159,25 @@ function App() {
         return () => { 
             isMounted = false; 
             clearTimeout(safetyTimeout);
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         };
-    }, []); // Empty array ensures zero Vercel warnings.
+    }, []); 
 
     const handleAppReady = useCallback(() => {
         setIsAppReady(true);
     }, []);
+
+    // 🟢 3. NEW: THE BUTTON CLICK HANDLER
+    const handleInstallClick = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt(); // Safely triggers the official Google Install UI
+        
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setIsInstallable(false); // Hides the banner forever once installed
+            setDeferredPrompt(null);
+        }
+    };
 
     if (isMaintenanceMode) return <div style={{textAlign: 'center', marginTop: '20%', fontSize: '24px', fontWeight: 'bold'}}>Maintenance Mode Active</div>;
 
@@ -168,7 +191,51 @@ function App() {
                 <Router>
                     <ScrollToTop />
                     <ToastContainer theme="colored" position="top-center" autoClose={1500} hideProgressBar={true} />
-                    <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
+                    <div style={{ minHeight: '100vh', background: '#f8fafc', position: 'relative' }}>
+                        
+                        {/* 🌟 4. THE PREMIUM INSTALL BANNER */}
+                        {isInstallable && (
+                            <div style={{
+                                background: 'linear-gradient(90deg, #0f172a, #2563eb)',
+                                color: 'white',
+                                padding: '12px 15px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                position: 'sticky',
+                                top: 0,
+                                zIndex: 999, // Keeps it above everything else
+                                boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <span style={{ fontSize: '28px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>📲</span>
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <span style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '0.5px' }}>Install Subhams Hub</span>
+                                        <span style={{ fontSize: '11px', color: '#bfdbfe', fontWeight: '600' }}>Fast access • No browser needed</span>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={handleInstallClick}
+                                    style={{
+                                        background: 'linear-gradient(135deg, #facc15, #f59e0b)',
+                                        color: '#713f12',
+                                        border: 'none',
+                                        padding: '8px 18px',
+                                        borderRadius: '20px',
+                                        fontWeight: '900',
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)',
+                                        transition: 'transform 0.2s'
+                                    }}
+                                    onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                                    onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                                >
+                                    INSTALL NOW
+                                </button>
+                            </div>
+                        )}
+
                         <Routes>
                             <Route path="/" element={<Home />} />
                             <Route path="/product/:id" element={<ProductDetails />} />
@@ -188,7 +255,6 @@ function App() {
         </GoogleOAuthProvider>
     );
 }
-
 // ==========================================
 // 🎨 HUB-SPECIFIC LOADER STYLES
 // ==========================================
