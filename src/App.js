@@ -26,23 +26,23 @@ function ScrollToTop() {
     return null;
 }
 
-// 🛡️ ULTRA-PREMIUM, SMART SERVER-AWARE LOADING SCREEN
+// 🛍️ DIGITAL MARKETPLACE SMART LOADER (Customized for Subhams Hub)
 const PremiumLoader = ({ isDataReady, onComplete }) => {
     const [fadeOut, setFadeOut] = useState(false);
-    const [statusText, setStatusText] = useState("Establishing Secure Connection...");
+    const [statusText, setStatusText] = useState("Connecting Local Markets...");
 
     useEffect(() => {
         // Smart UX: If backend takes more than 3 seconds (asleep), change the text
         const slowServerTimer = setTimeout(() => {
             if (!isDataReady) {
-                setStatusText("Waking Cloud Servers... (Please wait a moment)");
+                setStatusText("Waking up the Marketplace... (Please wait a moment)");
             }
         }, 3000);
         return () => clearTimeout(slowServerTimer);
     }, [isDataReady]);
 
     useEffect(() => {
-        // Perfect Exit: As soon as data is ready, fade out immediately. No forced waiting.
+        // Perfect Exit: As soon as data is ready, fade out immediately.
         if (isDataReady) {
             setFadeOut(true);
             const exitTimer = setTimeout(() => {
@@ -56,24 +56,40 @@ const PremiumLoader = ({ isDataReady, onComplete }) => {
         <div style={{...sStyles.wrapper, opacity: fadeOut ? 0 : 1, visibility: fadeOut ? 'hidden' : 'visible'}}>
             <style>
                 {`
-                    @keyframes spin-slow { 100% { transform: rotate(360deg); } }
-                    @keyframes spin-fast { 100% { transform: rotate(-360deg); } }
-                    @keyframes pulse-glow { 0%, 100% { text-shadow: 0 0 15px rgba(59,130,246,0.5); } 50% { text-shadow: 0 0 30px rgba(59,130,246,0.9); } }
-                    @keyframes gradient-shift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-                    @keyframes text-blink { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+                    @keyframes broadcast-pulse { 
+                        0% { transform: scale(0.8); opacity: 0.8; border-width: 4px; } 
+                        100% { transform: scale(2.5); opacity: 0; border-width: 1px; } 
+                    }
+                    @keyframes float-icon { 
+                        0%, 100% { transform: translateY(0px); filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); } 
+                        50% { transform: translateY(-8px); filter: drop-shadow(0 15px 15px rgba(37,99,235,0.4)); } 
+                    }
+                    @keyframes pulse-glow { 
+                        0%, 100% { text-shadow: 0 0 10px rgba(37,99,235,0.3); } 
+                        50% { text-shadow: 0 0 25px rgba(37,99,235,0.8); } 
+                    }
+                    @keyframes gradient-shift { 
+                        0% { background-position: 0% 50%; } 
+                        50% { background-position: 100% 50%; } 
+                        100% { background-position: 0% 50%; } 
+                    }
+                    @keyframes text-blink { 
+                        0%, 100% { opacity: 0.6; } 
+                        50% { opacity: 1; } 
+                    }
                 `}
             </style>
 
             <div style={sStyles.container}>
-                {/* 🌟 Premium Double-Ring Vault Animation */}
+                {/* 🌟 Local Business Digital Radar Animation */}
                 <div style={{ position: 'relative', width: '100px', height: '100px', marginBottom: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={sStyles.outerRing}></div>
-                    <div style={sStyles.innerRing}></div>
-                    <div style={{ fontSize: '28px', zIndex: 10 }}>🚀</div>
+                    <div style={sStyles.pulseRing1}></div>
+                    <div style={sStyles.pulseRing2}></div>
+                    <div style={{ fontSize: '45px', zIndex: 10, animation: 'float-icon 2.5s ease-in-out infinite' }}>🏪</div>
                 </div>
 
                 {/* 🌟 High-End Branding */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                     <h1 style={sStyles.brandName}>SUBHAMS</h1>
                     <span style={sStyles.hubBadge}>HUB</span>
                 </div>
@@ -174,63 +190,63 @@ function App() {
 }
 
 // ==========================================
-// 🎨 ULTRA-PREMIUM LOADER STYLES
+// 🎨 HUB-SPECIFIC LOADER STYLES
 // ==========================================
 const sStyles = {
     wrapper: {
         position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh',
-        backgroundColor: '#020617', // Pitch dark premium slate
+        backgroundColor: '#0f172a', // Clean, professional dark blue for e-commerce
         display: 'flex', alignItems: 'center', justifyContent: 'center', 
-        zIndex: 99999, fontFamily: "'Inter', 'Segoe UI', sans-serif",
+        zIndex: 99999, fontFamily: "'Roboto', 'Inter', sans-serif",
         transition: 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
     },
     container: {
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         padding: '40px', borderRadius: '24px',
-        background: 'radial-gradient(circle at center, rgba(30,41,59,0.5) 0%, rgba(2,6,23,0) 70%)'
+        background: 'radial-gradient(circle at center, rgba(30,41,59,0.7) 0%, rgba(15,23,42,0) 70%)'
     },
-    outerRing: {
-        position: 'absolute', width: '100px', height: '100px',
-        border: '3px solid transparent', borderTop: '3px solid #3b82f6', borderBottom: '3px solid #8b5cf6',
-        borderRadius: '50%', animation: 'spin-slow 2s linear infinite'
+    pulseRing1: {
+        position: 'absolute', width: '80px', height: '80px',
+        border: 'solid #3b82f6', borderRadius: '50%',
+        animation: 'broadcast-pulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite'
     },
-    innerRing: {
-        position: 'absolute', width: '75px', height: '75px',
-        border: '3px solid transparent', borderLeft: '3px solid #facc15', borderRight: '3px solid #f59e0b',
-        borderRadius: '50%', animation: 'spin-fast 1.5s linear infinite'
+    pulseRing2: {
+        position: 'absolute', width: '80px', height: '80px',
+        border: 'solid #60a5fa', borderRadius: '50%',
+        animation: 'broadcast-pulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite 1s'
     },
     brandName: { 
-        fontSize: 'clamp(32px, 6vw, 48px)', 
+        fontSize: 'clamp(32px, 6vw, 45px)', 
         color: '#ffffff', 
         fontWeight: '900', 
         margin: 0,
-        letterSpacing: '2px',
+        letterSpacing: '1px',
         animation: 'pulse-glow 3s infinite ease-in-out'
     },
     hubBadge: { 
         fontSize: 'clamp(14px, 3vw, 18px)', 
-        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)', // E-commerce trustworthy blue
         color: '#fff', 
         padding: '4px 12px', 
         borderRadius: '8px',
         fontWeight: '900', 
         letterSpacing: '2px',
-        boxShadow: '0 4px 10px rgba(245,158,11,0.3)'
+        boxShadow: '0 4px 10px rgba(37,99,235,0.3)'
     },
     statusText: {
         color: '#94a3b8',
-        fontSize: '14px',
-        fontWeight: '600',
+        fontSize: '14.5px',
+        fontWeight: '500',
         marginTop: '25px',
         marginBottom: '15px',
         animation: 'text-blink 2s infinite ease-in-out'
     },
     loadingBarContainer: {
-        width: '180px', height: '4px', background: '#1e293b', borderRadius: '4px', overflow: 'hidden'
+        width: '200px', height: '4px', background: '#1e293b', borderRadius: '4px', overflow: 'hidden'
     },
     loadingBarFill: {
         width: '50%', height: '100%',
-        background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #f59e0b, #3b82f6)',
+        background: 'linear-gradient(90deg, #3b82f6, #60a5fa, #facc15, #3b82f6)',
         backgroundSize: '300% 100%',
         borderRadius: '4px',
         animation: 'gradient-shift 2s infinite linear'

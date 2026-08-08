@@ -96,9 +96,15 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
     
-    <!--
-      This HTML file is a template.
-      The build step will place the bundled scripts into the <body> tag.
-    -->
+ <script>
+      // Register the Subhams Hub Service Worker for instant PWA Installation
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('%PUBLIC_URL%/sw.js')
+            .then(reg => console.log('Service Worker Registered!', reg))
+            .catch(err => console.log('Service Worker Failed!', err));
+        });
+      }
+    </script>
   </body>
 </html>
