@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { ShoppingCart, Search, User, Menu, X, MapPin, Globe, Settings } from 'lucide-react';
+import { ShoppingCart, Search, User, X, MapPin, Globe, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../context/CartContext'; 
@@ -29,7 +29,6 @@ const Home = () => {
 
     const [products, setProducts] = useState([]);
     const [activeShops, setActiveShops] = useState([]); 
-    const [uniqueVendors, setUniqueVendors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024); 
     
@@ -201,7 +200,7 @@ const Home = () => {
                     </div>
                 ) : (
                     <>
-                        {selectedCategory === t('Trending') && <TrendingSection vendors={uniqueVendors} navigate={navigate} t={t} />}
+                        {selectedCategory === t('Trending') && <TrendingSection vendors={[]} navigate={navigate} t={t} />}
                         {selectedCategory === t('Promotions') && <PromotionsSection />}
 
                         {/* 🟢 SMART DYNAMIC TAB RENDERING FOR SHOPS */}
@@ -229,7 +228,7 @@ const Home = () => {
                                             >
                                                 <div style={{ position: 'relative', height: '140px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                     
-                                                    {/* 🟢 SMART AVATAR LOGIC: Prioritize Custom Image, fallback to Smart Emoji */}
+                                                    {/* SMART AVATAR LOGIC: Prioritize Custom Image, fallback to Smart Emoji */}
                                                     {shop.id_front_url ? (
                                                         <img src={shop.id_front_url} alt={shop.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                     ) : (
