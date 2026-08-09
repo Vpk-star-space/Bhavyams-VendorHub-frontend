@@ -1,22 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import axios from 'axios';
 import 'react-toastify/dist/ReactToastify.css';
 
+// 🟢 Global State Providers
+import { AppProvider } from './context/AppContext'; 
 import { CartProvider } from './context/CartContext'; 
+
 import Home from './pages/Home'; 
-import Login from './pages/Login';
-import Register from './pages/Register';
+import Welcome from './pages/Welcome';
+import AdminDashboard from './pages/AdminDashboard';
+import BusinessRegistration from './pages/BusinessRegistration';
 import Dashboard from './pages/Dashboard';
 import Cart from './pages/Cart'; 
 import AddProduct from './pages/AddProduct';
 import ProtectedRoute from './components/ProtectedRoute';
-import ForgotPassword from './pages/ForgotPassword';
 import VendorDashboard from './pages/VendorDashboard';
 import ProductDetails from './pages/ProductDetails';
 import Profile from './pages/Profile';
+import ShopProfile from './pages/ShopProfile';
 
 const isMaintenanceMode = false; 
 
@@ -26,13 +30,23 @@ function ScrollToTop() {
     return null;
 }
 
-// 🛍️ DIGITAL MARKETPLACE SMART LOADER (Customized for Subhams Hub)
+// 🛡️ ULTRA-SECURE ADMIN GATEKEEPER
+const AdminRoute = ({ children }) => {
+    const userStr = localStorage.getItem('user');
+    const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
+    
+    // Strict check: Must have admin role OR your specific owner email
+    const isAdmin = (user.role && user.role.toLowerCase() === 'admin') || user.email === 'pavanvenkat63@gmail.com';
+
+    return isAdmin ? children : <Navigate to="/" replace />;
+};
+
+// 🛍️ DIGITAL MARKETPLACE SMART LOADER
 const PremiumLoader = ({ isDataReady, onComplete }) => {
     const [fadeOut, setFadeOut] = useState(false);
     const [statusText, setStatusText] = useState("Connecting Local Markets...");
 
     useEffect(() => {
-        // Smart UX: If backend takes more than 3 seconds (asleep), change the text
         const slowServerTimer = setTimeout(() => {
             if (!isDataReady) {
                 setStatusText("Waking up the Marketplace... (Please wait a moment)");
@@ -42,12 +56,11 @@ const PremiumLoader = ({ isDataReady, onComplete }) => {
     }, [isDataReady]);
 
     useEffect(() => {
-        // Perfect Exit: As soon as data is ready, fade out immediately.
         if (isDataReady) {
             setFadeOut(true);
             const exitTimer = setTimeout(() => {
                 onComplete(); 
-            }, 600); // 600ms smooth fade transition
+            }, 600); 
             return () => clearTimeout(exitTimer);
         }
     }, [isDataReady, onComplete]);
@@ -81,23 +94,19 @@ const PremiumLoader = ({ isDataReady, onComplete }) => {
             </style>
 
             <div style={sStyles.container}>
-                {/* 🌟 Local Business Digital Radar Animation */}
                 <div style={{ position: 'relative', width: '100px', height: '100px', marginBottom: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={sStyles.pulseRing1}></div>
                     <div style={sStyles.pulseRing2}></div>
                     <div style={{ fontSize: '45px', zIndex: 10, animation: 'float-icon 2.5s ease-in-out infinite' }}>🏪</div>
                 </div>
 
-                {/* 🌟 High-End Branding */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                     <h1 style={sStyles.brandName}>SUBHAMS</h1>
                     <span style={sStyles.hubBadge}>HUB</span>
                 </div>
                 
-                {/* 🌟 Smart Dynamic Status Text */}
                 <p style={sStyles.statusText}>{statusText}</p>
                 
-                {/* 🌟 Animated Loading Bar */}
                 <div style={sStyles.loadingBarContainer}>
                     <div style={sStyles.loadingBarFill}></div>
                 </div>
@@ -112,14 +121,13 @@ function App() {
     const [serverResponded, setServerResponded] = useState(false); 
     const hasRespondedRef = useRef(false);
 
-    // 🟢 1. NEW: PWA INSTALLATION STATE
+    // PWA INSTALLATION STATE
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [isInstallable, setIsInstallable] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
         
-        // 🌐 Fetch Google ID & Wake Up Backend
         const fetchGoogleId = async () => {
             try {
                 const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
@@ -139,15 +147,13 @@ function App() {
         };
         fetchGoogleId();
 
-        // 🟢 2. NEW: CAPTURE THE INSTALL PROMPT SAFELY
         const handleBeforeInstallPrompt = (e) => {
-            e.preventDefault(); // Stops Chrome from throwing automatic popup errors
-            setDeferredPrompt(e); // Saves the event in memory
-            setIsInstallable(true); // Shows our beautiful banner
+            e.preventDefault(); 
+            setDeferredPrompt(e); 
+            setIsInstallable(true); 
         };
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-        // 🟢 SAFETY NET: If Render takes an absurdly long time
         const safetyTimeout = setTimeout(() => {
             if (isMounted && !hasRespondedRef.current) {
                 hasRespondedRef.current = true;
@@ -167,14 +173,13 @@ function App() {
         setIsAppReady(true);
     }, []);
 
-    // 🟢 3. NEW: THE BUTTON CLICK HANDLER
     const handleInstallClick = async () => {
         if (!deferredPrompt) return;
-        deferredPrompt.prompt(); // Safely triggers the official Google Install UI
+        deferredPrompt.prompt(); 
         
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
-            setIsInstallable(false); // Hides the banner forever once installed
+            setIsInstallable(false); 
             setDeferredPrompt(null);
         }
     };
@@ -187,81 +192,109 @@ function App() {
 
     return (
         <GoogleOAuthProvider clientId={googleClientId}>
-            <CartProvider>
-                <Router>
-                    <ScrollToTop />
-                    <ToastContainer theme="colored" position="top-center" autoClose={1500} hideProgressBar={true} />
-                    <div style={{ minHeight: '100vh', background: '#f8fafc', position: 'relative' }}>
-                        
-                        {/* 🌟 4. THE PREMIUM INSTALL BANNER */}
-                        {isInstallable && (
-                            <div style={{
-                                background: 'linear-gradient(90deg, #0f172a, #2563eb)',
-                                color: 'white',
-                                padding: '12px 15px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                position: 'sticky',
-                                top: 0,
-                                zIndex: 999, // Keeps it above everything else
-                                boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <span style={{ fontSize: '28px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>📲</span>
-                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                        <span style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '0.5px' }}>Install Subhams Hub</span>
-                                        <span style={{ fontSize: '11px', color: '#bfdbfe', fontWeight: '600' }}>Fast access • No browser needed</span>
+            <AppProvider>
+                <CartProvider>
+                    <Router>
+                        <ScrollToTop />
+                        <ToastContainer theme="colored" position="top-center" autoClose={1500} hideProgressBar={true} />
+                        <div style={{ minHeight: '100vh', background: '#f8fafc', position: 'relative' }}>
+                            
+                            {/* PREMIUM INSTALL BANNER */}
+                            {isInstallable && (
+                                <div style={{
+                                    background: 'linear-gradient(90deg, #0f172a, #2563eb)',
+                                    color: 'white',
+                                    padding: '12px 15px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    position: 'sticky',
+                                    top: 0,
+                                    zIndex: 999, 
+                                    boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ fontSize: '28px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>📲</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '0.5px' }}>Install Subhams Hub</span>
+                                            <span style={{ fontSize: '11px', color: '#bfdbfe', fontWeight: '600' }}>Fast access • No browser needed</span>
+                                        </div>
                                     </div>
+                                    <button 
+                                        onClick={handleInstallClick}
+                                        style={{
+                                            background: 'linear-gradient(135deg, #facc15, #f59e0b)',
+                                            color: '#713f12',
+                                            border: 'none',
+                                            padding: '8px 18px',
+                                            borderRadius: '20px',
+                                            fontWeight: '900',
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)',
+                                            transition: 'transform 0.2s'
+                                        }}
+                                        onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                                        onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                                    >
+                                        INSTALL NOW
+                                    </button>
                                 </div>
-                                <button 
-                                    onClick={handleInstallClick}
-                                    style={{
-                                        background: 'linear-gradient(135deg, #facc15, #f59e0b)',
-                                        color: '#713f12',
-                                        border: 'none',
-                                        padding: '8px 18px',
-                                        borderRadius: '20px',
-                                        fontWeight: '900',
-                                        fontSize: '12px',
-                                        cursor: 'pointer',
-                                        boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)',
-                                        transition: 'transform 0.2s'
-                                    }}
-                                    onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
-                                    onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-                                >
-                                    INSTALL NOW
-                                </button>
-                            </div>
-                        )}
+                            )}
+<Routes><Route 
+                                    path="/" 
+                                    element={
+                                        (() => {
+                                            const token = localStorage.getItem('token');
+                                            const userStr = localStorage.getItem('user');
+                                            const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
+                                            
+                                            // 🟢 If they have a token AND their phone number is saved in DB, let them straight in!
+                                            if (token && user.phone && user.phone.length > 3) {
+                                                return <Home />;
+                                            } else {
+                                                return <Navigate to="/welcome" replace />;
+                                            }
+                                        })()
+                                    } 
+                                />
+                                
+                                <Route path="/welcome" element={<Welcome />} />
+                                
+                                {/* 🔒 SECURE MASTER ADMIN PANEL ROUTE */}
+                                <Route path="/admin" element={
+                                    <AdminRoute>
+                                        <AdminDashboard />
+                                    </AdminRoute>
+                                } />
 
-                        <Routes>
-                            <Route path="/" element={<Home />} />
-                            <Route path="/product/:id" element={<ProductDetails />} />
-                            <Route path="/cart" element={<Cart />} />
-                            <Route path="/login" element={<Login />} />
-                            <Route path="/register" element={<Register />} />
-                            <Route path="/forgot-password" element={<ForgotPassword />} />
-                            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                            <Route path="/profile" element={<Profile />} />
-                            <Route path="/vendor-dashboard" element={<VendorDashboard />} />
-                            <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-                            <Route path="*" element={<Home />} />
-                        </Routes>
-                    </div>
-                </Router>
-            </CartProvider>
+                                {/* 🌍 NEW: THE PUBLIC INSTAGRAM-STYLE SHOP PROFILE */}
+                                <Route path="/shop/:id" element={<ShopProfile />} />
+
+                                <Route path="/product/:id" element={<ProtectedRoute><ProductDetails /></ProtectedRoute>} />
+                                <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+                                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                                
+                                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                                <Route path="/register-business" element={<ProtectedRoute><BusinessRegistration /></ProtectedRoute>} />
+                                <Route path="/vendor-dashboard" element={<ProtectedRoute><VendorDashboard /></ProtectedRoute>} />
+                                <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+                                
+                                <Route path="*" element={<Navigate to="/" replace />} />
+                                
+                            </Routes>
+                        </div>
+                    </Router>
+                </CartProvider>
+            </AppProvider>
         </GoogleOAuthProvider>
     );
 }
-// ==========================================
-// 🎨 HUB-SPECIFIC LOADER STYLES
-// ==========================================
+
 const sStyles = {
     wrapper: {
         position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh',
-        backgroundColor: '#0f172a', // Clean, professional dark blue for e-commerce
+        backgroundColor: '#0f172a', 
         display: 'flex', alignItems: 'center', justifyContent: 'center', 
         zIndex: 99999, fontFamily: "'Roboto', 'Inter', sans-serif",
         transition: 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -291,7 +324,7 @@ const sStyles = {
     },
     hubBadge: { 
         fontSize: 'clamp(14px, 3vw, 18px)', 
-        background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)', // E-commerce trustworthy blue
+        background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)', 
         color: '#fff', 
         padding: '4px 12px', 
         borderRadius: '8px',
