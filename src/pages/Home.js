@@ -9,7 +9,7 @@ import { AppContext } from '../context/AppContext';
 import TrendingSection from '../components/TrendingSection';
 import PromotionsSection from '../components/PromotionsSection';
 
-// 🟢 SMART ICON GENERATOR: Adds visuals based on category
+// 🟢 SMART ICON GENERATOR
 const getCategoryIcon = (category) => {
     const cat = (category || '').toLowerCase();
     if (cat.includes('cater') || cat.includes('food') || cat.includes('meal')) return '🍃'; 
@@ -22,6 +22,26 @@ const getCategoryIcon = (category) => {
     return '🏪'; 
 };
 
+const getFallbackImage = (category) => {
+    const cat = (category || '').toLowerCase();
+    if (cat.includes('veg')) return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=500&q=80';
+    if (cat.includes('grocer')) return 'https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?auto=format&fit=crop&w=500&q=80';
+    if (cat.includes('cater') || cat.includes('food') || cat.includes('meal')) return 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=500&q=80';
+    if (cat.includes('ac ') || cat.includes('mechanic') || cat.includes('repair')) return 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=500&q=80';
+    if (cat.includes('cloth') || cat.includes('men')) return 'https://images.unsplash.com/photo-1617137968427-85924c800a22?auto=format&fit=crop&w=500&q=80';
+    if (cat.includes('saree') || cat.includes('women')) return 'https://images.unsplash.com/photo-1610030469983-98e550d61dc0?auto=format&fit=crop&w=500&q=80';
+    if (cat.includes('plumb')) return 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?auto=format&fit=crop&w=500&q=80';
+    if (cat.includes('electric')) return 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=500&q=80';
+    if (cat.includes('beauty') || cat.includes('salon')) return 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=500&q=80';
+    return 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=500&q=80'; 
+};
+
+const getBackendUrl = () => {
+    return process.env.NODE_ENV === 'production' 
+        ? 'https://bhavyams-vendorhub-backend.onrender.com/api' 
+        : 'http://localhost:5000/api';
+};
+
 const Home = () => {
     const { language, setLanguage, t, location } = useContext(AppContext);
 
@@ -29,6 +49,10 @@ const Home = () => {
 
     const [products, setProducts] = useState([]);
     const [activeShops, setActiveShops] = useState([]); 
+    
+    const [adminCategories, setAdminCategories] = useState([]);
+    const [selectedSubCategory, setSelectedSubCategory] = useState(null);
+
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024); 
     
@@ -59,14 +83,20 @@ const Home = () => {
             try {
                 const lat = location?.lat || 0;
                 const lng = location?.lng || 0;
-                const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
+                const BACKEND_URL = getBackendUrl();
                 
                 const res = await axios.get(`${BACKEND_URL}/products/feed?lat=${lat}&lng=${lng}`);
-                const fetchedProducts = res.data.products || [];
-                setProducts(fetchedProducts);
+                setProducts(res.data.products || []);
 
                 const shopRes = await axios.get(`${BACKEND_URL}/shops/active/all`);
                 setActiveShops(shopRes.data.shops || []);
+
+                try {
+                    const catRes = await axios.get(`${BACKEND_URL}/admin/categories`);
+                    setAdminCategories(catRes.data || []);
+                } catch (catErr) {
+                    console.warn("Categories API not yet active.");
+                }
 
             } catch (err) {
                 console.error("Error fetching data:", err);
@@ -83,13 +113,14 @@ const Home = () => {
             return;
         }
         setSelectedCategory(cat);
+        setSelectedSubCategory(null);
         setSearchQuery('');
     };
 
     const handleSettingsSave = async () => {
         try {
             const token = localStorage.getItem('token'); 
-            const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
+            const BACKEND_URL = getBackendUrl();
             const fullPreciseAddress = settingsData.pincode ? `${settingsData.address}, ${settingsData.area}, Pincode: ${settingsData.pincode}` : settingsData.address;
 
             const res = await axios.put(`${BACKEND_URL}/auth/update-profile`, {
@@ -102,7 +133,7 @@ const Home = () => {
 
             localStorage.setItem('user', JSON.stringify(res.data.user));
             setShowSettings(false);
-            setPopupConfig({ show: true, type: 'success', title: '✅ Details Updated!', message: "Your profile and exact location are saved." });
+            setPopupConfig({ show: true, type: 'success', title: 'Details Updated!', message: "Your profile and exact location are saved." });
         } catch (err) {
             alert("Failed to save settings. Please ensure you are logged in.");
         }
@@ -114,6 +145,8 @@ const Home = () => {
         const pCategory = (product.category || '').toLowerCase();
         return !safeSearch || pName.includes(safeSearch) || pCategory.includes(safeSearch);
     });
+
+    const currentTabEnglish = selectedCategory === t('Services') ? 'Services' : (selectedCategory === t('Products') ? 'Products' : selectedCategory);
 
     if (loading) {
         return (
@@ -129,7 +162,7 @@ const Home = () => {
             <div style={styles.header}>
                 <div style={isMobile ? styles.mobileHeaderContent : styles.desktopHeaderContent}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                        <h1 style={styles.mobileLogoText} onClick={() => {setSearchQuery(''); setSelectedCategory(t('Trending'));}}>
+                        <h1 style={styles.mobileLogoText} onClick={() => {setSearchQuery(''); setSelectedCategory(t('Trending')); setSelectedSubCategory(null);}}>
                             <span className="glowing-green-logo">Subhams</span>
                             <span style={styles.hubText}>Hub</span>
                         </h1>
@@ -186,13 +219,10 @@ const Home = () => {
             {/* 📦 MAIN CONTENT AREA */}
             <div style={{ maxWidth: '1000px', margin: '20px auto', padding: '0 15px', width: '100%', boxSizing: 'border-box' }}>
                 
-                {/* GLOBAL SEARCH OVERRIDE */}
                 {searchQuery ? (
                     <div>
                         <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#1e293b' }}>Search Results for "{searchQuery}"</h2>
-                        {filteredProducts.length === 0 ? (
-                            <div style={styles.emptyBox}>No items found matching your search.</div>
-                        ) : (
+                        {filteredProducts.length > 0 && (
                             <div style={isMobile ? styles.mobileProductGrid : styles.desktopProductGrid}>
                                 {filteredProducts.map(product => <ProductCard key={product.id} product={product} t={t} />)}
                             </div>
@@ -200,11 +230,11 @@ const Home = () => {
                     </div>
                 ) : (
                     <>
-                        {selectedCategory === t('Trending') && <TrendingSection vendors={[]} navigate={navigate} t={t} />}
+                        {selectedCategory === t('Trending') && <TrendingSection vendors={activeShops} navigate={navigate} t={t} />}
                         {selectedCategory === t('Promotions') && <PromotionsSection />}
 
-                        {/* 🟢 SMART DYNAMIC TAB RENDERING FOR SHOPS */}
-                        {(selectedCategory === t('Products') || selectedCategory === t('Services') || selectedCategory === t('Promotions') || selectedCategory === t('Trending')) && (
+                        {/* DIRECT LIST VIEW FOR PROMOTIONS AND TRENDING */}
+                        {(selectedCategory === t('Promotions') || selectedCategory === t('Trending')) && (
                             <div>
                                 <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#1e293b' }}>
                                     {selectedCategory === t('Trending') ? '🔥 Top Trending Shops' : `${selectedCategory} Near You`}
@@ -214,8 +244,6 @@ const Home = () => {
                                     {activeShops
                                         .filter(shop => {
                                             const dbType = shop.shop_type || 'Products'; 
-                                            if (selectedCategory === t('Products')) return dbType.includes('Products');
-                                            if (selectedCategory === t('Services')) return dbType.includes('Services');
                                             if (selectedCategory === t('Promotions')) return dbType.includes('Promotions');
                                             if (selectedCategory === t('Trending')) return dbType.includes('Trending');
                                             return false;
@@ -224,21 +252,14 @@ const Home = () => {
                                             <div 
                                                 key={shop.id} 
                                                 onClick={() => navigate(`/shop/${shop.id}`)}
-                                                style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}
+                                                style={{ width: '240px', flexShrink: 0, background: 'white', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}
                                             >
                                                 <div style={{ position: 'relative', height: '140px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    
-                                                    {/* SMART AVATAR LOGIC: Prioritize Custom Image, fallback to Smart Emoji */}
-                                                    {shop.id_front_url ? (
-                                                        <img src={shop.id_front_url} alt={shop.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                    ) : (
-                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                                            <span style={{ fontSize: '48px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>
-                                                                {getCategoryIcon(shop.category)}
-                                                            </span>
-                                                        </div>
-                                                    )}
-
+                                                    <img 
+                                                        src={shop.shop_image || getFallbackImage(shop.category)} 
+                                                        alt={shop.business_name} 
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                    />
                                                     {shop.is_online ? (
                                                         <span style={{ position: 'absolute', top: '10px', right: '10px', background: '#22c55e', color: 'white', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>Open</span>
                                                     ) : (
@@ -253,22 +274,136 @@ const Home = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                    ))}
-                                    
-                                    {/* Empty State */}
-                                    {activeShops.filter(shop => {
-                                        const dbType = shop.shop_type || 'Products';
-                                        if (selectedCategory === t('Products')) return dbType.includes('Products');
-                                        if (selectedCategory === t('Services')) return dbType.includes('Services');
-                                        if (selectedCategory === t('Promotions')) return dbType.includes('Promotions');
-                                        if (selectedCategory === t('Trending')) return dbType.includes('Trending');
-                                        return false;
-                                    }).length === 0 && (
-                                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', background: 'white', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                                            <h3 style={{color: '#64748b', margin: 0}}>No {selectedCategory} found in your area yet!</h3>
-                                        </div>
-                                    )}
+                                        ))}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* 🟢 ROUND FOLDER VIEW FOR PRODUCTS & SERVICES */}
+                        {(selectedCategory === t('Products') || selectedCategory === t('Services')) && (
+                            <div>
+                                {!selectedSubCategory ? (
+                                    <>
+                                        <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#1e293b' }}>
+                                            Browse {selectedCategory}
+                                        </h2>
+                                        
+                                        {(() => {
+                                            const shopsInTab = activeShops.filter(shop => {
+                                                const dbType = shop.shop_type || 'Products'; 
+                                                return dbType.toLowerCase().includes(currentTabEnglish.toLowerCase());
+                                            });
+                                            const registeredCategories = [...new Set(shopsInTab.map(s => s.category).filter(Boolean))];
+
+                                            const adminCatForTab = adminCategories.filter(c => c.section && c.section.toLowerCase() === currentTabEnglish.toLowerCase());
+                                            const adminNamesLower = adminCatForTab.map(c => c.name.toLowerCase().trim());
+
+                                            const extraRegistered = registeredCategories.filter(cat => 
+                                                !adminNamesLower.includes(cat.toLowerCase().trim())
+                                            );
+
+                                            const allCategoryNames = [
+                                                ...adminCatForTab.map(c => c.name),
+                                                ...extraRegistered
+                                            ];
+
+                                            if (allCategoryNames.length === 0) {
+                                                return null;
+                                            }
+
+                                            return (
+                                                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                                                    {allCategoryNames.map((catName, index) => {
+                                                        const adminCat = adminCatForTab.find(c => c.name.toLowerCase() === catName.toLowerCase());
+                                                        const imgSrc = adminCat ? adminCat.hd_image : getFallbackImage(catName);
+
+                                                        return (
+                                                            <div 
+                                                                key={index} 
+                                                                onClick={() => setSelectedSubCategory(catName)}
+                                                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '85px', cursor: 'pointer' }}
+                                                            >
+                                                                <img 
+                                                                    src={imgSrc} 
+                                                                    alt={catName} 
+                                                                    style={{ 
+                                                                        width: '75px', height: '75px', 
+                                                                        borderRadius: '50%', objectFit: 'cover', 
+                                                                        border: '2px solid #e2e8f0',
+                                                                        boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+                                                                        transition: 'transform 0.2s'
+                                                                    }} 
+                                                                    onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.08)'}
+                                                                    onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                                                />
+                                                                <span style={{ fontSize: '13px', marginTop: '8px', fontWeight: '600', color: '#334155', textAlign: 'center', lineHeight: '1.2' }}>
+                                                                    {catName}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            );
+                                        })()}
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* STATE 2: SHOW REGISTERED SHOPS INSIDE THE SELECTED FOLDER */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+                                            <button 
+                                                onClick={() => setSelectedSubCategory(null)} 
+                                                style={{ background: '#e2e8f0', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                            >
+                                                <X size={16} /> Back
+                                            </button>
+                                            <h2 style={{ fontSize: '22px', margin: 0, color: '#1e293b' }}>
+                                                {selectedSubCategory} Sellers
+                                            </h2>
+                                        </div>
+
+                                        <div style={isMobile ? styles.mobileProductGrid : styles.desktopProductGrid}>
+                                            {activeShops
+                                                .filter(shop => {
+                                                    const dbType = shop.shop_type || 'Products'; 
+                                                    const matchesTab = dbType.toLowerCase().includes(currentTabEnglish.toLowerCase());
+                                                    
+                                                    const shopCat = (shop.category || '').toLowerCase().trim();
+                                                    const targetCat = selectedSubCategory.toLowerCase().trim();
+                                                    const matchesCategory = shopCat === targetCat || shopCat.includes(targetCat) || targetCat.includes(shopCat);
+
+                                                    return matchesTab && matchesCategory;
+                                                })
+                                                .map(shop => (
+                                                    <div 
+                                                        key={shop.id} 
+                                                        onClick={() => navigate(`/shop/${shop.id}`)}
+                                                        style={{ width: '240px', flexShrink: 0, background: 'white', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}
+                                                    >
+                                                        <div style={{ position: 'relative', height: '140px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            <img 
+                                                                src={shop.shop_image || getFallbackImage(shop.category)} 
+                                                                alt={shop.business_name} 
+                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                            />
+
+                                                            {shop.is_online ? (
+                                                                <span style={{ position: 'absolute', top: '10px', right: '10px', background: '#22c55e', color: 'white', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>Open</span>
+                                                            ) : (
+                                                                <span style={{ position: 'absolute', top: '10px', right: '10px', background: '#ef4444', color: 'white', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>Closed</span>
+                                                            )}
+                                                        </div>
+                                                        <div style={{ padding: '15px' }}>
+                                                            <h4 style={{ margin: '0 0 4px 0', color: '#0f172a', fontSize: '15px' }}>{shop.business_name}</h4>
+                                                            <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '12px', fontWeight: 'bold' }}>{shop.category}</p>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#94a3b8' }}>
+                                                                <MapPin size={12} /> {shop.address || 'Local Area'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
                     </>
@@ -315,6 +450,7 @@ const Home = () => {
     );
 };
 
+// 🟢 CSS FIX: Changed Grid to Flex to strictly force sizes and stop stretching!
 const styles = {
     page: { background: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' },
     header: { background: '#2874f0', padding: '12px 0', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' },
@@ -331,8 +467,11 @@ const styles = {
     categoryStrip: { background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '12px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' },
     catContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', gap: '25px', padding: '0 20px', overflowX: 'auto', whiteSpace: 'nowrap', scrollbarWidth: 'none' },
     catItem: { fontSize: '15px', color: '#475569', cursor: 'pointer', paddingBottom: '8px', transition: 'all 0.2s' },
-    desktopProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' },
-    mobileProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' },
+    
+    // 🟢 BUG FIX: Replaced grid with Flexbox to completely stop wide stretching
+    desktopProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'flex-start' },
+    mobileProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'flex-start' },
+    
     loaderContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f8fafc' },
     spinner: { width: '45px', height: '45px', border: '4px solid #e2e8f0', borderTop: '4px solid #2874f0', borderRadius: '50%', animation: 'spin 1s linear infinite' },
     emptyBox: { textAlign: 'center', padding: '40px', background: 'white', borderRadius: '12px', color: '#64748b' },
