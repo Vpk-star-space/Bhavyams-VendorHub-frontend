@@ -60,7 +60,7 @@ const translations = {
     // Settings & GPS
     "App Settings": "యాప్ సెట్టింగ్‌లు",
     "App Language": "యాప్ భాష",
-    "Your Name": "మీ పేరు",
+   
     "Change Location (Area/City)": "స్థానాన్ని మార్చండి (ప్రాంతం/నగరం)",
     "Phone & Full Address": "ఫోన్ & పూర్తి చిరునామా",
     "Save Settings": "సెట్టింగ్‌లను సేవ్ చేయండి",

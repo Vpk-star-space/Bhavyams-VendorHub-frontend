@@ -8,7 +8,7 @@ import { Phone, Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, 
 const ShopProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { t } = useContext(AppContext);
+    const {} = useContext(AppContext);
     
     const [shopData, setShopData] = useState(null);
     const [products, setProducts] = useState([]);

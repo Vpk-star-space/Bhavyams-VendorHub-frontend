@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -35,7 +35,6 @@ const AdminRoute = ({ children }) => {
     const userStr = localStorage.getItem('user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
     
-    // Strict check: Must have admin role OR your specific owner email
     const isAdmin = (user.role && user.role.toLowerCase() === 'admin') || user.email === 'pavanvenkat63@gmail.com';
 
     return isAdmin ? children : <Navigate to="/" replace />;
@@ -116,10 +115,11 @@ const PremiumLoader = ({ isDataReady, onComplete }) => {
 };
 
 function App() {
-    const [googleClientId, setGoogleClientId] = useState(null);
+    // 🟢 BUG FIX: Hardcode Client ID so it never fails on mobile/slow connection
+    const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || "465013694995-fv7d53lqv69oh3305hkc7icijqhgpg4v.apps.googleusercontent.com";
+    
     const [isAppReady, setIsAppReady] = useState(false);
     const [serverResponded, setServerResponded] = useState(false); 
-    const hasRespondedRef = useRef(false);
 
     // PWA INSTALLATION STATE
     const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -127,25 +127,11 @@ function App() {
 
     useEffect(() => {
         let isMounted = true;
-        
-        const fetchGoogleId = async () => {
-            try {
-                const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id');
-                if (isMounted) {
-                    hasRespondedRef.current = true;
-                    setGoogleClientId(res.data.clientId);
-                    setServerResponded(true); 
-                }
-            } catch (err) {
-                console.error("Failed to connect to backend.");
-                if (isMounted) {
-                    hasRespondedRef.current = true;
-                    setGoogleClientId("offline-mode.apps.googleusercontent.com");
-                    setServerResponded(true); 
-                }
-            }
-        };
-        fetchGoogleId();
+
+        // Wake up Render backend, but don't crash if it's asleep
+        axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id')
+            .then(() => { if(isMounted) setServerResponded(true); })
+            .catch(() => { if(isMounted) setServerResponded(true); });
 
         const handleBeforeInstallPrompt = (e) => {
             e.preventDefault(); 
@@ -154,17 +140,8 @@ function App() {
         };
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-        const safetyTimeout = setTimeout(() => {
-            if (isMounted && !hasRespondedRef.current) {
-                hasRespondedRef.current = true;
-                setGoogleClientId("timeout-mode.apps.googleusercontent.com");
-                setServerResponded(true);
-            }
-        }, 45000);
-
         return () => { 
             isMounted = false; 
-            clearTimeout(safetyTimeout);
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         };
     }, []); 
@@ -241,7 +218,8 @@ function App() {
                                     </button>
                                 </div>
                             )}
-<Routes><Route 
+                            <Routes>
+                                <Route 
                                     path="/" 
                                     element={
                                         (() => {

@@ -6,7 +6,7 @@ import { Store, ArrowLeft, Upload, CheckCircle, ShieldCheck } from 'lucide-react
 
 const BusinessRegistration = () => {
     const navigate = useNavigate();
-    const { t } = useContext(AppContext);
+    const {  } = useContext(AppContext);
 
     const userStr = localStorage.getItem('user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};

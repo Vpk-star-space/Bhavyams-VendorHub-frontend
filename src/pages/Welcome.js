@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +6,7 @@ import { AppContext } from '../context/AppContext';
 
 const Welcome = () => {
     const navigate = useNavigate();
-    const { language, setLanguage, t, location } = useContext(AppContext);
+    const { language, setLanguage,  location } = useContext(AppContext);
 
     const [step, setStep] = useState(1);
     const [phone, setPhone] = useState('');
