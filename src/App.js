@@ -21,6 +21,8 @@ import VendorDashboard from './pages/VendorDashboard';
 import ProductDetails from './pages/ProductDetails';
 import Profile from './pages/Profile';
 import ShopProfile from './pages/ShopProfile';
+import ManageCatalog from './pages/ManageCatalog';
+import ItemDetail from './pages/ItemDetail';
 
 const isMaintenanceMode = false; 
 
@@ -257,8 +259,9 @@ function App() {
                                 <Route path="/register-business" element={<ProtectedRoute><BusinessRegistration /></ProtectedRoute>} />
                                 <Route path="/vendor-dashboard" element={<ProtectedRoute><VendorDashboard /></ProtectedRoute>} />
                                 <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-                                
+                                <Route path="/manage-catalog/:id" element={<ManageCatalog />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
+                                <Route path="/item/:itemId" element={<ItemDetail />} />
                                 
                             </Routes>
                         </div>
