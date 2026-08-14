@@ -14,7 +14,7 @@ import Welcome from './pages/Welcome';
 import AdminDashboard from './pages/AdminDashboard';
 import BusinessRegistration from './pages/BusinessRegistration';
 import Dashboard from './pages/Dashboard';
-import Cart from './pages/Cart'; 
+
 import AddProduct from './pages/AddProduct';
 import ProtectedRoute from './components/ProtectedRoute';
 import VendorDashboard from './pages/VendorDashboard';
@@ -23,7 +23,7 @@ import Profile from './pages/Profile';
 import ShopProfile from './pages/ShopProfile';
 import ManageCatalog from './pages/ManageCatalog';
 import ItemDetail from './pages/ItemDetail';
-
+import UserOrders from './pages/UserOrders';
 const isMaintenanceMode = false; 
 
 function ScrollToTop() {
@@ -252,7 +252,7 @@ function App() {
                                 <Route path="/shop/:id" element={<ShopProfile />} />
 
                                 <Route path="/product/:id" element={<ProtectedRoute><ProductDetails /></ProtectedRoute>} />
-                                <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+                           
                                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                                 
                                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
@@ -262,6 +262,7 @@ function App() {
                                 <Route path="/manage-catalog/:id" element={<ManageCatalog />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                                 <Route path="/item/:itemId" element={<ItemDetail />} />
+                                <Route path="/my-orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
                                 
                             </Routes>
                         </div>

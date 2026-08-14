@@ -2,9 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, Share2, Heart, ShoppingCart, Calendar, Store, Star, MessageCircle, Send, BadgeCheck, AlertTriangle, Trash2, Clock } from 'lucide-react';
-
-// 🟢 NEW: Import your global AppContext to instantly sync language changes
 import { AppContext } from '../context/AppContext';
+import { useCart } from '../context/CartContext'; // 🟢 FIXED: Added Cart Context
 
 const getBackendUrl = () => {
     return process.env.NODE_ENV === 'production' 
@@ -78,8 +77,10 @@ const ItemDetail = () => {
     const { itemId } = useParams();
     const navigate = useNavigate();
     
-    // 🟢 FETCH GLOBAL LANGUAGE FROM APP CONTEXT directly
+    // 🟢 GLOBAL CONTEXTS
     const { language } = useContext(AppContext);
+    const { addToCart } = useCart(); // 🟢 FIXED: Grab the addToCart function
+
     const lang = language === 'te' ? 'te' : 'en';
     const t = translations[lang];
 
@@ -97,6 +98,7 @@ const ItemDetail = () => {
 
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
+    const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
     useEffect(() => {
         const fetchItemDetail = async () => {
@@ -176,9 +178,7 @@ const ItemDetail = () => {
     const mrp = Number(item.mrp) || 0;
     const discount = mrp > sellPrice ? Math.round(((mrp - sellPrice) / mrp) * 100) : 0;
     
-    // Dynamic Total Price Calculation
     const totalPrice = sellPrice * quantity;
-
     const isService = item.unit_type === 'Service' || item.unit_type === 'Hour';
     const stockCount = Number(item.stock_count) || 0;
 
@@ -201,6 +201,45 @@ const ItemDetail = () => {
     const handleQuantity = (type) => {
         if (type === 'minus' && quantity > 1) setQuantity(quantity - 1);
         if (type === 'plus' && quantity < stockCount) setQuantity(quantity + 1);
+    };
+
+// 🟢 FIXED: Add To Cart Logic (Prevents React Context Crashes)
+    const handleAddToCart = (orderType) => {
+        if (!currentUser) {
+            alert("Please log in to add items.");
+            return;
+        }
+
+        setIsPlacingOrder(true);
+
+        const newItem = {
+            id: item.id,
+            name: item.name,
+            price: sellPrice,
+            quantity: quantity, // 🟢 FORCE EXACT QUANTITY
+            qty: quantity,      // 🟢 Backup variable
+            image: activeImage || item.image_url,
+            vendor_id: item.vendor_id,
+            shop_id: item.shop_id || item.vendor_id,
+            order_type: orderType,
+            total_price: totalPrice
+        };
+
+        // 1. Force save to LocalStorage immediately
+        let currentCart = JSON.parse(localStorage.getItem('subhams_cart') || '[]');
+        currentCart = currentCart.filter(c => c.id !== item.id); // Remove duplicate if exists
+        currentCart.push(newItem);
+        localStorage.setItem('subhams_cart', JSON.stringify(currentCart));
+
+        // 2. Safely update context without crashing React
+        setTimeout(() => {
+            if(addToCart) addToCart(newItem);
+        }, 0);
+
+        // 3. Navigate to Orders and FORCE the 'list' tab
+        setTimeout(() => {
+            navigate('/my-orders', { state: { forceTab: 'list' } });
+        }, 300);
     };
 
     return (
@@ -360,8 +399,12 @@ const ItemDetail = () => {
 
                         <div style={{ display: 'flex', gap: '10px', flex: 1, justifyContent: 'flex-end' }}>
                             {isService ? (
-                                <button style={styles.bookBtn} onClick={() => alert("Added to Booking List!")}>
-                                    <Calendar size={18} /> {t.bookService}
+                                <button 
+                                    style={{...styles.bookBtn, opacity: isPlacingOrder ? 0.7 : 1}} 
+                                    onClick={() => handleAddToCart('Service')}
+                                    disabled={isPlacingOrder}
+                                >
+                                    <Calendar size={18} /> {isPlacingOrder ? "Wait..." : t.bookService}
                                 </button>
                             ) : (
                                 <>
@@ -370,8 +413,12 @@ const ItemDetail = () => {
                                         <span style={styles.qtyText}>{quantity}</span>
                                         <button onClick={() => handleQuantity('plus')} style={styles.qtyBtn} disabled={quantity >= stockCount}>+</button>
                                     </div>
-                                    <button style={styles.addToCartBtn} onClick={() => alert(`Added ${quantity} item(s) to order list!`)} disabled={stockCount === 0}>
-                                        <ShoppingCart size={18} /> {t.addToCart}
+                                    <button 
+                                        style={{...styles.addToCartBtn, opacity: (stockCount === 0 || isPlacingOrder) ? 0.7 : 1}} 
+                                        onClick={() => handleAddToCart('Product')} 
+                                        disabled={stockCount === 0 || isPlacingOrder}
+                                    >
+                                        <ShoppingCart size={18} /> {isPlacingOrder ? "Wait..." : t.addToCart}
                                     </button>
                                 </>
                             )}
@@ -428,7 +475,6 @@ const styles = {
     sectionTitle: { margin: '0 0 15px 0', fontSize: '18px', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' },
     description: { fontSize: '14px', color: '#334155', lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' },
     
-    // 🟢 STRICT RED DISCLAIMER BOX
     disclaimerBox: { background: '#fef2f2', border: '1px solid #fca5a5', padding: '16px', borderRadius: '12px', marginBottom: '25px' },
     disclaimerTitle: { margin: '0 0 10px 0', fontSize: '15px', color: '#dc2626', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' },
     disclaimerList: { margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#b91c1c', lineHeight: '1.6' },
@@ -445,7 +491,6 @@ const styles = {
     commentText: { margin: 0, fontSize: '13px', color: '#475569', lineHeight: '1.4' },
     deleteCommentBtn: { background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' },
     
-    // 🟢 BOTTOM ACTION BAR
     bottomActionBar: { position: 'fixed', bottom: 0, left: 0, right: 0, maxWidth: '800px', margin: '0 auto', background: '#ffffff', borderTop: '1px solid #e2e8f0', zIndex: 100, boxShadow: '0 -4px 12px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' },
     callNoticeBox: { background: '#fef2f2', color: '#dc2626', fontSize: '12px', fontWeight: '700', padding: '8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', borderBottom: '1px solid #fee2e2' },
     actionButtonsRow: { padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
