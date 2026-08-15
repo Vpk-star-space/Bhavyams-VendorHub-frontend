@@ -111,7 +111,7 @@ const UserOrders = () => {
         fetchMyOrders();
     }, []);
 
-    const handleConfirmBooking = async () => {
+const handleConfirmBooking = async () => {
         const token = localStorage.getItem('token');
         if (!token) return navigate('/welcome');
 
@@ -143,13 +143,15 @@ const UserOrders = () => {
                 });
             }
 
-            // Successfully booked! Clear local state
+            toast.success("Booking Confirmed!");
+            
+            // 🟢 Fetch the fresh data FROM THE DB FIRST before switching tabs!
+            await fetchMyOrders(); 
+
+            // 🟢 Now it is safe to clear the UI and switch tabs smoothly
             localStorage.setItem('subhams_cart', '[]');
             setListItems([]);
-            
-            toast.success("Booking Confirmed!");
-            setActiveTab('active');
-            fetchMyOrders(); 
+            setActiveTab('active'); // Deleted the buggy clearCart line entirely!
 
         } catch (err) {
             toast.error(err.response?.data?.message || "Error placing booking.");

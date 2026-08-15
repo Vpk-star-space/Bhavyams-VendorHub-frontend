@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle } from 'lucide-react';
+import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus } from 'lucide-react';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -141,7 +141,7 @@ const AdminDashboard = () => {
             alert(`✅ Added ${newCatName} to ${newCatSection}!`);
             setNewCatName('');
             setNewCatImage(null);
-            fetchCategories(); // Refresh category list
+            fetchCategories(); 
         } catch (err) {
             console.error(err);
             alert("Failed to upload category. Ensure backend routes and payload limit are configured.");
@@ -168,6 +168,32 @@ const AdminDashboard = () => {
         : vendors.filter(v => v.is_approved === true);
 
     const TYPE_OPTIONS = ["Trending", "Products", "Services", "Promotions"];
+
+    // 🟢 DYNAMIC VENDOR FOLDERS RADAR
+    // Finds all categories created by vendors that don't have an HD image yet!
+    const activeShops = vendors.filter(v => v.is_approved === true);
+    let extractedVendorCategories = [];
+    activeShops.forEach(shop => {
+        if (shop.category) {
+            shop.category.split(',').forEach(c => {
+                const cleanCat = c.trim();
+                if (cleanCat) {
+                    extractedVendorCategories.push({ name: cleanCat, shopName: shop.business_name, shopId: shop.id });
+                }
+            });
+        }
+    });
+
+    // Group them so we know which shops are using which category
+    const dynamicFolders = {};
+    extractedVendorCategories.forEach(item => {
+        if (!dynamicFolders[item.name]) dynamicFolders[item.name] = [];
+        dynamicFolders[item.name].push({ name: item.shopName, id: item.shopId });
+    });
+
+    const adminCatNamesLower = categories.map(c => c.name.toLowerCase().trim());
+    // Filter out the ones that already have official Admin Images
+    const unstyledFolders = Object.keys(dynamicFolders).filter(cat => !adminCatNamesLower.includes(cat.toLowerCase()));
 
     if (loading) return <div style={styles.loading}>Loading Master Control Room...</div>;
 
@@ -198,16 +224,58 @@ const AdminDashboard = () => {
                         style={activeTab === 'categories' ? styles.activeTab : styles.inactiveTab} 
                         onClick={() => setActiveTab('categories')}
                     >
-                        📂 Manage Categories
+                        📂 Manage Folders & Images
                     </button>
                 </div>
 
                 {activeTab === 'categories' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        
+                        {/* 🟢 THE VENDOR FOLDER RADAR */}
+                        <div style={{...styles.card, border: '2px solid #f59e0b', background: '#fffbeb'}}>
+                            <h2 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309'}}>
+                                <Eye size={22}/> Unstyled Folders (Vendor Created)
+                            </h2>
+                            <p style={{color: '#92400e', fontSize: '14px', marginBottom: '20px'}}>
+                                These folders were automatically created by vendors. You can either <b>Upload a Logo</b> for them, or if they are selling bad items, ban the shop!
+                            </p>
+                            
+                            {unstyledFolders.length === 0 ? (
+                                <div style={{padding: '20px', textAlign: 'center', background: '#fef3c7', borderRadius: '8px', color: '#b45309'}}>
+                                    No new unstyled folders detected.
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
+                                    {unstyledFolders.map((catName, idx) => (
+                                        <div key={idx} style={{ background: '#ffffff', padding: '15px', borderRadius: '12px', border: '1px solid #fcd34d', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                                            <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#0f172a' }}>📁 {catName}</h4>
+                                            
+                                            <div style={{fontSize: '12px', color: '#64748b', marginBottom: '10px'}}>
+                                                <strong>Used by:</strong><br/>
+                                                {dynamicFolders[catName].map((shop, i) => (
+                                                    <span key={i}>• {shop.name}<br/></span>
+                                                ))}
+                                            </div>
+
+                                            <button 
+                                                onClick={() => {
+                                                    setNewCatName(catName);
+                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                }}
+                                                style={{...styles.approveBtn, width: '100%', padding: '8px', fontSize: '12px', justifyContent: 'center'}}
+                                            >
+                                                <ImagePlus size={14} /> Upload HD Logo
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
                         {/* CREATE CATEGORY FORM */}
                         <div style={styles.card}>
-                            <h2 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px'}}><PlusCircle size={22} color="#16a34a"/> Create App Category</h2>
-                            <p style={{color: '#64748b', fontSize: '14px', marginBottom: '20px'}}>Upload HD photos and create folders for the home screen (e.g., Vegetables, AC Mechanic).</p>
+                            <h2 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px'}}><PlusCircle size={22} color="#16a34a"/> Upload Official Folder Logo</h2>
+                            <p style={{color: '#64748b', fontSize: '14px', marginBottom: '20px'}}>Create a new folder or upgrade a Vendor's folder with an HD image.</p>
                             
                             <form onSubmit={handleCreateCategory} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '500px' }}>
                                 <div>
@@ -242,13 +310,13 @@ const AdminDashboard = () => {
                                         required
                                     />
                                 </div>
-                                <button type="submit" style={styles.approveBtn}>Create & Upload</button>
+                                <button type="submit" style={styles.approveBtn}>Create & Upload Image</button>
                             </form>
                         </div>
 
                         {/* LIST EXISTING CATEGORIES */}
                         <div style={styles.card}>
-                            <h3 style={{ marginTop: 0, color: '#0f172a' }}>Existing Categories ({categories.length})</h3>
+                            <h3 style={{ marginTop: 0, color: '#0f172a' }}>Official Categories with Logos ({categories.length})</h3>
                             {categories.length === 0 ? (
                                 <div style={styles.emptyBox}>No custom categories created yet.</div>
                             ) : (
@@ -354,7 +422,7 @@ const AdminDashboard = () => {
                                                         <AlertTriangle size={16}/> Suspend
                                                     </button>
                                                     <button onClick={() => handleAction(vendor.id, vendor.business_name, 'delete')} style={styles.deleteBtn}>
-                                                        <Trash2 size={16}/> Remove
+                                                        <Trash2 size={16}/> Delete Shop
                                                     </button>
                                                 </>
                                             )}
