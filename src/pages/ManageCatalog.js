@@ -138,9 +138,10 @@ const ManageCatalog = () => {
         try {
             const BACKEND_URL = getBackendUrl();
             const token = localStorage.getItem('token');
-            await axios.delete(`${BACKEND_URL}/products/delete/${productId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+           // ✅ CORRECT REST PATH
+await axios.delete(`${BACKEND_URL}/products/${productId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+});
             fetchProducts();
         } catch (err) {
             console.error(err);

@@ -76,7 +76,7 @@ const ShopProfile = () => {
         return () => socket.off('shop_updated');
     }, [id]);
 
- const handleUpdateSubmit = async (e) => {
+    const handleUpdateSubmit = async (e) => {
         e.preventDefault();
         setUploadError('');
 
@@ -84,14 +84,14 @@ const ShopProfile = () => {
             const BACKEND_URL = getBackendUrl();
             const token = localStorage.getItem('token');
             
-            // 🟢 MUST use FormData to match your backend's Multer setup
             const formData = new FormData();
             formData.append('business_name', editForm.business_name);
             formData.append('category', editForm.category);
             formData.append('shop_type', editForm.shop_type);
             formData.append('is_online', editForm.is_online);
             
-            // 🟢 Your backend looks for 'shop_logo' inside upload.single()
+            // 🟢 SECURITY FIX: Only updating the public shop logo/image. 
+            // NO IDs are handled here.
             if (imageFile) {
                 formData.append('shop_logo', imageFile);
             }
@@ -99,7 +99,7 @@ const ShopProfile = () => {
             const res = await axios.put(`${BACKEND_URL}/shops/${id}`, formData, {
                 headers: { 
                     'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data' // <-- CRITICAL for Multer
+                    'Content-Type': 'multipart/form-data'
                 }
             });
             
@@ -112,6 +112,7 @@ const ShopProfile = () => {
             setUploadError("❌ Update failed! Ensure your backend 'uploads' folder exists.");
         }
     };
+
     const handleShare = async () => {
         if (navigator.share) {
             try {
@@ -143,7 +144,6 @@ const ShopProfile = () => {
 
     return (
         <div style={styles.page}>
-            {/* FIXED TOP NAVIGATION */}
             <div style={styles.navBar}>
                 <button onClick={() => navigate(-1)} style={styles.backBtn}>
                     <ArrowLeft size={20} /> Back
@@ -153,7 +153,6 @@ const ShopProfile = () => {
                 </button>
             </div>
 
-            {/* 🟢 FIXED: REMOVED DUPLICATE BANNER AND ALIGNED TEXT */}
             <div style={styles.bannerBackground}>
                 <div style={styles.bannerTextContainer}>
                     <span style={styles.bannerCategoryText}>{shopData.category || 'Local Business'}</span>
@@ -163,11 +162,11 @@ const ShopProfile = () => {
             
             <div style={styles.profileContentWrapper}>
                 <div style={styles.avatarRow}>
-               <div style={styles.avatarContainer}>
-    {/* 👇 It now checks for your NEW upload first, then falls back to the old one */}
-    {(shopData.shop_logo || shopData.id_front_url) ? (
-        <img src={shopData.shop_logo || shopData.id_front_url} alt="Shop Logo" style={styles.businessLogo} />
-    ) : (
+                    <div style={styles.avatarContainer}>
+                        {/* 🟢 CRITICAL BUG FIXED: Strictly only using the public shop image. No ID fallbacks. */}
+                        {(shopData.shop_image || shopData.shop_logo) ? (
+                            <img src={shopData.shop_image || shopData.shop_logo} alt="Shop Logo" style={styles.businessLogo} />
+                        ) : (
                             <div style={{...styles.businessLogo, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                 <Store size={40} color="#94a3b8" />
                             </div>
@@ -189,7 +188,7 @@ const ShopProfile = () => {
                         {shopData.business_name} <BadgeCheck size={20} color="#2563eb" />
                     </h2>
                     <span style={styles.categoryTag}>{shopData.category}</span>
-                    <p style={styles.address}><MapPin size={14} /> {shopData.address || 'Local Business'}</p>
+                    <p style={styles.address}><MapPin size={14} /> {shopData.address || shopData.location || 'Local Business'}</p>
                     
                     <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: '#475569', fontWeight: 'bold' }}>
                         <Users size={14} /> {shopData.followers_count || 0} Followers
@@ -285,7 +284,6 @@ const ShopProfile = () => {
 
     return (
         <div key={product.id} style={styles.listItem}>
-            {/* 🟢 NEW: Added onClick here to open the new Item Detail page */}
             <div 
                 style={{ display: 'flex', gap: '15px', alignItems: 'center', cursor: 'pointer', flex: 1 }} 
                 onClick={() => navigate(`/item/${product.id}`)}
@@ -311,7 +309,6 @@ const ShopProfile = () => {
                 </div>
             </div>
             
-            {/* Action Box stays on the right side */}
             {!(isOwner || isMasterAdmin) && (
                 <div style={styles.listActionBox}>
                     <button style={styles.addBtn} onClick={() => alert("Added to cart/booking!")}>
@@ -344,7 +341,7 @@ const ShopProfile = () => {
                         <form onSubmit={handleUpdateSubmit} style={{display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left'}}>
                             
                             <div style={styles.uploadBox}>
-                                <label style={styles.uploadLabel}><Upload size={16}/> Update Brand Logo / Profile Pic</label>
+                                <label style={styles.uploadLabel}><Upload size={16}/> Update Brand Logo / Store Photo</label>
                                 <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} style={{fontSize: '12px', marginTop: '5px'}} />
                             </div>
 
@@ -394,38 +391,10 @@ const styles = {
     backBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '15px', padding: 0 },
     shareIconBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '13px', padding: '6px 12px', borderRadius: '8px' },
     
-    bannerBackground: { 
-        height: '160px', 
-        background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)', 
-        width: '100%', 
-        display: 'flex', 
-        alignItems: 'center', 
-        boxSizing: 'border-box' 
-    },
-    // 🟢 FIXED: Adjusted margin to perfectly align the text above the avatar
-    bannerTextContainer: { 
-        display: 'flex', 
-        flexDirection: 'column', 
-        width: '100%',
-        maxWidth: '800px',
-        margin: '0 auto',
-        padding: '0 20px',
-        marginBottom: '20px'
-    },
-    bannerCategoryText: { 
-        fontSize: '12px', 
-        fontWeight: 'bold', 
-        color: '#93c5fd', 
-        textTransform: 'uppercase', 
-        letterSpacing: '1px' 
-    },
-    bannerTitleText: { 
-        margin: '2px 0 0 0', 
-        fontSize: '28px', 
-        fontWeight: '900', 
-        color: 'white', 
-        textShadow: '0 2px 4px rgba(0,0,0,0.2)' 
-    },
+    bannerBackground: { height: '160px', background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)', width: '100%', display: 'flex', alignItems: 'center', boxSizing: 'border-box' },
+    bannerTextContainer: { display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '800px', margin: '0 auto', padding: '0 20px', marginBottom: '20px' },
+    bannerCategoryText: { fontSize: '12px', fontWeight: 'bold', color: '#93c5fd', textTransform: 'uppercase', letterSpacing: '1px' },
+    bannerTitleText: { margin: '2px 0 0 0', fontSize: '28px', fontWeight: '900', color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.2)' },
 
     profileContentWrapper: { padding: '0 20px', marginTop: '-45px', position: 'relative', zIndex: 2, maxWidth: '800px', margin: '-45px auto 0 auto' },
     avatarRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' },
