@@ -2,38 +2,34 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client'; 
-import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus, MessageSquare, Lock, Edit } from 'lucide-react';
+import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus, MessageSquare, Lock, Edit, UserX, Unlock, Clock, Ban, Search, Users, Store, User } from 'lucide-react';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [allUsers, setAllUsers] = useState([]); 
+    
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState(null);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-    
     const [activeTab, setActiveTab] = useState('pending');
-
+    
+    const [adminSearch, setAdminSearch] = useState('');
     const [newCatName, setNewCatName] = useState('');
     const [newCatSection, setNewCatSection] = useState('Products');
     const [newCatImage, setNewCatImage] = useState(null);
 
     const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
-    const SOCKET_URL = BACKEND_URL.replace('/api', ''); 
+    const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://bhavyams-vendorhub-backend.onrender.com';
 
-    // 🟢 1. LIVE WEBSOCKET CONNECTION (Fixed for Render Production)
     useEffect(() => {
-        // Added transports: ['websocket', 'polling'] to prevent Render from blocking the connection!
         const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-        
         socket.on('connect', () => console.log('🟢 Admin Live Sync Connected'));
         
         socket.on('admin_refresh', () => {
-            console.log('🔄 Live Update Received! Syncing dashboard...');
-            fetchVendors();
-            fetchCategories();
+            fetchVendors(); fetchCategories(); fetchAllUsers(); 
         });
-
         return () => socket.disconnect(); 
     }, [SOCKET_URL]);
 
@@ -47,68 +43,58 @@ const AdminDashboard = () => {
         try {
             setErrorMsg(null);
             const token = localStorage.getItem('token');
-            const res = await axios.get(`${BACKEND_URL}/admin/pending-vendors`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get(`${BACKEND_URL}/admin/pending-vendors`, { headers: { Authorization: `Bearer ${token}` } });
             setVendors(res.data || []);
-        } catch (err) {
-            console.error("Error fetching admin data:", err);
-            setErrorMsg(err.response?.data?.message || "Failed to load shops. Ensure you are logged in as admin.");
-        } finally {
-            setLoading(false); 
-        }
+        } catch (err) { setErrorMsg("Failed to load data."); } finally { setLoading(false); }
     };
 
     const fetchCategories = async () => {
         try {
             const res = await axios.get(`${BACKEND_URL}/admin/categories`);
             setCategories(res.data || []);
-        } catch (err) {
-            console.error("Error fetching categories:", err);
-        }
+        } catch (err) { }
     };
 
+    const fetchAllUsers = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${BACKEND_URL}/admin/all-users`, { headers: { Authorization: `Bearer ${token}` } });
+            setAllUsers(res.data || []);
+        } catch (err) { }
+    };
+
+    useEffect(() => { fetchVendors(); fetchCategories(); fetchAllUsers(); }, []);
+
+    // 🟢 SILENT POLLER FIX
     useEffect(() => {
-        fetchVendors();
-        fetchCategories();
-    }, []);
+        if (activeTab === 'security') {
+            const interval = setInterval(() => { fetchAllUsers(); }, 15000);
+            return () => clearInterval(interval);
+        }
+    }, [activeTab]);
 
     const handleTypeToggle = async (shop, toggledType) => {
         try {
             const currentTypes = shop.shop_type ? shop.shop_type.split(',').map(s => s.trim()) : ['Products'];
-            let newTypes;
+            let newTypes = currentTypes.includes(toggledType) ? currentTypes.filter(t => t !== toggledType) : [...currentTypes, toggledType];
+            if (newTypes.length === 0) newTypes = ['Products'];
 
-            if (currentTypes.includes(toggledType)) {
-                newTypes = currentTypes.filter(t => t !== toggledType);
-                if (newTypes.length === 0) newTypes = ['Products'];
-            } else {
-                newTypes = [...currentTypes, toggledType];
-            }
-
-            const newTypeString = newTypes.join(',');
             const token = localStorage.getItem('token');
-            
             const formData = new FormData();
             formData.append('business_name', shop.business_name);
             formData.append('category', shop.category);
-            formData.append('shop_type', newTypeString); 
+            formData.append('shop_type', newTypes.join(',')); 
             formData.append('is_online', shop.is_online);
 
-            await axios.put(`${BACKEND_URL}/shops/${shop.id}`, formData, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
+            await axios.put(`${BACKEND_URL}/shops/${shop.id}`, formData, { headers: { 'Authorization': `Bearer ${token}` } });
             fetchVendors(); 
-        } catch (err) {
-            alert("Failed to toggle store section.");
-        }
+        } catch (err) { alert("Failed to toggle section."); }
     };
 
     const handleAdminEdit = async (vendor) => {
         const newBusinessName = window.prompt("Edit Business Name:", vendor.business_name);
         if (!newBusinessName) return;
-
-        const newCategory = window.prompt("Edit Categories (comma separated):", vendor.category);
+        const newCategory = window.prompt("Edit Categories:", vendor.category);
         if (!newCategory) return;
 
         try {
@@ -118,54 +104,30 @@ const AdminDashboard = () => {
             formData.append('category', newCategory);
             formData.append('shop_type', vendor.shop_type); 
 
-            await axios.put(`${BACKEND_URL}/shops/${vendor.id}`, formData, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            alert(`✅ ${newBusinessName} updated successfully!`);
+            await axios.put(`${BACKEND_URL}/shops/${vendor.id}`, formData, { headers: { 'Authorization': `Bearer ${token}` } });
+            alert(`✅ ${newBusinessName} updated!`);
             fetchVendors(); 
-        } catch (err) {
-            alert("Failed to edit shop details.");
-        }
+        } catch (err) { alert("Failed to edit."); }
     };
 
     const handleAction = async (id, businessName, actionType) => {
         let reason = '';
-        
         if (actionType === 'request_changes') {
-            reason = window.prompt(`What needs to be fixed by "${businessName}"? (This message will be sent to the vendor's dashboard)`);
+            reason = window.prompt(`What needs to be fixed by "${businessName}"?`);
             if (!reason) return; 
         } else {
-            const prompts = {
-                approve: `Approve "${businessName}" and make their shop live?`,
-                suspend: `Suspend "${businessName}"? Their shop will be hidden from users instantly.`,
-                delete: `PERMANENTLY DELETE "${businessName}"? This wipes their entire account.`
-            };
+            const prompts = { approve: `Approve "${businessName}"?`, suspend: `Suspend "${businessName}"?`, delete: `PERMANENTLY DELETE "${businessName}"?` };
             if (!window.confirm(prompts[actionType])) return;
         }
 
         try {
             const token = localStorage.getItem('token');
-            
-            if (actionType === 'approve') {
-                await axios.put(`${BACKEND_URL}/admin/approve-vendor/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
-                alert(`🎉 ${businessName} is now live.`);
-            } else if (actionType === 'suspend') {
-                await axios.put(`${BACKEND_URL}/admin/suspend-vendor/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
-                alert(`⏸️ ${businessName} has been suspended.`); 
-            } else if (actionType === 'delete') {
-                await axios.delete(`${BACKEND_URL}/admin/delete-vendor/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-                alert(`🗑️ ${businessName} has been deleted.`);
-            } else if (actionType === 'request_changes') {
-                await axios.put(`${BACKEND_URL}/admin/request-changes/${id}`, { reason }, { headers: { Authorization: `Bearer ${token}` } });
-                alert(`✉️ Message sent successfully to the vendor!`);
-            }
-            
+            if (actionType === 'approve') await axios.put(`${BACKEND_URL}/admin/approve-vendor/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            else if (actionType === 'suspend') await axios.put(`${BACKEND_URL}/admin/suspend-vendor/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            else if (actionType === 'delete') await axios.delete(`${BACKEND_URL}/admin/delete-vendor/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+            else if (actionType === 'request_changes') await axios.put(`${BACKEND_URL}/admin/request-changes/${id}`, { reason }, { headers: { Authorization: `Bearer ${token}` } });
             fetchVendors();
-        } catch (err) {
-            console.error(err);
-            alert(`Failed to execute ${actionType}.`);
-        }
+        } catch (err) { alert(`Failed to execute ${actionType}.`); }
     };
 
     const fileToBase64 = (file) => new Promise((resolve, reject) => {
@@ -181,19 +143,11 @@ const AdminDashboard = () => {
         try {
             const token = localStorage.getItem('token');
             const base64Image = await fileToBase64(newCatImage);
-
-            await axios.post(`${BACKEND_URL}/admin/categories`, {
-                name: newCatName, section: newCatSection, hd_image: base64Image
-            }, {
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-            });
-
+            await axios.post(`${BACKEND_URL}/admin/categories`, { name: newCatName, section: newCatSection, hd_image: base64Image }, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
             alert(`✅ Added ${newCatName}!`);
             setNewCatName(''); setNewCatImage(null);
             fetchCategories(); 
-        } catch (err) {
-            alert("Failed to upload category.");
-        }
+        } catch (err) { alert("Failed to upload category."); }
     };
 
     const handleDeleteCategory = async (id, name) => {
@@ -202,12 +156,62 @@ const AdminDashboard = () => {
             const token = localStorage.getItem('token');
             await axios.delete(`${BACKEND_URL}/admin/categories/${id}`, { headers: { Authorization: `Bearer ${token}` }});
             fetchCategories();
-        } catch (err) {
-            alert("Failed to delete category.");
-        }
+        } catch (err) { alert("Failed to delete category."); }
     };
 
-    const displayVendors = activeTab === 'pending' ? vendors.filter(v => v.is_approved === false) : vendors.filter(v => v.is_approved === true);
+    const handleUserSecurity = async (userId, username, action) => {
+        let reason = '';
+        let minutes = 0;
+
+        if (action === 'warn') {
+            reason = window.prompt(`⚠️ SEND WARNING TO ${username}:\nType the message that will scroll on their home screen:`);
+            if (!reason) return;
+        } else if (action === 'temp_block') {
+            reason = window.prompt(`⏳ TEMP BLOCK ${username}:\nReason for block:`);
+            if (!reason) return;
+            const timeInput = window.prompt(`How long? Type number followed by m, h, or d.\nExamples:\n"30m" = 30 minutes\n"5h" = 5 hours\n"2d" = 2 days`);
+            if (!timeInput) return;
+            const val = parseInt(timeInput);
+            if (isNaN(val)) return alert("Invalid time format.");
+            if (timeInput.toLowerCase().includes('d')) minutes = val * 1440;
+            else if (timeInput.toLowerCase().includes('h')) minutes = val * 60;
+            else minutes = val;
+        } else if (action === 'perma_banned') {
+            reason = window.prompt(`⛔ PERMA BAN ${username}:\nState the reason for permanent ban:`);
+            if (!reason) return;
+            if (!window.confirm(`Are you absolutely sure you want to PERMANENTLY BAN ${username}? They will never be able to access the app again.`)) return;
+        } else if (action === 'unblock') {
+            if (!window.confirm(`Remove all restrictions from ${username} and make them Active?`)) return;
+        } else if (action === 'delete') {
+            if (!window.confirm(`🚨 CRITICAL WARNING 🚨\nAre you sure you want to PERMANENTLY WIPE ${username} and ALL their data (shop, cart, products) from the database?`)) return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            if (action === 'delete') {
+                await axios.delete(`${BACKEND_URL}/admin/delete-user/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+                alert(`🗑️ User ${username} completely deleted.`);
+            } else {
+                await axios.put(`${BACKEND_URL}/admin/user-security/${userId}`, { action, reason, minutes }, { headers: { Authorization: `Bearer ${token}` } });
+                alert(`✅ Applied ${action} to ${username}.`);
+            }
+            fetchAllUsers(); fetchVendors(); 
+        } catch (err) { alert("Failed to update security status."); }
+    };
+
+    const formatIST = (dateString) => {
+        if (!dateString) return '';
+        const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        return new Date(dateString).toLocaleString('en-IN', options);
+    };
+
+    const safeSearch = adminSearch.toLowerCase().trim();
+    const displayVendors = activeTab === 'pending' 
+        ? vendors.filter(v => v.is_approved === false && (v.business_name?.toLowerCase().includes(safeSearch) || v.username?.toLowerCase().includes(safeSearch))) 
+        : vendors.filter(v => v.is_approved === true && (v.business_name?.toLowerCase().includes(safeSearch) || v.username?.toLowerCase().includes(safeSearch)));
+    
+    const filteredUsers = allUsers.filter(u => u.username?.toLowerCase().includes(safeSearch) || u.phone?.includes(safeSearch) || u.email?.toLowerCase().includes(safeSearch));
+
     const TYPE_OPTIONS = ["Trending", "Products", "Services", "Expo"];
 
     const activeShops = vendors.filter(v => v.is_approved === true);
@@ -236,19 +240,92 @@ const AdminDashboard = () => {
         <div style={styles.page}>
             <div style={styles.container}>
                 <div style={styles.headerBar}>
-                    <button onClick={() => navigate('/')} style={styles.backBtn}><ArrowLeft size={18} /> {isMobile ? "" : "Back to Hub"}</button>
-                    <h1 style={styles.title}><ShieldCheck size={isMobile ? 22 : 26} color="#2874f0" /> Master Admin Panel</h1>
+                    <button onClick={() => navigate('/')} style={styles.backBtn}><ArrowLeft size={18} /> {isMobile ? "" : "Back"}</button>
+                    <h1 style={styles.title}><ShieldCheck size={22} color="#2874f0" /> Master Admin</h1>
                 </div>
 
                 {errorMsg && <div style={styles.errorBox}>❌ {errorMsg}</div>}
 
-                <div style={styles.tabContainer}>
-                    <button style={activeTab === 'pending' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('pending')}>⏳ Pending Approvals</button>
-                    <button style={activeTab === 'active' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('active')}>✅ Active Shops</button>
-                    <button style={activeTab === 'categories' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('categories')}>📂 Manage Folders</button>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '5px' }}>
+                    <div style={{...styles.statCard, background: '#eff6ff', border: '1px solid #bfdbfe'}}>
+                        <Users size={20} color="#2563eb" />
+                        <div>
+                            <h3 style={{margin: 0, fontSize: '18px', color: '#1e3a8a'}}>{allUsers.length}</h3>
+                            <p style={{margin: 0, fontSize: '11px', color: '#3b82f6', fontWeight: 'bold'}}>Total Users</p>
+                        </div>
+                    </div>
+                    <div style={{...styles.statCard, background: '#f0fdf4', border: '1px solid #bbf7d0'}}>
+                        <User size={20} color="#16a34a" />
+                        <div>
+                            <h3 style={{margin: 0, fontSize: '18px', color: '#14532d'}}>{allUsers.filter(u=>u.role==='customer').length}</h3>
+                            <p style={{margin: 0, fontSize: '11px', color: '#22c55e', fontWeight: 'bold'}}>Customers</p>
+                        </div>
+                    </div>
+                    <div style={{...styles.statCard, background: '#fef9c3', border: '1px solid #fef08a'}}>
+                        <Store size={20} color="#ca8a04" />
+                        <div>
+                            <h3 style={{margin: 0, fontSize: '18px', color: '#713f12'}}>{allUsers.filter(u=>u.role==='vendor').length}</h3>
+                            <p style={{margin: 0, fontSize: '11px', color: '#eab308', fontWeight: 'bold'}}>Vendors</p>
+                        </div>
+                    </div>
                 </div>
 
-                {activeTab === 'categories' ? (
+                <div style={{ display: 'flex', alignItems: 'center', background: 'white', padding: '12px 15px', borderRadius: '12px', border: '1px solid #cbd5e1', marginBottom: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+                    <Search size={18} color="#64748b" />
+                    <input type="text" placeholder="Search users, shops, emails, or phone numbers..." value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', marginLeft: '10px', fontSize: '14px', background: 'transparent' }} />
+                </div>
+
+                <div style={styles.tabContainer}>
+                    <button style={activeTab === 'pending' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('pending')}>⏳ Pending</button>
+                    <button style={activeTab === 'active' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('active')}>✅ Active Shops</button>
+                    <button style={activeTab === 'categories' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('categories')}>📂 Folders</button>
+                    <button style={activeTab === 'security' ? {...styles.activeTab, background: '#ef4444'} : styles.inactiveTab} onClick={() => setActiveTab('security')}>🛡️ Security</button>
+                </div>
+
+                {activeTab === 'security' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <div style={{...styles.card, background: '#fef2f2', border: '1px solid #ef4444'}}>
+                            <h2 style={{marginTop: 0, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px'}}><AlertTriangle /> Global Security Center</h2>
+                            <p style={{color: '#991b1b', fontSize: '13px', margin: 0}}>Manage all accounts. <b>Temp Blocks</b> auto-expire via IST. <b>Perma Ban</b> locks them forever. <b>Wipe</b> deletes their data.</p>
+                        </div>
+
+                        {filteredUsers.length === 0 ? <div style={styles.emptyBox}>No users found.</div> : filteredUsers.map(u => (
+                            <div key={u.id} style={{...styles.card, display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px', padding: '15px', borderLeft: u.account_status !== 'active' ? '5px solid #dc2626' : '1px solid #e2e8f0'}}>
+                                <div>
+                                    <h4 style={{ margin: '0 0 5px 0', fontSize: '16px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        {u.username} <span style={{fontSize: '10px', background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase'}}>{u.role}</span>
+                                    </h4>
+                                    <p style={{margin: '0 0 4px 0', fontSize: '12px', color: '#475569'}}>📧 {u.email || 'No email'} | 📱 {u.phone || 'No phone'}</p>
+                                    
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                        <span style={{fontSize: '12px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '6px', background: u.account_status === 'active' ? '#dcfce7' : '#fee2e2', color: u.account_status === 'active' ? '#166534' : '#991b1b'}}>
+                                            Status: {u.account_status.replace('_', ' ').toUpperCase()}
+                                        </span>
+                                        {u.account_status === 'temp_block' && u.ban_until && (
+                                            <span style={{fontSize: '11px', color: '#b45309', display: 'flex', alignItems: 'center', gap: '4px'}}><Clock size={12}/> Unblocks: {formatIST(u.ban_until)}</span>
+                                        )}
+                                    </div>
+                                    {u.ban_reason && <p style={{margin: '8px 0 0 0', fontSize: '12px', color: '#b91c1c', fontWeight: 'bold'}}>⚠️ Msg: {u.ban_reason}</p>}
+                                </div>
+                                
+                                <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto'}}>
+                                    {u.account_status !== 'active' ? (
+                                        <button onClick={() => handleUserSecurity(u.id, u.username, 'unblock')} style={{...styles.approveBtn, flex: isMobile ? 1 : 'auto', background: '#16a34a'}}><Unlock size={14}/> Unblock</button>
+                                    ) : (
+                                        <>
+                                            <button onClick={() => handleUserSecurity(u.id, u.username, 'warn')} style={{...styles.suspendBtn, flex: isMobile ? 1 : 'auto'}}><AlertTriangle size={14}/> Warn</button>
+                                            <button onClick={() => handleUserSecurity(u.id, u.username, 'temp_block')} style={{...styles.suspendBtn, background: '#ea580c', flex: isMobile ? 1 : 'auto'}}><Clock size={14}/> Block Time</button>
+                                        </>
+                                    )}
+                                    {u.account_status !== 'perma_banned' && (
+                                        <button onClick={() => handleUserSecurity(u.id, u.username, 'perma_banned')} style={{...styles.deleteBtn, background: '#7f1d1d', flex: isMobile ? 1 : 'auto'}}><Ban size={14}/> Perma Ban</button>
+                                    )}
+                                    <button onClick={() => handleUserSecurity(u.id, u.username, 'delete')} style={{...styles.deleteBtn, flex: isMobile ? 1 : 'auto', background: '#0f172a'}}><UserX size={14}/> Wipe DB</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : activeTab === 'categories' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div style={{...styles.card, border: '2px solid #f59e0b', background: '#fffbeb'}}>
                             <h2 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontSize: '18px'}}><Eye size={22}/> Unstyled Folders (Vendor Created)</h2>
@@ -317,96 +394,53 @@ const AdminDashboard = () => {
                 ) : (
                     <div style={{...styles.card, padding: isMobile ? '15px' : '30px'}}>
                         {displayVendors.length === 0 ? (
-                            <div style={styles.emptyBox}>No {activeTab} shops right now.</div>
+                            <div style={styles.emptyBox}>No {activeTab} shops match your search.</div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 {displayVendors.map(vendor => {
                                     const currentTypes = vendor.shop_type ? vendor.shop_type.split(',').map(s => s.trim()) : ['Products'];
-
                                     return (
-                                    <div key={vendor.id} style={isMobile ? styles.vendorBoxMobile : styles.vendorBoxDesktop}>
-                                        
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                            <h4 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                {vendor.business_name} 
-                                                <button onClick={() => handleAdminEdit(vendor)} style={styles.iconBtn} title="Edit Shop Info"><Edit size={16}/></button>
-                                            </h4>
-                                            <span style={{ fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '12px', background: vendor.is_approved ? '#dcfce7' : '#fef9c3', color: vendor.is_approved ? '#166534' : '#a16207' }}>
-                                                {vendor.is_approved ? 'Live' : 'Pending'}
-                                            </span>
-                                        </div>
+                                        <div key={vendor.id} style={isMobile ? styles.vendorBoxMobile : styles.vendorBoxDesktop}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                
+                                                {/* 🟢 VIEW SHOP FRONTEND BUTTON INJECTED HERE */}
+                                                <h4 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {vendor.business_name} 
+                                                    <button onClick={() => window.open(`/shop/${vendor.id}`, '_blank')} style={{...styles.iconBtn, background: '#eff6ff', color: '#2563eb'}} title="Open Shop Details"><ExternalLink size={16}/></button>
+                                                    <button onClick={() => handleAdminEdit(vendor)} style={styles.iconBtn} title="Edit Shop Info"><Edit size={16}/></button>
+                                                </h4>
 
-                                        {/* 🟢 FIXED MISSING LOCATION & EMAIL WITH STRONG FALLBACKS */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px', background: '#ffffff', padding: '15px', borderRadius: '10px', border: '1px solid #cbd5e1', marginBottom: '15px' }}>
-                                            <p style={styles.detailText}>👤 <strong>Owner Name:</strong> {vendor.username || vendor.name || 'Unknown'}</p>
-                                            <p style={styles.detailText}>📱 <strong>Phone:</strong> {vendor.user_phone || vendor.phone || 'Not Provided'}</p>
-                                            <p style={styles.detailText}>📧 <strong>Email:</strong> {vendor.user_email || vendor.email || 'Not Provided'}</p>
-                                            <p style={styles.detailText}>📍 <strong>Location:</strong> {vendor.location || vendor.user_address || vendor.address || 'Not Provided'}</p>
-                                            <p style={styles.detailText}>📦 <strong>Categories:</strong> {vendor.category}</p>
-                                            <p style={styles.detailText}>🏬 <strong>Shop Type:</strong> {vendor.shop_type || 'Products'}</p>
-                                            <p style={styles.detailText}>🏠 <strong>Work Mode:</strong> {vendor.work_mode === 'home' ? 'Home Business' : 'Physical Shop'}</p>
-                                        </div>
-                                            
-                                        <div style={{ marginBottom: '15px', padding: '10px', background: 'white', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                                            <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <FolderSync size={12} /> Assign Home Screen Tabs (Multi-Select):
-                                            </p>
-                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                                {TYPE_OPTIONS.map(type => {
-                                                    const isActive = currentTypes.includes(type);
-                                                    return (
-                                                        <button 
-                                                            key={type} onClick={() => handleTypeToggle(vendor, type)}
-                                                            style={{
-                                                                display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: 'none', transition: '0.2s',
-                                                                background: isActive ? '#16a34a' : '#f1f5f9', color: isActive ? 'white' : '#64748b', boxShadow: isActive ? '0 2px 5px rgba(22,163,74,0.3)' : 'none'
-                                                            }}
-                                                        >
-                                                            {isActive && <CheckCircle size={12} />} {type === 'Trending' && !isActive && '🔥'} {type}
-                                                        </button>
-                                                    )
-                                                })}
+                                                <span style={{ fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '12px', background: vendor.is_approved ? '#dcfce7' : '#fef9c3', color: vendor.is_approved ? '#166534' : '#a16207' }}>
+                                                    {vendor.is_approved ? 'Live' : 'Pending'}
+                                                </span>
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px', background: '#ffffff', padding: '15px', borderRadius: '10px', border: '1px solid #cbd5e1', marginBottom: '15px' }}>
+                                                <p style={styles.detailText}>👤 <strong>Owner Name:</strong> {vendor.username || vendor.name || 'Unknown'}</p>
+                                                <p style={styles.detailText}>📱 <strong>Phone:</strong> {vendor.user_phone || vendor.phone || 'Not Provided'}</p>
+                                                <p style={styles.detailText}>📧 <strong>Email:</strong> {vendor.user_email || vendor.email || 'Not Provided'}</p>
+                                                <p style={styles.detailText}>📍 <strong>Location:</strong> {vendor.location || vendor.user_address || vendor.address || 'Not Provided'}</p>
+                                                <p style={styles.detailText}>📦 <strong>Categories:</strong> {vendor.category}</p>
+                                                <p style={styles.detailText}>🏬 <strong>Shop Type:</strong> {vendor.shop_type || 'Products'}</p>
+                                            </div>
+                                                
+                                            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '10px' }}>
+                                                {activeTab === 'pending' ? (
+                                                    <>
+                                                        <button onClick={() => handleAction(vendor.id, vendor.business_name, 'approve')} style={{...styles.approveBtn, flex: 1, justifyContent: 'center'}}><CheckCircle size={16}/> Approve Live</button>
+                                                        <button onClick={() => handleAction(vendor.id, vendor.business_name, 'request_changes')} style={{...styles.requestBtn, flex: 1, justifyContent: 'center'}}><MessageSquare size={16}/> Request Changes</button>
+                                                        <button onClick={() => handleAction(vendor.id, vendor.business_name, 'delete')} style={{...styles.deleteBtn, flex: 1, justifyContent: 'center'}}><Trash2 size={16}/> Delete Application</button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button onClick={() => handleAction(vendor.id, vendor.business_name, 'suspend')} style={{...styles.suspendBtn, flex: 1, justifyContent: 'center'}}><AlertTriangle size={16}/> Suspend</button>
+                                                        <button onClick={() => handleAction(vendor.id, vendor.business_name, 'delete')} style={{...styles.deleteBtn, flex: 1, justifyContent: 'center'}}><Trash2 size={16}/> Delete Shop</button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
-
-                                        <div style={styles.docBox}>
-                                            <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
-                                                <Lock size={14}/> Secure Vault (ID Proofs & Evidence)
-                                            </span>
-                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                                {vendor.id_front_url && <a href={vendor.id_front_url} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Front ID <ExternalLink size={12} /></a>}
-                                                {vendor.id_back_url && <a href={vendor.id_back_url} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Back ID <ExternalLink size={12} /></a>}
-                                                {vendor.shop_image && <a href={vendor.shop_image} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Shop Photo <ExternalLink size={12} /></a>}
-                                                {vendor.business_certificate && <a href={vendor.business_certificate} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Certificate <ExternalLink size={12} /></a>}
-                                            </div>
-                                        </div>
-
-                                        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '10px' }}>
-                                            {activeTab === 'pending' ? (
-                                                <>
-                                                    <button onClick={() => handleAction(vendor.id, vendor.business_name, 'approve')} style={{...styles.approveBtn, flex: 1, justifyContent: 'center'}}>
-                                                        <CheckCircle size={16}/> Approve Live
-                                                    </button>
-                                                    <button onClick={() => handleAction(vendor.id, vendor.business_name, 'request_changes')} style={{...styles.requestBtn, flex: 1, justifyContent: 'center'}}>
-                                                        <MessageSquare size={16}/> Request Changes
-                                                    </button>
-                                                    <button onClick={() => handleAction(vendor.id, vendor.business_name, 'delete')} style={{...styles.deleteBtn, flex: 1, justifyContent: 'center'}}>
-                                                        <Trash2 size={16}/> Delete Application
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <button onClick={() => handleAction(vendor.id, vendor.business_name, 'suspend')} style={{...styles.suspendBtn, flex: 1, justifyContent: 'center'}}>
-                                                        <AlertTriangle size={16}/> Suspend
-                                                    </button>
-                                                    <button onClick={() => handleAction(vendor.id, vendor.business_name, 'delete')} style={{...styles.deleteBtn, flex: 1, justifyContent: 'center'}}>
-                                                        <Trash2 size={16}/> Delete Shop
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                )})}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -425,30 +459,24 @@ const styles = {
     backBtn: { background: 'white', border: '1px solid #cbd5e1', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '13px' },
     errorBox: { textAlign: 'center', padding: '15px', color: '#dc2626', fontWeight: 'bold', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', marginBottom: '20px' },
     
-    tabContainer: { display: 'flex', gap: '10px', marginBottom: '20px', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '5px' },
-    activeTab: { flex: 1, minWidth: '130px', padding: '12px', background: '#2874f0', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 6px rgba(40,116,240,0.3)', fontSize: '13px' },
-    inactiveTab: { flex: 1, minWidth: '130px', padding: '12px', background: '#e2e8f0', color: '#475569', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '13px' },
+    statCard: { flex: 1, minWidth: '100px', padding: '15px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' },
+
+    tabContainer: { display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '5px' },
+    activeTab: { flex: 1, minWidth: '100px', padding: '12px', background: '#2874f0', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', fontSize: '12px' },
+    inactiveTab: { flex: 1, minWidth: '100px', padding: '12px', background: '#e2e8f0', color: '#475569', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '12px' },
     
-    card: { background: 'white', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' },
+    card: { background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0' },
     emptyBox: { textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b', fontWeight: 'bold' },
     
     vendorBoxDesktop: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column' },
     vendorBoxMobile: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '15px', display: 'flex', flexDirection: 'column' },
-    
     detailText: { margin: '0', fontSize: '13px', color: '#475569', padding: '5px 0' },
+    iconBtn: { background: '#e2e8f0', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' },
     
-    docBox: { background: '#eff6ff', padding: '15px', borderRadius: '12px', border: '1px solid #bfdbfe' },
-    docLink: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', background: '#ffffff', color: '#2563eb', padding: '6px 10px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', border: '1px solid #bfdbfe' },
-    
-    iconBtn: { background: '#e2e8f0', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-    
-    approveBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#16a34a', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
-    requestBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#8b5cf6', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
-    suspendBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#f59e0b', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
-    deleteBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#dc2626', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
-    
-    catLabel: { fontWeight: 'bold', fontSize: '13px', color: '#475569', display: 'block', marginBottom: '6px' },
-    catInput: { width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }
+    approveBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#16a34a', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
+    requestBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#8b5cf6', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
+    suspendBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f59e0b', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
+    deleteBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#dc2626', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }
 };
 
 export default AdminDashboard;
