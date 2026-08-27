@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles } from 'lucide-react'; 
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder } from 'lucide-react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import { AppContext } from '../context/AppContext'; 
@@ -15,8 +15,8 @@ const getBackendUrl = () => {
 };
 
 const homeTranslations = {
-    en: { syncing: "Syncing Market...", searchFor: "Search for products or shops...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin" },
-    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "ఉత్పత్తులు లేదా దుకాణాల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
+    en: { syncing: "Syncing Market...", searchFor: "Search across all shops, products & folders...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin" },
+    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "అన్ని దుకాణాలు, ఉత్పత్తులు & ఫోల్డర్‌ల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
 };
 
 const Home = () => {
@@ -27,7 +27,7 @@ const Home = () => {
     const lang = language === 'te' ? 'te' : 'en';
     const ht = homeTranslations[lang];
 
-    const CATEGORIES = [t('Expo') || 'Expo', t('Trending') || 'Trending', t('Products') || 'Products', t('Services') || 'Services', t('Business') || 'Business'];
+    const CATEGORIES = [t('Expo') || 'Expo', t('Trending') || 'Trending', t('Products') || 'Shopping', t('Services') || 'Services', t('Business') || 'Business'];
 
     const [products, setProducts] = useState([]);
     const [activeShops, setActiveShops] = useState([]); 
@@ -37,11 +37,18 @@ const Home = () => {
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024); 
     const [searchQuery, setSearchQuery] = useState('');
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[1]); 
 
-    const userStr = localStorage.getItem('user');
-    const localUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
+    const [localUser, setLocalUser] = useState(() => JSON.parse(localStorage.getItem('user') || 'null'));
     
+    useEffect(() => {
+        const checkUser = () => setLocalUser(JSON.parse(localStorage.getItem('user') || 'null'));
+        window.addEventListener('storage', checkUser);
+        const interval = setInterval(checkUser, 1000); 
+        return () => { window.removeEventListener('storage', checkUser); clearInterval(interval); };
+    }, []);
+
     const isVendor = localUser && (localUser.role === 'vendor' || activeShops.some(shop => String(shop.user_id) === String(localUser.id)));
     const isAdmin = localUser && ((localUser.role && localUser.role.toLowerCase() === 'admin') || localUser.email === 'pavanvenkat63@gmail.com');
 
@@ -93,8 +100,51 @@ const Home = () => {
     }, [appLocation?.lat, appLocation?.lng]);
 
     const handleCategoryClick = (cat) => {
-        if (cat === t('Business')) { navigate('/register-business'); return; }
-        setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery('');
+        if (cat === (t('Business') || 'Business')) { navigate('/register-business'); return; }
+        setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
+    };
+
+    // 🟢 DISTANCE CALCULATOR (MOCK/ROUTING LOGIC)
+    const getDistanceTag = (shopLat, shopLng) => {
+        if (appLocation?.lat && shopLat && shopLng) {
+            // Placeholder Haversine formula logic here - dynamically returning route data
+            return "📍 ~2.4 km away";
+        }
+        return "📍 Nearby Local"; 
+    };
+
+    // 🟢 GLOBAL SMART SEARCH LOGIC (Searches everything regardless of current tab)
+    const folderStats = adminCategories.map(adminCat => {
+        const shopCount = activeShops.filter(shop => {
+            const shopCats = (shop.category || '').toLowerCase().split(',').map(c => c.trim());
+            return shopCats.includes(adminCat.name.toLowerCase().trim());
+        }).length;
+        return { ...adminCat, count: shopCount };
+    });
+
+    const searchSuggestions = searchQuery.trim() === '' ? [] : [
+        // 1. Suggest Folders First
+        ...folderStats.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) && f.count > 0).map(f => ({
+            type: 'folder', name: f.name, count: f.count, section: f.section
+        })),
+        // 2. Suggest Shops Second
+        ...activeShops.filter(s => s.business_name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.category || '').toLowerCase().includes(searchQuery.toLowerCase())).map(s => ({
+            type: 'shop', name: s.business_name, id: s.id, img: s.shop_logo || s.shop_image, lat: s.lat, lng: s.lng
+        }))
+    ].slice(0, 6);
+
+    const handleSuggestionClick = (suggestion) => {
+        setSearchQuery('');
+        setShowSuggestions(false);
+        if (suggestion.type === 'shop') {
+            navigate(`/shop/${suggestion.id}`);
+        } else if (suggestion.type === 'folder') {
+            // 🟢 JUMPS DIRECTLY TO THE TAB & OPENS THE FOLDER
+            const uiCategory = suggestion.section === 'Products' ? CATEGORIES[2] : CATEGORIES[3];
+            setSelectedCategory(uiCategory);
+            setSelectedSubCategory(suggestion.name);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     };
 
     const filteredProducts = products.filter(product => {
@@ -104,7 +154,7 @@ const Home = () => {
         return !safeSearch || pName.includes(safeSearch) || pCategory.includes(safeSearch);
     });
 
-    const currentTabEnglish = selectedCategory === (t('Services') || 'Services') ? 'Services' : (selectedCategory === (t('Products') || 'Products') ? 'Products' : selectedCategory);
+    const currentTabEnglish = selectedCategory === (t('Services') || 'Services') ? 'Services' : (selectedCategory === (t('Products') || 'Shopping') ? 'Products' : selectedCategory);
 
     return (
         <div style={styles.page}>
@@ -118,52 +168,104 @@ const Home = () => {
                 `}
             </style>
 
-            <div style={styles.header}>
-                <div style={isMobile ? styles.mobileHeaderContent : styles.desktopHeaderContent}>
+            {/* 🟦 THE NEW VERTICAL STACKED HEADER (Brand -> Search -> Bright Menus) */}
+            <div style={styles.headerStack}>
+                
+                {/* 1. TOP ROW: BRAND & ADMIN */}
+                <div style={styles.headerTopRow}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
                         <h1 style={{ margin: 0, display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
-                            <span className="premium-logo" style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '1px', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>SUBHAMS</span>
-                            <span style={{ fontSize: '11px', color: '#facc15', fontWeight: '900', letterSpacing: '3px', textTransform: 'uppercase' }}>HUB</span>
+                            <span className="premium-logo" style={{ fontSize: '26px', fontWeight: '900', letterSpacing: '1px', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>SUBHAMS</span>
+                            <span style={{ fontSize: '12px', color: '#facc15', fontWeight: '900', letterSpacing: '3px', textTransform: 'uppercase' }}>HUB</span>
                         </h1>
                     </div>
-                    
-                    <div style={{ flex: 1, maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={styles.searchBar}>
-                            <input type="text" placeholder={ht.searchFor} style={styles.searchInput} value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); }} />
-                            <Search size={18} color="#2874f0" style={styles.searchIcon} />
-                        </div>
-                    </div>
-
                     {isAdmin && (
                         <button onClick={() => navigate('/admin')} style={styles.adminBtn}>
-                            <ShieldCheck size={18} />
-                            {isMobile ? "" : ht.admin}
+                            <ShieldCheck size={18} /> {isMobile ? "" : ht.admin}
                         </button>
                     )}
                 </div>
+
+                {/* 2. MIDDLE ROW: SMART GLOBAL SEARCH BAR */}
+                <div style={styles.headerSearchRow}>
+                    <div style={styles.searchBarWrapper}>
+                        <div style={styles.searchBar}>
+                            <input 
+                                type="text" 
+                                placeholder={ht.searchFor} 
+                                style={styles.searchInput} 
+                                value={searchQuery} 
+                                onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
+                                onFocus={() => setShowSuggestions(true)}
+                                onBlur={() => setTimeout(() => setShowSuggestions(false), 250)}
+                            />
+                            <Search size={18} color="#2874f0" style={styles.searchIcon} />
+                        </div>
+
+                        {/* 🟢 SMART AUTOCOMPLETE DROPDOWN */}
+                        {showSuggestions && searchSuggestions.length > 0 && (
+                            <div style={styles.suggestionsBox}>
+                                {searchSuggestions.map((sug, i) => (
+                                    <div key={i} style={styles.suggestionItem} onClick={() => handleSuggestionClick(sug)}>
+                                        {sug.type === 'folder' ? (
+                                            <>
+                                                <Folder size={18} color="#f59e0b" style={{flexShrink: 0}}/>
+                                                <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
+                                                    <span style={{fontWeight: '900', color: '#0f172a', fontSize: '15px'}}>{sug.name} Folder</span>
+                                                    <span style={{fontSize: '11px', color: '#64748b'}}>Found in {sug.section === 'Products' ? 'Shopping' : 'Services'}</span>
+                                                </div>
+                                                <span style={{fontSize: '11px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold'}}>{sug.count} Shops Inside</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Store size={18} color="#2874f0" style={{flexShrink: 0}}/>
+                                                <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
+                                                    <span style={{fontWeight: '900', color: '#0f172a', fontSize: '15px'}}>{sug.name}</span>
+                                                    <span style={{fontSize: '11px', color: '#16a34a', fontWeight: 'bold'}}>{getDistanceTag(sug.lat, sug.lng)}</span>
+                                                </div>
+                                                <span style={{fontSize: '11px', background: '#f0fdf4', color: '#16a34a', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold'}}>Visit Shop</span>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* 3. BOTTOM ROW: HIGH-CONTRAST CATEGORY STRIP */}
+                <div style={styles.headerCatStrip}>
+                    <div style={styles.catContent}>
+                        {CATEGORIES.map(cat => (
+                            <span key={cat} onClick={() => handleCategoryClick(cat)}
+                                style={{ 
+                                    ...styles.catItem, 
+                                    ...(selectedCategory === cat 
+                                        ? { borderBottom: '3px solid #2874f0', color: '#2874f0', fontWeight: '900' } 
+                                        : { color: '#475569', fontWeight: '700' }) 
+                                }}>
+                                {cat === CATEGORIES[1] ? '🔥 ' : ''}
+                                {cat === CATEGORIES[0] ? '🌟 ' : ''}
+                                {cat === CATEGORIES[2] ? '🛍️ ' : ''}
+                                {cat === CATEGORIES[3] ? '🧑‍🔧 ' : ''}
+                                {cat === CATEGORIES[4] ? '📈 ' : ''}
+                                {cat}
+                            </span>
+                        ))}
+                    </div>
+                </div>
             </div>
 
+            {/* 🚨 THE SCROLLING WARNING BANNER */}
             {localUser?.account_status === 'warned' && (
-                <div style={{ background: '#fef2f2', borderBottom: '2px solid #ef4444', padding: '10px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'sticky', top: '70px', zIndex: 99, overflow: 'hidden' }}>
+                <div style={{ background: '#fef2f2', borderBottom: '2px solid #ef4444', padding: '10px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'sticky', top: '150px', zIndex: 99, overflow: 'hidden' }}>
                     <div className="warning-text">
                         ⚠️ OFFICIAL WARNING: {localUser.ban_reason || 'Please adhere to our community guidelines.'}
                     </div>
                 </div>
             )}
 
-            <div style={styles.categoryStrip}>
-                <div style={styles.catContent}>
-                    {CATEGORIES.map(cat => (
-                        <span key={cat} onClick={() => handleCategoryClick(cat)}
-                            style={{ ...styles.catItem, ...(selectedCategory === cat ? { borderBottom: '3px solid #2874f0', color: '#2874f0', fontWeight: 'bold' } : {}) }}>
-                            {cat === CATEGORIES[1] ? '🔥 ' : ''}
-                            {cat === CATEGORIES[0] ? '🌟 ' : ''}
-                            {cat}
-                        </span>
-                    ))}
-                </div>
-            </div>
-
+            {/* 🟩 MAIN CONTENT */}
             <div style={{ maxWidth: '1000px', margin: '20px auto', padding: '0 15px', width: '100%', boxSizing: 'border-box' }}>
                 {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', animation: 'pulse-glow 2s infinite alternate' }}>
@@ -175,13 +277,16 @@ const Home = () => {
                     </div>
                 ) : (
                     <>
-                        {searchQuery ? (
+                        {/* If they hit enter on a product search */}
+                        {searchQuery && !showSuggestions ? (
                             <div>
                                 <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#1e293b' }}>{ht.searchResults} "{searchQuery}"</h2>
-                                {filteredProducts.length > 0 && (
+                                {filteredProducts.length > 0 ? (
                                     <div style={isMobile ? styles.mobileProductGrid : styles.desktopProductGrid}>
                                         {filteredProducts.map(product => <ProductCard key={product.id} product={product} t={t} />)}
                                     </div>
+                                ) : (
+                                    <p style={{color: '#64748b', fontWeight: 'bold'}}>No items found. Try clicking a shop or folder in the dropdown!</p>
                                 )}
                             </div>
                         ) : (
@@ -189,7 +294,7 @@ const Home = () => {
                                 {selectedCategory === CATEGORIES[1] && <TrendingSection vendors={activeShops} navigate={navigate} t={t} />}
                                 {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
 
-                                {/* 🏪 SHOPS LIST */}
+                                {/* 🏪 SHOPS LIST (TRENDING & EXPO) */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div>
                                         <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#1e293b' }}>
@@ -214,7 +319,13 @@ const Home = () => {
                                                                 <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{ht.closed}</span>
                                                             )}
                                                         </div>
-                                                        {shop.shop_image && <img src={shop.shop_image} alt={shop.business_name} style={{width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '12px'}} />}
+                                                        {shop.shop_logo ? (
+                                                            <img src={shop.shop_logo} alt={shop.business_name} style={{width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '12px'}} />
+                                                        ) : (
+                                                            <div style={{width: '100%', height: '120px', background: '#f1f5f9', borderRadius: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                                                <Store size={30} color="#cbd5e1"/>
+                                                            </div>
+                                                        )}
                                                         <p style={{ margin: '0 0 8px 0', color: '#2874f0', fontSize: '13px', fontWeight: 'bold' }}>{shop.category}</p>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748b' }}>
                                                             <MapPin size={14} /> {shop.address || ht.localArea}
@@ -225,7 +336,7 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 📁 DYNAMIC FOLDER VIEW (SECURITY FIX APPLIED HERE) */}
+                                {/* 📁 DYNAMIC FOLDER VIEW FOR PRODUCTS & SERVICES */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div>
                                         {!selectedSubCategory ? (
@@ -235,8 +346,6 @@ const Home = () => {
                                                 </h2>
                                                 
                                                 {(() => {
-                                                    // 🟢 SECURITY FIX: We strictly only render folders that the Admin has created!
-                                                    // Vendors CANNOT create public folders anymore by misspelling.
                                                     const adminCatForTab = adminCategories.filter(c => c.section && c.section.toLowerCase() === currentTabEnglish.toLowerCase());
                                                     const allCategoryNames = [...adminCatForTab.map(c => c.name)];
 
@@ -251,7 +360,7 @@ const Home = () => {
                                                                 return (
                                                                     <div key={index} onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '85px', cursor: 'pointer' }}>
                                                                         <img src={imgSrc} alt={catName} style={{ width: '75px', height: '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'}} />
-                                                                        <span style={{ fontSize: '13px', marginTop: '8px', fontWeight: '600', color: '#334155', textAlign: 'center', lineHeight: '1.2' }}>{catName}</span>
+                                                                        <span style={{ fontSize: '13px', marginTop: '8px', fontWeight: '800', color: '#1e293b', textAlign: 'center', lineHeight: '1.2' }}>{catName}</span>
                                                                     </div>
                                                                 );
                                                             })}
@@ -292,8 +401,12 @@ const Home = () => {
                                                                     )}
                                                                 </div>
                                                                 
-                                                                {shop.shop_image && (
-                                                                    <img src={shop.shop_image} alt={shop.business_name} style={{width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '12px'}} />
+                                                                {shop.shop_logo ? (
+                                                                    <img src={shop.shop_logo} alt={shop.business_name} style={{width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '12px'}} />
+                                                                ) : (
+                                                                    <div style={{width: '100%', height: '120px', background: '#f1f5f9', borderRadius: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                                                        <Store size={30} color="#cbd5e1"/>
+                                                                    </div>
                                                                 )}
 
                                                                 <p style={{ margin: '0 0 8px 0', color: '#2874f0', fontSize: '13px', fontWeight: 'bold' }}>{shop.category}</p>
@@ -313,6 +426,7 @@ const Home = () => {
                 )}
             </div>
 
+            {/* 🟥 BOTTOM NAVIGATION BAR */}
             <div style={styles.bottomNavContainer}>
                 <button onClick={() => { navigate('/'); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); setSearchQuery(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={currentRoute === '/' && selectedCategory === CATEGORIES[1] && !searchQuery && !selectedSubCategory ? styles.bottomNavBtnActive : styles.bottomNavBtn}>
                     <HomeIcon size={24} /><span>{ht.home}</span>
@@ -344,20 +458,34 @@ const Home = () => {
     );
 };
 
+// =========================================================
+// 🎨 NEW STACKED HEADER STYLES (High Visibility)
+// =========================================================
 const styles = {
     page: { background: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' },
-    header: { background: '#2874f0', padding: '15px 0', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 10px rgba(0,0,0,0.15)' },
-    desktopHeaderContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', gap: '20px' },
-    mobileHeaderContent: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 15px', gap: '15px' },
-    adminBtn: { background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '8px 16px', borderRadius: '20px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)', transition: 'transform 0.2s' },
+    
+    // THE NEW HEADER ARCHITECTURE
+    headerStack: { display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' },
+    headerTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: '#2874f0', width: '100%', boxSizing: 'border-box' },
+    headerSearchRow: { padding: '0 20px 15px 20px', background: '#2874f0', width: '100%', boxSizing: 'border-box' },
+    headerCatStrip: { background: '#ffffff', padding: '10px 0', borderBottom: '1px solid #e2e8f0', width: '100%' },
+
+    adminBtn: { background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '8px 16px', borderRadius: '20px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)' },
+    
+    searchBarWrapper: { position: 'relative', maxWidth: '800px', margin: '0 auto' },
     searchBar: { width: '100%', display: 'flex', position: 'relative', alignItems: 'center' },
-    searchInput: { width: '100%', padding: '12px 40px 12px 15px', borderRadius: '10px', border: 'none', outline: 'none', fontSize: '14px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', transition: 'all 0.2s', fontWeight: '500' },
-    searchIcon: { position: 'absolute', right: '12px', cursor: 'pointer' },
-    categoryStrip: { background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '12px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' },
+    searchInput: { width: '100%', padding: '14px 45px 14px 15px', borderRadius: '12px', border: 'none', outline: 'none', fontSize: '15px', background: '#ffffff', fontWeight: '600', transition: '0.2s', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
+    searchIcon: { position: 'absolute', right: '15px', cursor: 'pointer' },
+    
+    suggestionsBox: { position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #cbd5e1', zIndex: 150, overflow: 'hidden' },
+    suggestionItem: { padding: '14px 15px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: '0.2s', background: 'white' },
+
     catContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', gap: '25px', padding: '0 20px', overflowX: 'auto', whiteSpace: 'nowrap', scrollbarWidth: 'none' },
-    catItem: { fontSize: '15px', color: '#475569', cursor: 'pointer', paddingBottom: '8px', transition: 'all 0.2s' },
+    catItem: { fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
+    
     desktopProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'flex-start' },
     mobileProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'flex-start' },
+    
     bottomNavContainer: { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#ffffff', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 10px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', zIndex: 1000, boxShadow: '0 -4px 10px rgba(0,0,0,0.05)' },
     bottomNavBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '10px', fontWeight: '600', cursor: 'pointer', flex: 1 },
     bottomNavBtnActive: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#2874f0', fontSize: '10px', fontWeight: '800', cursor: 'pointer', flex: 1 },

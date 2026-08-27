@@ -212,7 +212,15 @@ const AdminDashboard = () => {
     
     const filteredUsers = allUsers.filter(u => u.username?.toLowerCase().includes(safeSearch) || u.phone?.includes(safeSearch) || u.email?.toLowerCase().includes(safeSearch));
 
-    const TYPE_OPTIONS = ["Trending", "Products", "Services", "Expo"];
+    // 🟢 UPDATED EMOJIS FOR TABS
+    const TYPE_OPTIONS = ["Trending", "Products", "Services", "Expo", "Business"];
+    const displayNames = {
+        'Products': '🛍️ Shopping',
+        'Services': '🧑‍🔧 Services',
+        'Business': '📈 Business',
+        'Trending': '🔥 Trending',
+        'Expo': '🌟 Expo'
+    };
 
     const activeShops = vendors.filter(v => v.is_approved === true);
     let extractedVendorCategories = [];
@@ -361,8 +369,9 @@ const AdminDashboard = () => {
                                 <div>
                                     <label style={styles.catLabel}>Assign to Section</label>
                                     <select style={styles.catInput} value={newCatSection} onChange={(e) => setNewCatSection(e.target.value)}>
-                                        <option value="Products">Products Tab</option>
+                                        <option value="Products">Shopping Tab</option>
                                         <option value="Services">Services Tab</option>
+                                        <option value="Business">Business Tab</option>
                                     </select>
                                 </div>
                                 <div>
@@ -403,16 +412,17 @@ const AdminDashboard = () => {
                                         <div key={vendor.id} style={isMobile ? styles.vendorBoxMobile : styles.vendorBoxDesktop}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                 
-                                                {/* 🟢 VIEW SHOP FRONTEND BUTTON INJECTED HERE */}
-                                                <h4 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    {vendor.business_name} 
-                                                    <button onClick={() => window.open(`/shop/${vendor.id}`, '_blank')} style={{...styles.iconBtn, background: '#eff6ff', color: '#2563eb'}} title="Open Shop Details"><ExternalLink size={16}/></button>
-                                                    <button onClick={() => handleAdminEdit(vendor)} style={styles.iconBtn} title="Edit Shop Info"><Edit size={16}/></button>
+                                                {/* 🟢 CLICKABLE SHOP NAME FOR ADMIN TO VIEW IT LIVE */}
+                                                <h4 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => window.open(`/shop/${vendor.id}`, '_blank')} title="Click to view live shop">
+                                                    {vendor.business_name} <ExternalLink size={18}/>
                                                 </h4>
 
-                                                <span style={{ fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '12px', background: vendor.is_approved ? '#dcfce7' : '#fef9c3', color: vendor.is_approved ? '#166534' : '#a16207' }}>
-                                                    {vendor.is_approved ? 'Live' : 'Pending'}
-                                                </span>
+                                                <div style={{display: 'flex', gap: '8px'}}>
+                                                    <button onClick={() => handleAdminEdit(vendor)} style={styles.iconBtn} title="Edit Shop Info"><Edit size={16}/></button>
+                                                    <span style={{ fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '12px', background: vendor.is_approved ? '#dcfce7' : '#fef9c3', color: vendor.is_approved ? '#166534' : '#a16207' }}>
+                                                        {vendor.is_approved ? 'Live' : 'Pending'}
+                                                    </span>
+                                                </div>
                                             </div>
 
                                             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px', background: '#ffffff', padding: '15px', borderRadius: '10px', border: '1px solid #cbd5e1', marginBottom: '15px' }}>
@@ -423,7 +433,42 @@ const AdminDashboard = () => {
                                                 <p style={styles.detailText}>📦 <strong>Categories:</strong> {vendor.category}</p>
                                                 <p style={styles.detailText}>🏬 <strong>Shop Type:</strong> {vendor.shop_type || 'Products'}</p>
                                             </div>
-                                                
+                                            
+                                            <div style={{ marginBottom: '15px', padding: '10px', background: 'white', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                                                <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <FolderSync size={12} /> Assign Home Screen Tabs:
+                                                </p>
+                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                    {TYPE_OPTIONS.map(type => {
+                                                        const isActive = currentTypes.includes(type);
+                                                        return (
+                                                            <button key={type} onClick={() => handleTypeToggle(vendor, type)}
+                                                                style={{
+                                                                    display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: 'none', transition: '0.2s',
+                                                                    background: isActive ? '#16a34a' : '#f1f5f9', color: isActive ? 'white' : '#64748b', boxShadow: isActive ? '0 2px 5px rgba(22,163,74,0.3)' : 'none'
+                                                                }}
+                                                            >
+                                                                {isActive && <CheckCircle size={12} />} 
+                                                                {displayNames[type] || type}
+                                                            </button>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* 🟢 SECURE VAULT - DOCUMENTS ARE FULLY VISIBLE HERE */}
+                                            <div style={styles.docBox}>
+                                                <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
+                                                    <Lock size={14}/> Secure Vault (ID Proofs & Evidence)
+                                                </span>
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                    {vendor.id_front_url && <a href={vendor.id_front_url} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Front ID <ExternalLink size={12} /></a>}
+                                                    {vendor.id_back_url && <a href={vendor.id_back_url} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Back ID <ExternalLink size={12} /></a>}
+                                                    {vendor.shop_image && <a href={vendor.shop_image} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Shop Photo <ExternalLink size={12} /></a>}
+                                                    {vendor.business_certificate && <a href={vendor.business_certificate} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Certificate <ExternalLink size={12} /></a>}
+                                                </div>
+                                            </div>
+
                                             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '10px' }}>
                                                 {activeTab === 'pending' ? (
                                                     <>
@@ -458,21 +503,18 @@ const styles = {
     title: { margin: 0, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '20px' },
     backBtn: { background: 'white', border: '1px solid #cbd5e1', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '13px' },
     errorBox: { textAlign: 'center', padding: '15px', color: '#dc2626', fontWeight: 'bold', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', marginBottom: '20px' },
-    
     statCard: { flex: 1, minWidth: '100px', padding: '15px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' },
-
     tabContainer: { display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '5px' },
     activeTab: { flex: 1, minWidth: '100px', padding: '12px', background: '#2874f0', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', fontSize: '12px' },
     inactiveTab: { flex: 1, minWidth: '100px', padding: '12px', background: '#e2e8f0', color: '#475569', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '12px' },
-    
     card: { background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0' },
     emptyBox: { textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b', fontWeight: 'bold' },
-    
     vendorBoxDesktop: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column' },
     vendorBoxMobile: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '15px', display: 'flex', flexDirection: 'column' },
     detailText: { margin: '0', fontSize: '13px', color: '#475569', padding: '5px 0' },
     iconBtn: { background: '#e2e8f0', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' },
-    
+    docBox: { background: '#eff6ff', padding: '15px', borderRadius: '12px', border: '1px solid #bfdbfe', marginBottom: '15px' },
+    docLink: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', background: '#ffffff', color: '#2563eb', padding: '6px 10px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', border: '1px solid #bfdbfe' },
     approveBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#16a34a', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
     requestBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#8b5cf6', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
     suspendBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f59e0b', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },

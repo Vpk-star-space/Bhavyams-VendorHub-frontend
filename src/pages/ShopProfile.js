@@ -25,7 +25,6 @@ const ShopProfile = () => {
     const [notifMenuOpen, setNotifMenuOpen] = useState(false);
     const [notifLevel, setNotifLevel] = useState('All');
 
-    // 🟢 FETCH ADMIN CATEGORIES FOR DATALIST SYNC
     const [adminCategories, setAdminCategories] = useState([]);
 
     const [showEditModal, setShowEditModal] = useState(false);
@@ -62,7 +61,6 @@ const ShopProfile = () => {
                     is_online: res.data.shop.is_online
                 });
 
-                // 🟢 FETCH CATEGORIES
                 const catRes = await axios.get(`${BACKEND_URL}/admin/categories`);
                 setAdminCategories(catRes.data || []);
 
@@ -97,6 +95,7 @@ const ShopProfile = () => {
             formData.append('shop_type', editForm.shop_type);
             formData.append('is_online', editForm.is_online);
             
+            // 🟢 ATTACH THE PUBLIC LOGO ONLY
             if (imageFile) {
                 formData.append('shop_logo', imageFile);
             }
@@ -135,6 +134,11 @@ const ShopProfile = () => {
     const isOwner = currentUser && shopData && (String(currentUser.id) === String(shopData.user_id));
     const dbShopType = shopData.shop_type || 'Products'; 
 
+    // 🟢 CRITICAL FIX: ONLY reads `shop_logo`. Never reads the secure `shop_image`.
+    const shopImageSrc = shopData.shop_logo 
+        ? `${shopData.shop_logo}?t=${new Date().getTime()}` 
+        : null;
+
     return (
         <div style={styles.page}>
             <div style={styles.navBar}>
@@ -152,8 +156,8 @@ const ShopProfile = () => {
             <div style={styles.profileContentWrapper}>
                 <div style={styles.avatarRow}>
                     <div style={styles.avatarContainer}>
-                        {(shopData.shop_image || shopData.shop_logo) ? (
-                            <img src={shopData.shop_image || shopData.shop_logo} alt="Shop Logo" style={styles.businessLogo} />
+                        {shopImageSrc ? (
+                            <img src={shopImageSrc} alt="Shop Logo" style={styles.businessLogo} />
                         ) : (
                             <div style={{...styles.businessLogo, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                 <Store size={40} color="#94a3b8" />
@@ -295,8 +299,6 @@ const ShopProfile = () => {
 
                             <div>
                                 <label style={styles.modalLabel}>Category / Industry</label>
-                                
-                                {/* 🟢 THE NEW DATALIST FOR SYNCING CATEGORIES */}
                                 <input 
                                     list="category-suggestions" 
                                     style={styles.input} 
@@ -317,8 +319,9 @@ const ShopProfile = () => {
                                 <div style={{ background: '#fffbeb', padding: '10px', borderRadius: '8px', border: '1px dashed #f59e0b', marginBottom: '10px' }}>
                                     <label style={{...styles.modalLabel, color: '#b45309'}}>👑 Admin Override: Assign Store Tab</label>
                                     <select style={styles.input} value={editForm.shop_type} onChange={e => setEditForm({...editForm, shop_type: e.target.value})}>
-                                        <option value="Products">🛒 Products & Retail</option>
-                                        <option value="Services">🛠️ Services & Bookings</option>
+                                        <option value="Products">🛍️ Shopping & Retail</option>
+                                        <option value="Services">🧑‍🔧 Services & Bookings</option>
+                                        <option value="Business">📈 Business & Enterprise</option>
                                         <option value="Promotions">📢 Promotions & Offers</option>
                                     </select>
                                 </div>
