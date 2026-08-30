@@ -4,6 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client'; 
 import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus, MessageSquare, Lock, Edit, UserX, Unlock, Clock, Ban, Search, Users, Store, User } from 'lucide-react';
 
+// 🟢 CLOUDINARY OPTIMIZER: Stops browser tracker blocks!
+const getOptimizedImage = (url) => {
+    if (!url) return null;
+    if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
+        return url.replace('/upload/', '/upload/q_auto,f_auto,w_400/');
+    }
+    return url; 
+};
+
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
@@ -23,14 +32,20 @@ const AdminDashboard = () => {
     const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
     const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://bhavyams-vendorhub-backend.onrender.com';
 
+    // 🟢 FIX: Local socket variable prevents React 18 from crashing WebSockets
     useEffect(() => {
-        const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-        socket.on('connect', () => console.log('🟢 Admin Live Sync Connected'));
+        const localSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+        localSocket.on('connect', () => console.log('🟢 Admin Live Sync Connected'));
         
-        socket.on('admin_refresh', () => {
+        localSocket.on('admin_refresh', () => {
             fetchVendors(); fetchCategories(); fetchAllUsers(); 
         });
-        return () => socket.disconnect(); 
+
+        return () => {
+            if (localSocket.connected) {
+                localSocket.disconnect();
+            }
+        };
     }, [SOCKET_URL]);
 
     useEffect(() => {
@@ -65,7 +80,6 @@ const AdminDashboard = () => {
 
     useEffect(() => { fetchVendors(); fetchCategories(); fetchAllUsers(); }, []);
 
-    // 🟢 SILENT POLLER FIX
     useEffect(() => {
         if (activeTab === 'security') {
             const interval = setInterval(() => { fetchAllUsers(); }, 15000);
@@ -212,7 +226,6 @@ const AdminDashboard = () => {
     
     const filteredUsers = allUsers.filter(u => u.username?.toLowerCase().includes(safeSearch) || u.phone?.includes(safeSearch) || u.email?.toLowerCase().includes(safeSearch));
 
-    // 🟢 UPDATED EMOJIS FOR TABS
     const TYPE_OPTIONS = ["Trending", "Products", "Services", "Expo", "Business"];
     const displayNames = {
         'Products': '🛍️ Shopping',
@@ -412,7 +425,6 @@ const AdminDashboard = () => {
                                         <div key={vendor.id} style={isMobile ? styles.vendorBoxMobile : styles.vendorBoxDesktop}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                 
-                                                {/* 🟢 CLICKABLE SHOP NAME FOR ADMIN TO VIEW IT LIVE */}
                                                 <h4 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => window.open(`/shop/${vendor.id}`, '_blank')} title="Click to view live shop">
                                                     {vendor.business_name} <ExternalLink size={18}/>
                                                 </h4>
@@ -456,16 +468,16 @@ const AdminDashboard = () => {
                                                 </div>
                                             </div>
 
-                                            {/* 🟢 SECURE VAULT - DOCUMENTS ARE FULLY VISIBLE HERE */}
+                                            {/* 🟢 CLOUDINARY OPTIMIZED VAULT IMAGES */}
                                             <div style={styles.docBox}>
                                                 <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
                                                     <Lock size={14}/> Secure Vault (ID Proofs & Evidence)
                                                 </span>
                                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                                    {vendor.id_front_url && <a href={vendor.id_front_url} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Front ID <ExternalLink size={12} /></a>}
-                                                    {vendor.id_back_url && <a href={vendor.id_back_url} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Back ID <ExternalLink size={12} /></a>}
-                                                    {vendor.shop_image && <a href={vendor.shop_image} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Shop Photo <ExternalLink size={12} /></a>}
-                                                    {vendor.business_certificate && <a href={vendor.business_certificate} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Certificate <ExternalLink size={12} /></a>}
+                                                    {vendor.id_front_url && <a href={getOptimizedImage(vendor.id_front_url)} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Front ID <ExternalLink size={12} /></a>}
+                                                    {vendor.id_back_url && <a href={getOptimizedImage(vendor.id_back_url)} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Back ID <ExternalLink size={12} /></a>}
+                                                    {vendor.shop_image && <a href={getOptimizedImage(vendor.shop_image)} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Shop Photo <ExternalLink size={12} /></a>}
+                                                    {vendor.business_certificate && <a href={getOptimizedImage(vendor.business_certificate)} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Certificate <ExternalLink size={12} /></a>}
                                                 </div>
                                             </div>
 

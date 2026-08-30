@@ -6,7 +6,6 @@ import axios from 'axios';
 import { io } from 'socket.io-client'; 
 import 'react-toastify/dist/ReactToastify.css';
 
-// 🟢 Global State Providers
 import { AppProvider } from './context/AppContext'; 
 import { CartProvider } from './context/CartContext'; 
 
@@ -34,7 +33,6 @@ function ScrollToTop() {
     return null;
 }
 
-// 🛡️ ULTRA-SECURE ADMIN GATEKEEPER
 const AdminRoute = ({ children }) => {
     const userStr = localStorage.getItem('user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
@@ -42,16 +40,16 @@ const AdminRoute = ({ children }) => {
     return isAdmin ? children : <Navigate to="/" replace />;
 };
 
-// 🛍️ LIGHTNING FAST BRANDED LOADER
 const PremiumLoader = ({ onComplete }) => {
     const [fadeOut, setFadeOut] = useState(false);
 
     useEffect(() => {
+        // 🟢 FIX: Dropped the artificial timer from 1500ms down to 400ms! No more fake "buffering"!
         const timer = setTimeout(() => {
             setFadeOut(true);
-            const exitTimer = setTimeout(() => { onComplete(); }, 500); 
+            const exitTimer = setTimeout(() => { onComplete(); }, 300); 
             return () => clearTimeout(exitTimer);
-        }, 1200);
+        }, 400);
 
         return () => clearTimeout(timer);
     }, [onComplete]);
@@ -85,13 +83,11 @@ function App() {
     const [isInstallable, setIsInstallable] = useState(false);
     const [timeLeft, setTimeLeft] = useState(''); 
 
-    // 🟢 FETCH LOGGED IN USER FOR SECURITY CHECKS
     const [currentUser, setCurrentUser] = useState(() => {
         const str = localStorage.getItem('user');
         return str && str !== 'undefined' ? JSON.parse(str) : null;
     });
 
-    // 🟢 SILENT BACKGROUND SYNC
     useEffect(() => {
         const syncStatus = async () => {
             const token = localStorage.getItem('token');
@@ -117,14 +113,14 @@ function App() {
         syncStatus();
     }, []); 
 
-    // 🟢 LIVE SOCKET CONNECTION FOR INSTANT BANS
     useEffect(() => {
         if (!currentUser) return;
         const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
         const SOCKET_URL = BACKEND_URL.replace('/api', '');
-        const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+        
+        const localSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
 
-        socket.on('force_logout', (data) => {
+        localSocket.on('force_logout', (data) => {
             if (String(data.userId) === String(currentUser.id)) {
                 const updatedUser = { ...currentUser };
                 
@@ -151,7 +147,12 @@ function App() {
                 localStorage.setItem('user', JSON.stringify(updatedUser));
             }
         });
-        return () => socket.disconnect();
+
+        return () => {
+            if (localSocket.connected) {
+                localSocket.disconnect();
+            }
+        };
     }, [currentUser?.id]);
 
     useEffect(() => {
@@ -171,7 +172,6 @@ function App() {
         };
     }, []); 
 
-    // 🟢 LIVE TICKING TIMER & ANTI-INFINITE REFRESH FIX
     useEffect(() => {
         if (currentUser?.account_status === 'temp_block' && currentUser?.ban_until) {
             const interval = setInterval(() => {
@@ -183,12 +183,10 @@ function App() {
                     setTimeLeft('Unblocking...');
                     clearInterval(interval);
                     
-                    // 🟢 FIX: UNLOCK INSTANTLY WITHOUT RELOADING
                     const activeUser = { ...currentUser, account_status: 'active', ban_reason: null, ban_until: null };
                     setCurrentUser(activeUser);
                     localStorage.setItem('user', JSON.stringify(activeUser));
                     
-                    // Silently clear backend
                     const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
                     axios.get(`${BACKEND_URL}/admin/my-security-status`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).catch(()=>{});
                 } else {
@@ -199,7 +197,7 @@ function App() {
                     let timeString = '';
                     if (d > 0) timeString += `${d}d `;
                     if (h > 0) timeString += `${h}h `;
-                    timeString += `${m}m${s}s`;
+                    timeString += `${m}m ${s}s`;
                     setTimeLeft(timeString);
                 }
             }, 1000);
@@ -222,12 +220,7 @@ function App() {
         return <PremiumLoader onComplete={handleAppReady} />;
     }
 
-    // =====================================================================
-    // 🛡️ GLOBAL FULL-SCREEN LOCKS (TEMP & PERMA BAN ONLY)
-    // =====================================================================
     if (currentUser && currentUser.account_status) {
-        
-        // TEMPORARY TIME-BASED BLOCK
         if (currentUser.account_status === 'temp_block') {
             return (
                 <div style={lockStyles.page}>
@@ -250,7 +243,6 @@ function App() {
             );
         }
 
-        // PERMANENT BAN
         if (currentUser.account_status === 'perma_banned') {
             return (
                 <div style={{...lockStyles.page, background: '#fef2f2'}}>
@@ -268,9 +260,6 @@ function App() {
         }
     }
 
-    // =====================================================================
-    // 🌐 NORMAL APP RENDER 
-    // =====================================================================
     return (
         <GoogleOAuthProvider clientId={googleClientId}>
             <AppProvider>
@@ -327,7 +316,6 @@ function App() {
     );
 }
 
-// 🟢 NEW MOBILE-PERFECT LOCK STYLES
 const lockStyles = {
     page: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8fafc', padding: '20px', fontFamily: 'Inter, sans-serif' },
     card: { background: 'white', padding: '30px 20px', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px', textAlign: 'center', boxSizing: 'border-box' },

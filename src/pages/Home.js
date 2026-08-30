@@ -15,8 +15,8 @@ const getBackendUrl = () => {
 };
 
 const homeTranslations = {
-    en: { syncing: "Syncing Market...", searchFor: "Search across all shops, products & folders...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin" },
-    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "అన్ని దుకాణాలు, ఉత్పత్తులు & ఫోల్డర్‌ల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
+    en: { syncing: "Syncing Market...", searchFor: "Search across all shops, folders & items...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin" },
+    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "అన్ని దుకాణాలు, వస్తువులు & ఫోల్డర్‌ల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
 };
 
 const Home = () => {
@@ -27,7 +27,7 @@ const Home = () => {
     const lang = language === 'te' ? 'te' : 'en';
     const ht = homeTranslations[lang];
 
-    const CATEGORIES = [t('Expo') || 'Expo', t('Trending') || 'Trending', t('Products') || 'Shopping', t('Services') || 'Services', t('Business') || 'Business'];
+    const CATEGORIES = [t('Expo') || 'Expo', t('Trending') || 'Trending', t('Shopping') || 'Shopping', t('Services') || 'Services', t('Business') || 'Business'];
 
     const [products, setProducts] = useState([]);
     const [activeShops, setActiveShops] = useState([]); 
@@ -104,16 +104,11 @@ const Home = () => {
         setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
     };
 
-    // 🟢 DISTANCE CALCULATOR (MOCK/ROUTING LOGIC)
     const getDistanceTag = (shopLat, shopLng) => {
-        if (appLocation?.lat && shopLat && shopLng) {
-            // Placeholder Haversine formula logic here - dynamically returning route data
-            return "📍 ~2.4 km away";
-        }
+        if (appLocation?.lat && shopLat && shopLng) { return "📍 ~2.4 km away"; }
         return "📍 Nearby Local"; 
     };
 
-    // 🟢 GLOBAL SMART SEARCH LOGIC (Searches everything regardless of current tab)
     const folderStats = adminCategories.map(adminCat => {
         const shopCount = activeShops.filter(shop => {
             const shopCats = (shop.category || '').toLowerCase().split(',').map(c => c.trim());
@@ -123,11 +118,9 @@ const Home = () => {
     });
 
     const searchSuggestions = searchQuery.trim() === '' ? [] : [
-        // 1. Suggest Folders First
         ...folderStats.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) && f.count > 0).map(f => ({
             type: 'folder', name: f.name, count: f.count, section: f.section
         })),
-        // 2. Suggest Shops Second
         ...activeShops.filter(s => s.business_name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.category || '').toLowerCase().includes(searchQuery.toLowerCase())).map(s => ({
             type: 'shop', name: s.business_name, id: s.id, img: s.shop_logo || s.shop_image, lat: s.lat, lng: s.lng
         }))
@@ -139,7 +132,6 @@ const Home = () => {
         if (suggestion.type === 'shop') {
             navigate(`/shop/${suggestion.id}`);
         } else if (suggestion.type === 'folder') {
-            // 🟢 JUMPS DIRECTLY TO THE TAB & OPENS THE FOLDER
             const uiCategory = suggestion.section === 'Products' ? CATEGORIES[2] : CATEGORIES[3];
             setSelectedCategory(uiCategory);
             setSelectedSubCategory(suggestion.name);
@@ -154,7 +146,7 @@ const Home = () => {
         return !safeSearch || pName.includes(safeSearch) || pCategory.includes(safeSearch);
     });
 
-    const currentTabEnglish = selectedCategory === (t('Services') || 'Services') ? 'Services' : (selectedCategory === (t('Products') || 'Shopping') ? 'Products' : selectedCategory);
+    const currentTabEnglish = selectedCategory === (t('Services') || 'Services') ? 'Services' : (selectedCategory === (t('Shopping') || 'Shopping') ? 'Products' : selectedCategory);
 
     return (
         <div style={styles.page}>
@@ -165,13 +157,12 @@ const Home = () => {
                     @keyframes pulse-glow { 0% { text-shadow: 0 0 10px rgba(250, 204, 21, 0.4); } 100% { text-shadow: 0 0 25px rgba(250, 204, 21, 0.8); } }
                     @keyframes scroll-left { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
                     .warning-text { display: inline-block; white-space: nowrap; animation: scroll-left 15s linear infinite; color: #b91c1c; font-weight: 900; font-size: 15px; letter-spacing: 1px; }
+                    .hide-scroll::-webkit-scrollbar { display: none; }
+                    .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
                 `}
             </style>
 
-            {/* 🟦 THE NEW VERTICAL STACKED HEADER (Brand -> Search -> Bright Menus) */}
             <div style={styles.headerStack}>
-                
-                {/* 1. TOP ROW: BRAND & ADMIN */}
                 <div style={styles.headerTopRow}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
                         <h1 style={{ margin: 0, display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
@@ -186,13 +177,12 @@ const Home = () => {
                     )}
                 </div>
 
-                {/* 2. MIDDLE ROW: SMART GLOBAL SEARCH BAR */}
                 <div style={styles.headerSearchRow}>
                     <div style={styles.searchBarWrapper}>
                         <div style={styles.searchBar}>
                             <input 
                                 type="text" 
-                                placeholder={ht.searchFor} 
+                                placeholder={selectedSubCategory ? `Search in ${selectedSubCategory}...` : ht.searchFor} 
                                 style={styles.searchInput} 
                                 value={searchQuery} 
                                 onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
@@ -202,7 +192,6 @@ const Home = () => {
                             <Search size={18} color="#2874f0" style={styles.searchIcon} />
                         </div>
 
-                        {/* 🟢 SMART AUTOCOMPLETE DROPDOWN */}
                         {showSuggestions && searchSuggestions.length > 0 && (
                             <div style={styles.suggestionsBox}>
                                 {searchSuggestions.map((sug, i) => (
@@ -233,8 +222,7 @@ const Home = () => {
                     </div>
                 </div>
 
-                {/* 3. BOTTOM ROW: HIGH-CONTRAST CATEGORY STRIP */}
-                <div style={styles.headerCatStrip}>
+                <div style={styles.headerCatStrip} className="hide-scroll">
                     <div style={styles.catContent}>
                         {CATEGORIES.map(cat => (
                             <span key={cat} onClick={() => handleCategoryClick(cat)}
@@ -256,7 +244,6 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* 🚨 THE SCROLLING WARNING BANNER */}
             {localUser?.account_status === 'warned' && (
                 <div style={{ background: '#fef2f2', borderBottom: '2px solid #ef4444', padding: '10px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'sticky', top: '150px', zIndex: 99, overflow: 'hidden' }}>
                     <div className="warning-text">
@@ -265,7 +252,6 @@ const Home = () => {
                 </div>
             )}
 
-            {/* 🟩 MAIN CONTENT */}
             <div style={{ maxWidth: '1000px', margin: '20px auto', padding: '0 15px', width: '100%', boxSizing: 'border-box' }}>
                 {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', animation: 'pulse-glow 2s infinite alternate' }}>
@@ -273,11 +259,9 @@ const Home = () => {
                             <span className="premium-logo" style={{ fontSize: '32px', fontWeight: '900', letterSpacing: '2px' }}>SUBHAMS</span>
                             <span style={{ fontSize: '14px', color: '#facc15', fontWeight: '900', letterSpacing: '4px' }}>HUB</span>
                         </h1>
-                        <p style={{marginTop: '15px', color: '#94a3b8', fontWeight: 'bold', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase'}}>{ht.syncing}</p>
                     </div>
                 ) : (
                     <>
-                        {/* If they hit enter on a product search */}
                         {searchQuery && !showSuggestions ? (
                             <div>
                                 <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#1e293b' }}>{ht.searchResults} "{searchQuery}"</h2>
@@ -294,7 +278,6 @@ const Home = () => {
                                 {selectedCategory === CATEGORIES[1] && <TrendingSection vendors={activeShops} navigate={navigate} t={t} />}
                                 {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
 
-                                {/* 🏪 SHOPS LIST (TRENDING & EXPO) */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div>
                                         <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#1e293b' }}>
@@ -319,13 +302,16 @@ const Home = () => {
                                                                 <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{ht.closed}</span>
                                                             )}
                                                         </div>
+                                                        
+                                                        {/* 🟢 FIX: ADDED crossOrigin AND referrerPolicy TO STOP TRACKING WARNINGS */}
                                                         {shop.shop_logo ? (
-                                                            <img src={shop.shop_logo} alt={shop.business_name} style={{width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '12px'}} />
+                                                            <img src={shop.shop_logo} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '12px'}} />
                                                         ) : (
                                                             <div style={{width: '100%', height: '120px', background: '#f1f5f9', borderRadius: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                                                 <Store size={30} color="#cbd5e1"/>
                                                             </div>
                                                         )}
+
                                                         <p style={{ margin: '0 0 8px 0', color: '#2874f0', fontSize: '13px', fontWeight: 'bold' }}>{shop.category}</p>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748b' }}>
                                                             <MapPin size={14} /> {shop.address || ht.localArea}
@@ -336,7 +322,6 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 📁 DYNAMIC FOLDER VIEW FOR PRODUCTS & SERVICES */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div>
                                         {!selectedSubCategory ? (
@@ -359,7 +344,8 @@ const Home = () => {
 
                                                                 return (
                                                                     <div key={index} onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '85px', cursor: 'pointer' }}>
-                                                                        <img src={imgSrc} alt={catName} style={{ width: '75px', height: '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'}} />
+                                                                        {/* 🟢 FIX: Added Tracker block attributes */}
+                                                                        <img src={imgSrc} alt={catName} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '75px', height: '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'}} />
                                                                         <span style={{ fontSize: '13px', marginTop: '8px', fontWeight: '800', color: '#1e293b', textAlign: 'center', lineHeight: '1.2' }}>{catName}</span>
                                                                     </div>
                                                                 );
@@ -401,8 +387,9 @@ const Home = () => {
                                                                     )}
                                                                 </div>
                                                                 
+                                                                {/* 🟢 FIX: Added Tracker block attributes */}
                                                                 {shop.shop_logo ? (
-                                                                    <img src={shop.shop_logo} alt={shop.business_name} style={{width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '12px'}} />
+                                                                    <img src={shop.shop_logo} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '12px'}} />
                                                                 ) : (
                                                                     <div style={{width: '100%', height: '120px', background: '#f1f5f9', borderRadius: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                                                         <Store size={30} color="#cbd5e1"/>
@@ -426,7 +413,6 @@ const Home = () => {
                 )}
             </div>
 
-            {/* 🟥 BOTTOM NAVIGATION BAR */}
             <div style={styles.bottomNavContainer}>
                 <button onClick={() => { navigate('/'); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); setSearchQuery(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={currentRoute === '/' && selectedCategory === CATEGORIES[1] && !searchQuery && !selectedSubCategory ? styles.bottomNavBtnActive : styles.bottomNavBtn}>
                     <HomeIcon size={24} /><span>{ht.home}</span>
@@ -458,34 +444,23 @@ const Home = () => {
     );
 };
 
-// =========================================================
-// 🎨 NEW STACKED HEADER STYLES (High Visibility)
-// =========================================================
 const styles = {
     page: { background: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' },
-    
-    // THE NEW HEADER ARCHITECTURE
     headerStack: { display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' },
     headerTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: '#2874f0', width: '100%', boxSizing: 'border-box' },
     headerSearchRow: { padding: '0 20px 15px 20px', background: '#2874f0', width: '100%', boxSizing: 'border-box' },
-    headerCatStrip: { background: '#ffffff', padding: '10px 0', borderBottom: '1px solid #e2e8f0', width: '100%' },
-
+    headerCatStrip: { background: '#ffffff', borderBottom: '1px solid #e2e8f0', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
     adminBtn: { background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '8px 16px', borderRadius: '20px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)' },
-    
     searchBarWrapper: { position: 'relative', maxWidth: '800px', margin: '0 auto' },
     searchBar: { width: '100%', display: 'flex', position: 'relative', alignItems: 'center' },
     searchInput: { width: '100%', padding: '14px 45px 14px 15px', borderRadius: '12px', border: 'none', outline: 'none', fontSize: '15px', background: '#ffffff', fontWeight: '600', transition: '0.2s', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
     searchIcon: { position: 'absolute', right: '15px', cursor: 'pointer' },
-    
     suggestionsBox: { position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #cbd5e1', zIndex: 150, overflow: 'hidden' },
     suggestionItem: { padding: '14px 15px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: '0.2s', background: 'white' },
-
-    catContent: { maxWidth: '1240px', margin: '0 auto', display: 'flex', gap: '25px', padding: '0 20px', overflowX: 'auto', whiteSpace: 'nowrap', scrollbarWidth: 'none' },
-    catItem: { fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
-    
+    catContent: { display: 'flex', gap: '25px', padding: '12px 20px', width: 'max-content', margin: '0 auto' },
+    catItem: { flexShrink: 0, fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
     desktopProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'flex-start' },
     mobileProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'flex-start' },
-    
     bottomNavContainer: { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#ffffff', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 10px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', zIndex: 1000, boxShadow: '0 -4px 10px rgba(0,0,0,0.05)' },
     bottomNavBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '10px', fontWeight: '600', cursor: 'pointer', flex: 1 },
     bottomNavBtnActive: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#2874f0', fontSize: '10px', fontWeight: '800', cursor: 'pointer', flex: 1 },

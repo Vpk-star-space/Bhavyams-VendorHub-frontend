@@ -11,6 +11,16 @@ const getBackendUrl = () => {
         : 'http://localhost:5000/api';
 };
 
+// 🟢 CLOUDINARY OPTIMIZER: Forces lightning fast, unblockable images
+const getOptimizedImage = (url) => {
+    if (!url) return null;
+    if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
+        // Automatically compresses size and changes to WebP format
+        return url.replace('/upload/', '/upload/q_auto,f_auto,w_800/');
+    }
+    return url; 
+};
+
 const ShopProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -32,10 +42,7 @@ const ShopProfile = () => {
     const [uploadError, setUploadError] = useState('');
     
     const [editForm, setEditForm] = useState({ 
-        business_name: '', 
-        category: '', 
-        shop_type: 'Products', 
-        is_online: true 
+        business_name: '', category: '', shop_type: 'Products', is_online: true 
     });
 
     const userStr = localStorage.getItem('user');
@@ -95,7 +102,6 @@ const ShopProfile = () => {
             formData.append('shop_type', editForm.shop_type);
             formData.append('is_online', editForm.is_online);
             
-            // 🟢 ATTACH THE PUBLIC LOGO ONLY
             if (imageFile) {
                 formData.append('shop_logo', imageFile);
             }
@@ -113,7 +119,7 @@ const ShopProfile = () => {
             alert("✅ Store updated successfully!");
         } catch (err) {
             console.error(err);
-            setUploadError("❌ Update failed! Ensure your backend 'uploads' folder exists.");
+            setUploadError("❌ Update failed! Please check your connection.");
         }
     };
 
@@ -134,10 +140,8 @@ const ShopProfile = () => {
     const isOwner = currentUser && shopData && (String(currentUser.id) === String(shopData.user_id));
     const dbShopType = shopData.shop_type || 'Products'; 
 
-    // 🟢 CRITICAL FIX: ONLY reads `shop_logo`. Never reads the secure `shop_image`.
-    const shopImageSrc = shopData.shop_logo 
-        ? `${shopData.shop_logo}?t=${new Date().getTime()}` 
-        : null;
+    // 🟢 Apply Optimizer to Image
+    const shopImageSrc = getOptimizedImage(shopData.shop_logo);
 
     return (
         <div style={styles.page}>
@@ -243,11 +247,12 @@ const ShopProfile = () => {
                             const sellPrice = Number(product.price) || 0;
                             const mrp = Number(product.mrp) || (sellPrice ? Math.round(sellPrice * 1.15) : 0);
                             const discount = mrp > sellPrice ? Math.round(((mrp - sellPrice) / mrp) * 100) : 0;
+                            const prodImg = getOptimizedImage(product.image_url) || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=200&q=80';
 
                             return (
                                 <div key={product.id} style={styles.listItem}>
                                     <div style={{ display: 'flex', gap: '15px', alignItems: 'center', cursor: 'pointer', flex: 1 }} onClick={() => navigate(`/item/${product.id}`)}>
-                                        <img src={product.image_url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=200&q=80'} alt={product.name} style={styles.listImg} />
+                                        <img src={prodImg} alt={product.name} style={styles.listImg} />
                                         <div style={styles.listDetails}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                 <div>
