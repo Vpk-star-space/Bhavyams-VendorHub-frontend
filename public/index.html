@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#2874f0" /> 
+    
+    <!-- 🟢 FIX: Modern PWA standard (Stops the deprecation warning) -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     
@@ -13,7 +16,6 @@
     <!-- 1. STRICT SEARCH ENGINE TITLES, KEYWORDS & BRAND DESCRIPTION -->
     <title>subhams-hub | Venkata Pavan Kumar Amarthaluri</title>
     <meta name="description" content="subhams-hub - A full-stack multi-vendor marketplace engineered by Venkata Pavan Kumar Amarthaluri under the Subhams Networks ecosystem." />
-    <!-- Notice the strict keyword combo here -->
     <meta name="keywords" content="subhams-hub, subhams, subhams networks, Venkata Pavan Kumar Amarthaluri, multi-vendor marketplace, logistics, e-commerce" />
     <meta name="author" content="Venkata Pavan Kumar Amarthaluri" />
 
@@ -90,7 +92,7 @@
       body {
         margin: 0;
         font-family: 'Roboto', sans-serif;
-        background-color: #f1f3f6; /* Subtle grey background */
+        background-color: #f8fafc; /* Lighter, cleaner background */
         -webkit-font-smoothing: antialiased;
       }
     </style>
@@ -99,7 +101,7 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
     
- <script>
+    <script>
       // Register the Subhams Hub Service Worker for instant PWA Installation
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

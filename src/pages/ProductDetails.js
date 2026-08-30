@@ -1,10 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Share2, ShoppingCart, ArrowLeft, Truck, ShieldCheck, Star, Zap } from 'lucide-react';
+import { Share2, ShoppingCart, ArrowLeft, Truck, ShieldCheck, Star, Zap, User } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useCart } from '../context/CartContext';
 import confetti from 'canvas-confetti';
+
+const getOptimizedImage = (url) => {
+    if (!url) return null;
+    if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
+        return url.replace('/upload/', '/upload/q_auto,f_auto,w_800/');
+    }
+    return url; 
+};
 
 const ProductDetails = () => {
     const { id } = useParams();
@@ -15,6 +23,10 @@ const ProductDetails = () => {
     const [mainImage, setMainImage] = useState('');
     const [gallery, setGallery] = useState([]);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    // 🟢 FETCH LOGGED IN USER
+    const userStr = localStorage.getItem('user');
+    const currentUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -32,7 +44,7 @@ const ProductDetails = () => {
                     ? cleanUrl 
                     : `https://bhavyams-vendorhub-backend.onrender.com${cleanUrl}`;
 
-                setMainImage(initialImg);
+                setMainImage(getOptimizedImage(initialImg));
 
                 if (data.gallery) {
                     try {
@@ -41,15 +53,16 @@ const ProductDetails = () => {
                         const cleanGallery = Array.isArray(parsed) 
                             ? parsed.map(url => {
                                 const cUrl = url.replace(/["\\]/g, '');
-                                return cUrl.startsWith('http') ? cUrl : `https://bhavyams-vendorhub-backend.onrender.com${cUrl}`;
+                                const finalUrl = cUrl.startsWith('http') ? cUrl : `https://bhavyams-vendorhub-backend.onrender.com${cUrl}`;
+                                return getOptimizedImage(finalUrl);
                             })
-                            : [initialImg];
+                            : [getOptimizedImage(initialImg)];
                         setGallery(cleanGallery);
                     } catch (e) {
-                        setGallery([initialImg]);
+                        setGallery([getOptimizedImage(initialImg)]);
                     }
                 } else {
-                    setGallery([initialImg]);
+                    setGallery([getOptimizedImage(initialImg)]);
                 }
             } catch (err) {
                 toast.error("Product not found");
@@ -76,14 +89,17 @@ const ProductDetails = () => {
     };
 
     const handleAction = (type) => {
+        // 🟢 PUBLIC SHIELD: If they aren't logged in, instantly route them to sign up!
+        if (!currentUser) {
+            toast.info("Please login to add items to your cart!");
+            navigate('/welcome');
+            return;
+        }
+
         if (!product) return;
         
         const stockCount = Number(product.stock_count ?? product.stock ?? 0);
-        
-        // 🚀 FIX: Convert both IDs to Strings so JavaScript never misses the match!
         const itemInCart = cart.find(item => String(item.id) === String(product.id));
-        
-        // 🚀 FIX: Safely fallback to 1 if quantity is undefined
         const quantityInCart = itemInCart ? (itemInCart.quantity || 1) : 0;
 
         if (stockCount <= 0) {
@@ -91,7 +107,6 @@ const ProductDetails = () => {
             return;
         }
 
-        // 🚀 FIX: Block adding if cart quantity reaches stock limit
         if (quantityInCart >= stockCount) {
             toast.warning(`You already have all available stock (${stockCount}) in your cart!`);
             if (type === 'buy') navigate('/cart');
@@ -118,18 +133,30 @@ const ProductDetails = () => {
     const isAvailable = stockCount > 0;
     const isLowStock = stockCount > 0 && stockCount <= 5;
 
-    // 🚀 FIX: Calculate maxReached safely for the UI rendering
     const itemInCart = cart.find(item => String(item.id) === String(product.id));
     const quantityInCart = itemInCart ? (itemInCart.quantity || 1) : 0;
     const maxReached = quantityInCart >= stockCount;
 
     return (
         <div style={styles.page}>
-            <div style={styles.container}>
+            <div style={styles.navBar}>
                 <button onClick={() => navigate(-1)} style={styles.backBtn}>
-                    <ArrowLeft size={18}/> <span>Back to Store</span>
+                    <ArrowLeft size={20} /> Back
                 </button>
-                
+                <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+                    {/* 🟢 LOGIN BUTTON VISIBLE TO GUESTS */}
+                    {!currentUser && (
+                        <button onClick={() => navigate('/welcome')} style={styles.loginBtnSmall}>
+                            <User size={14} /> Login
+                        </button>
+                    )}
+                    <button onClick={() => {navigator.clipboard.writeText(window.location.href); toast.info("Link copied!");}} style={styles.shareIconBtn}>
+                        <Share2 size={18} /> Share
+                    </button>
+                </div>
+            </div>
+
+            <div style={styles.container}>
                 <div style={isMobile ? styles.mobileLayout : styles.mainGrid}>
                     <div style={styles.imageColumn}>
                         <div style={isMobile ? {} : styles.stickyWrapper}>
@@ -146,7 +173,7 @@ const ProductDetails = () => {
                                             onClick={() => setMainImage(img)}
                                             onMouseEnter={() => !isMobile && setMainImage(img)}
                                         >
-                                            <img src={img} alt="thumb" style={styles.thumbImg} />
+                                            <img src={img} alt="thumb" crossOrigin="anonymous" referrerPolicy="no-referrer" style={styles.thumbImg} />
                                         </div>
                                     ))}
                                 </div>
@@ -155,7 +182,7 @@ const ProductDetails = () => {
                                     ...(isMobile ? styles.mobileImageCard : styles.imageCard),
                                     filter: isAvailable ? 'none' : 'grayscale(1)'
                                 }}>
-                                    <img src={mainImage} alt={product.name} style={styles.image} />
+                                    <img src={mainImage} alt={product.name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={styles.image} />
                                     {!isAvailable && <div style={styles.soldOutBadge}>OUT OF STOCK</div>}
                                 </div>
                             </div>
@@ -221,16 +248,11 @@ const ProductDetails = () => {
                             <div style={styles.trustItem}><ShieldCheck size={18} color="#26a541" /> <span>Secure Payment</span></div>
                         </div>
 
-                        <button onClick={() => {navigator.clipboard.writeText(window.location.href); toast.info("Link copied!");}} style={styles.shareBtn}>
-                            <Share2 size={16} /> SHARE PRODUCT
-                        </button>
-
                         {isMobile && <div style={{height: '80px'}} />}
                     </div>
                 </div>
             </div>
 
-            {/* 📱 MOBILE STICKY FOOTER */}
             {isMobile && (
                 <div style={styles.mobileStickyFooter}>
                     <button 
@@ -242,7 +264,7 @@ const ProductDetails = () => {
                     </button>
                     <button 
                         style={isAvailable ? styles.mobileBuyNow : styles.disabledBtn} 
-                        disabled={!isAvailable}  // 🚀 FIX: Removed the empty space here!
+                        disabled={!isAvailable}  
                         onClick={() => handleAction('buy')}
                     >
                         {isAvailable ? "BUY NOW" : "NOT AVAILABLE"}
@@ -254,14 +276,19 @@ const ProductDetails = () => {
 };
 
 const styles = {
-    page: { background: '#fff', minHeight: '100vh', padding: '10px 0', fontFamily: 'Roboto, Arial, sans-serif' },
+    page: { background: '#fff', minHeight: '100vh', paddingBottom: '50px', fontFamily: 'Roboto, Arial, sans-serif' },
     container: { maxWidth: '1240px', margin: '0 auto', padding: '0 10px' },
     loader: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh', color: '#2874f0', fontWeight: 'bold' },
-    backBtn: { display: 'flex', alignItems: 'center', gap: '8px', border: 'none', background: 'none', cursor: 'pointer', color: '#878787', marginBottom: '15px', fontSize: '12px', fontWeight: 'bold' },
+    
+    navBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: 'white', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', marginBottom: '15px' },
+    backBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '15px', padding: 0 },
+    loginBtnSmall: { display: 'flex', alignItems: 'center', gap: '4px', background: '#2874f0', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
+    shareIconBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '13px', padding: '6px 12px', borderRadius: '8px' },
+
     mainGrid: { display: 'grid', gridTemplateColumns: '42% 58%', gap: '30px' },
     mobileLayout: { display: 'flex', flexDirection: 'column', gap: '15px' },
     imageColumn: { width: '100%' },
-    stickyWrapper: { position: 'sticky', top: '20px' },
+    stickyWrapper: { position: 'sticky', top: '90px' },
     galleryWrapper: { display: 'flex', gap: '12px' },
     mobileGallery: { display: 'flex', flexDirection: 'column-reverse', gap: '10px' },
     thumbStrip: { display: 'flex', flexDirection: 'column', gap: '8px' },
@@ -292,7 +319,6 @@ const styles = {
     descriptionText: { fontSize: '13px', color: '#212121', lineHeight: '1.6' },
     trustBox: { background: '#f9f9f9', padding: '12px', borderRadius: '4px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' },
     trustItem: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' },
-    shareBtn: { background: '#fff', border: '1px solid #e0e0e0', padding: '8px 15px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', color: '#2874f0', display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '2px' },
     soldOutBadge: { position: 'absolute', background: '#ef4444', color: '#fff', padding: '8px 20px', fontWeight: 'bold', borderRadius: '3px', zIndex: 10 }
 };
 

@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../context/AppContext';
 import axios from 'axios';
 import { AppContext } from '../context/AppContext';
-import { Phone, Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, Megaphone } from 'lucide-react';
+import { Phone, Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, Megaphone, User } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 const getBackendUrl = () => {
     return process.env.NODE_ENV === 'production' 
@@ -11,12 +12,10 @@ const getBackendUrl = () => {
         : 'http://localhost:5000/api';
 };
 
-// 🟢 CLOUDINARY OPTIMIZER: Forces lightning fast, unblockable images
 const getOptimizedImage = (url) => {
     if (!url) return null;
     if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
-        // Automatically compresses size and changes to WebP format
-        return url.replace('/upload/', '/upload/q_auto,f_auto,w_800/');
+        return url.replace('/upload/', '/upload/q_auto,f_auto,w_600/');
     }
     return url; 
 };
@@ -134,20 +133,33 @@ const ShopProfile = () => {
 
     const filteredCatalog = products.filter(item => (item.name || '').toLowerCase().includes(shopSearch.toLowerCase()));
 
+    // 🟢 SECURE ACTION HANDLER
+    const requireLogin = (actionMsg) => {
+        toast.info(`Please login to ${actionMsg}!`);
+        navigate('/welcome');
+    };
+
     if (loading) return <div style={styles.loading}>Loading Store Profile...</div>;
     if (!shopData) return null;
 
     const isOwner = currentUser && shopData && (String(currentUser.id) === String(shopData.user_id));
     const dbShopType = shopData.shop_type || 'Products'; 
 
-    // 🟢 Apply Optimizer to Image
     const shopImageSrc = getOptimizedImage(shopData.shop_logo);
 
     return (
         <div style={styles.page}>
             <div style={styles.navBar}>
                 <button onClick={() => navigate(-1)} style={styles.backBtn}><ArrowLeft size={20} /> Back</button>
-                <button onClick={handleShare} style={styles.shareIconBtn}><Share2 size={18} /> Share</button>
+                <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+                    {/* 🟢 LOGIN BUTTON VISIBLE TO GUESTS */}
+                    {!currentUser && (
+                        <button onClick={() => navigate('/welcome')} style={styles.loginBtnSmall}>
+                            <User size={14} /> Login
+                        </button>
+                    )}
+                    <button onClick={handleShare} style={styles.shareIconBtn}><Share2 size={18} /> Share</button>
+                </div>
             </div>
 
             <div style={styles.bannerBackground}>
@@ -161,7 +173,7 @@ const ShopProfile = () => {
                 <div style={styles.avatarRow}>
                     <div style={styles.avatarContainer}>
                         {shopImageSrc ? (
-                            <img src={shopImageSrc} alt="Shop Logo" style={styles.businessLogo} />
+                            <img src={shopImageSrc} alt="Shop Logo" crossOrigin="anonymous" referrerPolicy="no-referrer" style={styles.businessLogo} />
                         ) : (
                             <div style={{...styles.businessLogo, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                 <Store size={40} color="#94a3b8" />
@@ -205,9 +217,10 @@ const ShopProfile = () => {
 
                 {!(isOwner || isMasterAdmin) && (
                     <div style={styles.actionButtonsRow}>
-                        <button style={isFollowing ? styles.followingBtn : styles.primaryActionBtn} onClick={() => setIsFollowing(!isFollowing)}>
+                        <button style={isFollowing ? styles.followingBtn : styles.primaryActionBtn} onClick={() => currentUser ? setIsFollowing(!isFollowing) : requireLogin('follow this shop')}>
                             {isFollowing ? <Check size={18} /> : <Users size={18} />} {isFollowing ? 'Following' : 'Follow'}
                         </button>
+                        
                         {isFollowing && (
                             <div style={{ position: 'relative' }}>
                                 <button style={styles.secondaryActionBtn} onClick={() => setNotifMenuOpen(!notifMenuOpen)}>
@@ -224,7 +237,7 @@ const ShopProfile = () => {
                                 )}
                             </div>
                         )}
-                        <button style={styles.secondaryActionBtn} onClick={() => alert("Calling coming soon!")}><Phone size={18} /> Call</button>
+                        <button style={styles.secondaryActionBtn} onClick={() => currentUser ? alert("Calling coming soon!") : requireLogin('call the vendor')}><Phone size={18} /> Call</button>
                     </div>
                 )}
             </div>
@@ -252,7 +265,7 @@ const ShopProfile = () => {
                             return (
                                 <div key={product.id} style={styles.listItem}>
                                     <div style={{ display: 'flex', gap: '15px', alignItems: 'center', cursor: 'pointer', flex: 1 }} onClick={() => navigate(`/item/${product.id}`)}>
-                                        <img src={prodImg} alt={product.name} style={styles.listImg} />
+                                        <img src={prodImg} alt={product.name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={styles.listImg} />
                                         <div style={styles.listDetails}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                 <div>
@@ -271,7 +284,7 @@ const ShopProfile = () => {
                                     </div>
                                     {!(isOwner || isMasterAdmin) && (
                                         <div style={styles.listActionBox}>
-                                            <button style={styles.addBtn} onClick={() => alert("Added to cart/booking!")}>{dbShopType.includes('Services') ? 'Book' : 'Add +'}</button>
+                                            <button style={styles.addBtn} onClick={() => currentUser ? alert("Added to cart/booking!") : requireLogin('book this item')}>{dbShopType.includes('Services') ? 'Book' : 'Add +'}</button>
                                         </div>
                                     )}
                                 </div>
@@ -354,6 +367,9 @@ const styles = {
     loading: { textAlign: 'center', padding: '50px', fontWeight: 'bold', color: '#64748b' },
     navBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: 'white', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' },
     backBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '15px', padding: 0 },
+    
+    loginBtnSmall: { display: 'flex', alignItems: 'center', gap: '4px', background: '#2874f0', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
+    
     shareIconBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '13px', padding: '6px 12px', borderRadius: '8px' },
     bannerBackground: { height: '160px', background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)', width: '100%', display: 'flex', alignItems: 'center', boxSizing: 'border-box' },
     bannerTextContainer: { display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '800px', margin: '0 auto', padding: '0 20px', marginBottom: '20px' },

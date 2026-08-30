@@ -44,13 +44,11 @@ const PremiumLoader = ({ onComplete }) => {
     const [fadeOut, setFadeOut] = useState(false);
 
     useEffect(() => {
-        // 🟢 FIX: Dropped the artificial timer from 1500ms down to 400ms! No more fake "buffering"!
         const timer = setTimeout(() => {
             setFadeOut(true);
             const exitTimer = setTimeout(() => { onComplete(); }, 300); 
             return () => clearTimeout(exitTimer);
         }, 400);
-
         return () => clearTimeout(timer);
     }, [onComplete]);
 
@@ -107,7 +105,11 @@ function App() {
                     
                     setCurrentUser(updatedUser);
                     localStorage.setItem('user', JSON.stringify(updatedUser));
-                } catch (err) { console.error("Silent sync failed", err); }
+                } catch (err) { 
+                    if (err.response && err.response.status !== 401) {
+                        console.error("Silent sync failed", err); 
+                    }
+                }
             }
         };
         syncStatus();
@@ -149,9 +151,9 @@ function App() {
         });
 
         return () => {
-            if (localSocket.connected) {
-                localSocket.disconnect();
-            }
+            setTimeout(() => {
+                if (localSocket) localSocket.disconnect();
+            }, 500);
         };
     }, [currentUser?.id]);
 
@@ -289,24 +291,25 @@ function App() {
                             )}
 
                             <Routes>
-                                <Route path="/" element={(() => {
-                                    if (currentUser && currentUser.phone && currentUser.phone.length > 3) return <Home />;
-                                    else return <Navigate to="/welcome" replace />;
-                                })()} />
+                                {/* 🟢 FULLY UNLOCKED FOR PUBLIC & AI */}
+                                <Route path="/" element={<Home />} />
+                                <Route path="/shop/:id" element={<ShopProfile />} />
+                                <Route path="/product/:id" element={<ProductDetails />} /> 
+                                <Route path="/item/:itemId" element={<ItemDetail />} />
+
+                                {/* 🔒 PROTECTED CORE FEATURES */}
                                 <Route path="/welcome" element={<Welcome />} />
                                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                                <Route path="/shop/:id" element={<ShopProfile />} />
-                                <Route path="/product/:id" element={<ProtectedRoute><ProductDetails /></ProtectedRoute>} />
                                 <Route path="/dashboard" element={<ProtectedRoute><VendorDashboard /></ProtectedRoute>} />
                                 <Route path="/vendor-dashboard" element={<ProtectedRoute><VendorDashboard /></ProtectedRoute>} />
                                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                                 <Route path="/register-business" element={<ProtectedRoute><BusinessRegistration /></ProtectedRoute>} />
                                 <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-                                <Route path="/manage-catalog/:id" element={<ManageCatalog />} />
-                                <Route path="*" element={<Navigate to="/" replace />} />
-                                <Route path="/item/:itemId" element={<ItemDetail />} />
+                                <Route path="/manage-catalog/:id" element={<ProtectedRoute><ManageCatalog /></ProtectedRoute>} />
                                 <Route path="/my-orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
                                 <Route path="/vendor/orders" element={<ProtectedRoute><VendorOrders /></ProtectedRoute>} />
+                                
+                                <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </div>
                     </Router>
