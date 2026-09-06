@@ -22,10 +22,10 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
-// 🟢 REAL DISTANCE CALCULATOR (Haversine Formula)
+// 🟢 EXACT GPS MATHEMATICS (Haversine Formula)
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-    const R = 6371; // Radius of the earth in km
+    const R = 6371; 
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
     const a = 
@@ -141,12 +141,27 @@ const Home = () => {
         setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
     };
 
-    // 🟢 DYNAMIC LOCATION TAG (Using real math formula!)
-    const getDistanceTag = (shopLat, shopLng) => {
-        if (!localUser) return "📍 Login for distance";
-        if (!appLocation?.lat || !appLocation?.lng) return "📍 Turn on GPS";
-        const distance = calculateDistance(appLocation.lat, appLocation.lng, shopLat, shopLng);
-        if (distance) return `📍 ~${distance} km away`;
+    // 🟢 SMART LOCATION TAG: Real Math + Profile Syncing
+    const getDistanceTag = (shop) => {
+        // 1. If GPS is on, show exact km
+        if (appLocation?.lat && appLocation?.lng && shop.lat && shop.lng) {
+            const distance = calculateDistance(appLocation.lat, appLocation.lng, shop.lat, shop.lng);
+            if (distance) return `📍 ~${distance} km`;
+        }
+        
+        // 2. If no GPS, match user's profile address with the shop's address
+        const sAddr = shop.address || shop.location || '';
+        const uAddr = localUser?.address || localUser?.location || '';
+        
+        if (uAddr && sAddr.toLowerCase().includes(uAddr.toLowerCase())) {
+            return `📍 In ${uAddr.split(',')[0]}`;
+        }
+
+        // 3. Fallback to just the shop's city name
+        if (sAddr) {
+            return `📍 ${sAddr.split(',')[0]}`;
+        }
+
         return "📍 Nearby"; 
     };
 
@@ -194,14 +209,7 @@ const Home = () => {
             <style>
                 {`
                     @keyframes scroll-left { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-                    
-                    /* 🟢 NEW REAL LOADING ANIMATION */
-                    @keyframes pulse-logo {
-                        0% { transform: scale(0.95); opacity: 0.8; text-shadow: 0 0 5px rgba(250, 204, 21, 0.2); }
-                        50% { transform: scale(1.05); opacity: 1; text-shadow: 0 0 20px rgba(250, 204, 21, 0.6); }
-                        100% { transform: scale(0.95); opacity: 0.8; text-shadow: 0 0 5px rgba(250, 204, 21, 0.2); }
-                    }
-
+                    @keyframes pulse-logo { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.8; } }
                     .warning-text { display: inline-block; white-space: nowrap; animation: scroll-left 15s linear infinite; color: #b91c1c; font-weight: 900; font-size: 15px; letter-spacing: 1px; }
                     .hide-scroll::-webkit-scrollbar { display: none; }
                     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -261,7 +269,7 @@ const Home = () => {
                                                 <Store size={18} color="#2874f0" style={{flexShrink: 0}}/>
                                                 <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
                                                     <span style={{fontWeight: '900', color: '#0f172a', fontSize: '15px'}}>{sug.name}</span>
-                                                    <span style={{fontSize: '11px', color: '#16a34a', fontWeight: 'bold'}}>{getDistanceTag(sug.lat, sug.lng)}</span>
+                                                    <span style={{fontSize: '11px', color: '#16a34a', fontWeight: 'bold'}}>{getDistanceTag(sug)}</span>
                                                 </div>
                                                 <span style={{fontSize: '11px', background: '#f0fdf4', color: '#16a34a', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold'}}>Visit Shop</span>
                                             </>
@@ -303,10 +311,37 @@ const Home = () => {
                 </div>
             )}
 
-            <div style={{ maxWidth: '1000px', margin: '20px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box' }}>
+            <div style={{ maxWidth: '1000px', margin: '15px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box' }}>
+                
+                {/* 🟢 PREMIUM ECOSYSTEM BANNERS */}
+                {!loading && !searchQuery && !selectedSubCategory && (
+                    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '15px', scrollSnapType: 'x mandatory' }} className="hide-scroll">
+                        <div style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #2874f0, #1e3a8a)' }}>
+                            <div style={styles.ecoIcon}>🏪</div>
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                <span style={styles.ecoTitle}>Subhams Hub</span>
+                                <span style={styles.ecoSub}>Local Marketplace</span>
+                            </div>
+                        </div>
+                        <div style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
+                            <div style={styles.ecoIcon}>💰</div>
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                <span style={styles.ecoTitle}>Subhams PMMS</span>
+                                <span style={styles.ecoSub}>Secure Finances</span>
+                            </div>
+                        </div>
+                        <div style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}>
+                            <div style={styles.ecoIcon}>🖨️</div>
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                <span style={styles.ecoTitle}>Subhams Agent</span>
+                                <span style={styles.ecoSub}>Cloud Printing</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {loading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '100px 0' }}>
-                        {/* 🟢 NEW BEAUTIFUL HEARTBEAT ANIMATION */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
                         <div style={{ animation: 'pulse-logo 1.5s ease-in-out infinite', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '6px' }}>
                                 <span style={{ fontSize: '36px', fontWeight: '900', letterSpacing: '-1px', color: '#0f172a' }}>SUBHAMS</span>
@@ -319,9 +354,9 @@ const Home = () => {
                     <>
                         {searchQuery && !showSuggestions ? (
                             <div style={{padding: '0 5px'}}>
-                                <h2 style={{ fontSize: '20px', marginBottom: '20px', color: '#1e293b' }}>{ht.searchResults} "{searchQuery}"</h2>
+                                <h2 style={{ fontSize: '20px', marginBottom: '15px', color: '#1e293b' }}>{ht.searchResults} "{searchQuery}"</h2>
                                 {filteredProducts.length > 0 ? (
-                                    <div style={isMobile ? styles.mobileProductGrid : styles.desktopProductGrid}>
+                                    <div style={styles.desktopProductGrid}>
                                         {filteredProducts.map(product => <ProductCard key={product.id} product={product} t={t} />)}
                                     </div>
                                 ) : (
@@ -330,7 +365,7 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 NEW COMPACT "ACTIVE LOCAL SHOPS" (Replaces the huge space-wasting blocks!) */}
+                                {/* 🟢 COMPACT NEARBY ACTIVE SHOPS (Small Circular Icons) */}
                                 {selectedCategory === CATEGORIES[1] && activeShops.length > 0 && (
                                     <div style={{ marginBottom: '25px', padding: '0 5px' }}>
                                         <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>
@@ -351,14 +386,13 @@ const Home = () => {
 
                                 {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
 
-                                {/* 🏪 MAIN SHOPS LIST (1 2 3 GRID FORMAT APPLIED) */}
+                                {/* 🏪 MAIN SHOPS LIST (🟢 STRICT 3-COLUMN WRAPPING GRID) */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div style={{padding: '0 5px'}}>
                                         <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
                                             {selectedCategory === CATEGORIES[1] ? ht.topTrending : ht.subhamsExpo}
                                         </h2>
                                         
-                                        {/* 🟢 3-COLUMN PERFECT MOBILE GRID (1 2 3) */}
                                         <div style={isMobile ? styles.mobileGrid3 : styles.desktopProductGrid}>
                                             {activeShops
                                                 .filter(shop => {
@@ -369,8 +403,7 @@ const Home = () => {
                                                 })
                                                 .map(shop => (
                                                     <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
-                                                        {/* 🟢 Tiny badge overlapping image to save space */}
-                                                        <span style={{ position: 'absolute', top: '8px', right: '8px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '9px', padding: '2px 6px', borderRadius: '8px', fontWeight: 'bold', zIndex: 5 }}>
+                                                        <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
                                                             {shop.is_online ? ht.open : ht.closed}
                                                         </span>
 
@@ -378,18 +411,17 @@ const Home = () => {
                                                             <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={isMobile ? styles.shopImageMobile : styles.shopImageDesktop} />
                                                         ) : (
                                                             <div style={{...(isMobile ? styles.shopImageMobile : styles.shopImageDesktop), background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                                                                <Store size={isMobile ? 24 : 30} color="#cbd5e1"/>
+                                                                <Store size={isMobile ? 20 : 30} color="#cbd5e1"/>
                                                             </div>
                                                         )}
                                                         
-                                                        {/* 🟢 Ultra compact text for 3-grid layout */}
-                                                        <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '12px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                        <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                                                             {shop.business_name}
                                                         </h4>
-                                                        <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '10px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{shop.category}</p>
+                                                        <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{shop.category}</p>
                                                         
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: isMobile ? '9px' : '12px', color: '#64748b', fontWeight: '700' }}>
-                                                            <MapPin size={isMobile ? 10 : 14} color="#ef4444" /> {getDistanceTag(shop.lat, shop.lng)}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: isMobile ? '8px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            <MapPin size={isMobile ? 10 : 14} color="#ef4444" /> {getDistanceTag(shop)}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -397,7 +429,7 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 📁 FOLDERS & SHOPS VIEW (1 2 3 4 GRID FORMAT APPLIED) */}
+                                {/* 📁 FOLDERS & SHOPS VIEW (🟢 STRICT 4-COLUMN FOLDERS, 3-COLUMN SHOPS) */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div style={{padding: '0 5px'}}>
                                         {!selectedSubCategory ? (
@@ -413,7 +445,6 @@ const Home = () => {
                                                     if (allCategoryNames.length === 0) return <div style={{padding: '20px', color: '#64748b'}}>Folders will appear once created by the Admin.</div>;
 
                                                     return (
-                                                        /* 🟢 4-COLUMN PERFECT MOBILE GRID (1 2 3 4) */
                                                         <div style={isMobile ? styles.mobileGrid4 : styles.desktopFolderGrid}>
                                                             {allCategoryNames.map((catName, index) => {
                                                                 const adminCat = adminCatForTab.find(c => c.name.toLowerCase() === catName.toLowerCase());
@@ -441,7 +472,6 @@ const Home = () => {
                                                     </h2>
                                                 </div>
 
-                                                {/* 🟢 3-COLUMN SHOP GRID (INSIDE FOLDERS) */}
                                                 <div style={isMobile ? styles.mobileGrid3 : styles.desktopProductGrid}>
                                                     {activeShops
                                                         .filter(shop => {
@@ -455,7 +485,7 @@ const Home = () => {
                                                         })
                                                         .map(shop => (
                                                             <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
-                                                                <span style={{ position: 'absolute', top: '8px', right: '8px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '9px', padding: '2px 6px', borderRadius: '8px', fontWeight: 'bold', zIndex: 5 }}>
+                                                                <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
                                                                     {shop.is_online ? ht.open : ht.closed}
                                                                 </span>
 
@@ -463,17 +493,17 @@ const Home = () => {
                                                                     <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={isMobile ? styles.shopImageMobile : styles.shopImageDesktop} />
                                                                 ) : (
                                                                     <div style={{...(isMobile ? styles.shopImageMobile : styles.shopImageDesktop), background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                                                                        <Store size={isMobile ? 24 : 30} color="#cbd5e1"/>
+                                                                        <Store size={isMobile ? 20 : 30} color="#cbd5e1"/>
                                                                     </div>
                                                                 )}
 
-                                                                <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '12px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                                <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                                                                     {shop.business_name}
                                                                 </h4>
-                                                                <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '10px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{shop.category}</p>
+                                                                <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{shop.category}</p>
                                                                 
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: isMobile ? '9px' : '12px', color: '#64748b', fontWeight: '700' }}>
-                                                                    <MapPin size={isMobile ? 10 : 14} color="#ef4444" /> {getDistanceTag(shop.lat, shop.lng)}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: isMobile ? '8px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                    <MapPin size={isMobile ? 10 : 14} color="#ef4444" /> {getDistanceTag(shop)}
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -541,19 +571,22 @@ const styles = {
     catContent: { display: 'flex', gap: '22px', padding: '14px 20px', width: 'max-content', margin: '0 auto' },
     catItem: { flexShrink: 0, fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
     
-    // 🟢 3-COLUMN MOBILE GRID FOR SHOPS
+    // 🟢 PREMIUM ECOSYSTEM BANNERS
+    ecoBanner: { flexShrink: 0, width: '220px', scrollSnapAlign: 'start', borderRadius: '12px', padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
+    ecoIcon: { fontSize: '24px', background: 'rgba(255,255,255,0.2)', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' },
+    ecoTitle: { fontSize: '13px', fontWeight: '900', letterSpacing: '0.5px' },
+    ecoSub: { fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+
+    // 🟢 3-COLUMN & 4-COLUMN STRICT WRAPPING GRIDS
     mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', width: '100%' },
-    // 🟢 4-COLUMN MOBILE GRID FOR FOLDERS
-    mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', width: '100%' },
-    
+    mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', width: '100%' },
     desktopProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'flex-start' },
     desktopFolderGrid: { display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'flex-start' },
 
-    // 🟢 COMPACT SHOP CARD FOR MOBILE (Fits 3 per row)
-    shopCardMobile: { background: 'white', borderRadius: '10px', padding: '6px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', position: 'relative', width: '100%', boxSizing: 'border-box' },
-    shopImageMobile: { width: '100%', height: '70px', objectFit: 'cover', borderRadius: '6px', marginBottom: '6px' },
+    // 🟢 COMPACT SHOP CARD FOR 3-GRID
+    shopCardMobile: { background: 'white', borderRadius: '8px', padding: '6px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', position: 'relative', width: '100%', boxSizing: 'border-box' },
+    shopImageMobile: { width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' },
 
-    // 🟢 NORMAL SHOP CARD FOR DESKTOP
     shopCardDesktop: { width: '240px', background: 'white', borderRadius: '16px', padding: '16px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', position: 'relative' },
     shopImageDesktop: { width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginBottom: '12px' },
     
