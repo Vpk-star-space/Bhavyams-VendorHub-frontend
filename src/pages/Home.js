@@ -22,7 +22,7 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
-// 🟢 REAL GPS MATH (Haversine Formula) - Checks Exact Radius
+// 🟢 REAL GPS MATH (Haversine Formula) - Checks Exact 25km Radius
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const l1 = parseFloat(lat1), ln1 = parseFloat(lon1);
     const l2 = parseFloat(lat2), ln2 = parseFloat(lon2);
@@ -88,7 +88,7 @@ const Home = () => {
     const [localUserStr, setLocalUserStr] = useState(localStorage.getItem('user'));
     const localUser = localUserStr && localUserStr !== 'undefined' ? JSON.parse(localUserStr) : null;
     
-    // 🟢 CUSTOM LOCATION STATE (Saves GPS auto-complete coordinates)
+    // 🟢 CUSTOM LOCATION STATE
     const [customLocation, setCustomLocation] = useState(() => JSON.parse(localStorage.getItem('custom_hub_location')));
     const [showLocModal, setShowLocModal] = useState(false);
     const [locSearch, setLocSearch] = useState('');
@@ -129,7 +129,10 @@ const Home = () => {
 
     useEffect(() => {
         const fetchLocalFeed = async () => {
-            setLoading(true);
+            // 🟢 FIX: Only show full loading screen on the VERY FIRST load.
+            // If GPS connects later, it updates silently in the background!
+            if (activeShops.length === 0) setLoading(true);
+            
             const activeLat = customLocation?.lat || appLocation?.lat || 0;
             const activeLng = customLocation?.lng || appLocation?.lng || 0;
             const BACKEND_URL = getBackendUrl();
@@ -153,7 +156,7 @@ const Home = () => {
         fetchLocalFeed(); 
     }, [appLocation?.lat, appLocation?.lng, customLocation]);
 
-    // 🟢 LOCATION AUTO-COMPLETE FETCHER (OpenStreetMap Free API)
+    // 🟢 LOCATION AUTO-COMPLETE FETCHER
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
         if (query.length < 3) return setLocResults([]);
@@ -171,7 +174,7 @@ const Home = () => {
         toast.success(`Location set to ${loc.display_name.split(',')[0]}`);
     };
 
-    // 🟢 TOUCH GESTURE ENGINE (Swipe Left/Right to change menus)
+    // 🟢 BUTTERY SMOOTH TOUCH GESTURE ENGINE (Swipe Left/Right)
     const [touchStart, setTouchStart] = useState(null);
     const [touchStartY, setTouchStartY] = useState(null);
     
@@ -187,14 +190,11 @@ const Home = () => {
         const distanceX = touchStart - touchEndX;
         const distanceY = Math.abs(touchStartY - touchEndY);
         
-        // Ensure they are swiping left/right and not scrolling up/down
-        if (Math.abs(distanceX) > 60 && Math.abs(distanceX) > distanceY * 2) {
+        if (Math.abs(distanceX) > 60 && Math.abs(distanceX) > distanceY * 1.5) {
             const currentIndex = CATEGORIES.indexOf(selectedCategory);
             if (distanceX > 0 && currentIndex < CATEGORIES.length - 1) {
-                // Swipe Left -> Next Tab
                 handleCategoryClick(CATEGORIES[currentIndex + 1]);
             } else if (distanceX < 0 && currentIndex > 0) {
-                // Swipe Right -> Previous Tab
                 handleCategoryClick(CATEGORIES[currentIndex - 1]);
             }
         }
@@ -216,28 +216,39 @@ const Home = () => {
         setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
     };
 
-    // 🟢 EXACT DISTANCE USING MATHEMATICS
-    const getDistanceTag = (shop) => {
-        const activeLat = customLocation?.lat || appLocation?.lat;
-        const activeLng = customLocation?.lng || appLocation?.lng;
+    // 🟢 DUAL LOCATION ENGINE (Math GPS + Text Fallback)
+    const activeLat = customLocation?.lat || appLocation?.lat;
+    const activeLng = customLocation?.lng || appLocation?.lng;
 
+    const getDistanceTag = (shop) => {
+        // 1. Math Distance
         if (activeLat && activeLng && shop.lat && shop.lng) {
             const dist = calculateDistance(activeLat, activeLng, shop.lat, shop.lng);
             if (dist !== null) return `📍 ~${dist} km`;
         }
+        // 2. Exact City Fallback
         if (shop.address) return `📍 ${shop.address.split(',')[0]}`;
+        
         return "📍 Nearby"; 
     };
 
-    const activeLat = customLocation?.lat || appLocation?.lat;
-    const activeLng = customLocation?.lng || appLocation?.lng;
-
     const nearbyShops = activeShops.filter(shop => {
-        // If we have mathematical coordinates, strictly check 25km radius
+        // 1. Try mathematical GPS checking (within 25km)
         if (activeLat && activeLng && shop.lat && shop.lng) {
             const dist = calculateDistance(activeLat, activeLng, shop.lat, shop.lng);
             if (dist !== null && dist <= 25.0) return true; 
         }
+        
+        // 2. Try Smart Text Scanning (Finds matches even if user types "Kona" and shop says "Konanki, AP")
+        const searchAddr = (customLocation?.address || localUser?.address || localUser?.location || '').toLowerCase();
+        const shopAddr = (shop.address || shop.location || '').toLowerCase();
+        
+        if (searchAddr && shopAddr) {
+            const uParts = searchAddr.split(/[\s,]+/); 
+            // If any word longer than 3 letters matches (like "konanki"), show the shop!
+            if (uParts.some(part => part.length >= 4 && shopAddr.includes(part))) return true;
+        }
+        
         return false;
     });
 
@@ -301,22 +312,39 @@ const Home = () => {
                     @keyframes pulse-logo { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.8; } }
                     
                     @keyframes running-text {
-                        0%   { transform: translateX(100%); }
-                        100% { transform: translateX(-120%); }
+                        0%   { transform: translateX(0%); }
+                        100% { transform: translateX(-100%); }
                     }
                     .scroll-container {
                         width: 100%;
                         overflow: hidden;
                         white-space: nowrap;
                         box-sizing: border-box;
+                        position: relative;
                     }
                     .scroll-text {
                         display: inline-block;
-                        animation: running-text 5s linear infinite;
+                        padding-left: 100%;
+                        animation: running-text 8s linear infinite;
+                    }
+
+                    .touch-scale {
+                        transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+                    }
+                    @media (hover: hover) {
+                        .touch-scale:hover {
+                            transform: scale(1.04);
+                            box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+                            z-index: 10;
+                        }
+                    }
+                    .touch-scale:active {
+                        transform: scale(0.96);
                     }
 
                     .hide-scroll::-webkit-scrollbar { display: none; }
                     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+                    .swipe-content { transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
                 `}
             </style>
 
@@ -342,11 +370,12 @@ const Home = () => {
 
                 <div style={styles.headerSearchRow}>
                     <div style={styles.searchBarWrapper}>
-                        {/* 🟢 LOCATION DROP-DOWN LAUNCHER */}
-                        <div style={{display: 'flex', alignItems: 'center', background: '#1e3a8a', padding: '6px 12px', borderRadius: '8px', color: 'white', fontSize: '12px', fontWeight: 'bold', marginBottom: '10px', cursor: 'pointer', width: 'fit-content'}} onClick={() => setShowLocModal(true)}>
-                            <MapPin size={14} color="#facc15" style={{marginRight: '6px'}}/> 
-                            {customLocation ? customLocation.address.split(',')[0] : (appLocation?.lat ? "GPS Active - Nearby" : "Set Delivery Location")}
-                            <span style={{marginLeft: '8px', opacity: 0.7}}>▾</span>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginBottom: '10px' }}>
+                            <div className="touch-scale" style={{display: 'flex', alignItems: 'center', background: '#1e3a8a', padding: '6px 12px', borderRadius: '8px', color: 'white', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer'}} onClick={() => setShowLocModal(true)}>
+                                <MapPin size={14} color="#facc15" style={{marginRight: '6px'}}/> 
+                                {customLocation ? customLocation.address.split(',')[0] : (appLocation?.lat ? "GPS Active - Nearby" : "Set Location")}
+                                <span style={{marginLeft: '8px', opacity: 0.7}}>▾</span>
+                            </div>
                         </div>
 
                         <div style={styles.searchBar}>
@@ -411,10 +440,17 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* 🟢 LOCATION AUTO-COMPLETE MODAL */}
+            {localUser?.account_status === 'warned' && (
+                <div style={{ background: '#fef2f2', borderBottom: '2px solid #ef4444', padding: '10px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'sticky', top: '150px', zIndex: 99, overflow: 'hidden' }}>
+                    <div className="warning-text">
+                        ⚠️ OFFICIAL WARNING: {localUser.ban_reason || 'Please adhere to our community guidelines.'}
+                    </div>
+                </div>
+            )}
+
             {showLocModal && (
                 <div style={styles.overlay}>
-                    <div style={styles.locModal}>
+                    <div className="touch-scale" style={styles.locModal}>
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
                             <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>Set Delivery Location</h3>
                             <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLocModal(false)} />
@@ -437,7 +473,7 @@ const Home = () => {
                         {locResults.length > 0 && (
                             <div style={styles.locResultsBox}>
                                 {locResults.map((loc, i) => (
-                                    <div key={i} style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
+                                    <div key={i} className="touch-scale" style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
                                         <MapPin size={16} color="#2563eb" style={{flexShrink: 0}} />
                                         <span style={{fontSize: '13px', color: '#334155'}}>{loc.display_name}</span>
                                     </div>
@@ -448,11 +484,11 @@ const Home = () => {
                 </div>
             )}
 
-            {/* 🟢 MAIN SWIPEABLE CONTENT WRAPPER */}
             <div 
                 onTouchStart={onTouchStart} 
                 onTouchEnd={onTouchEnd} 
-                style={{ maxWidth: '1000px', margin: '15px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box' }}
+                className="swipe-content"
+                style={{ maxWidth: '1000px', margin: '15px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box', minHeight: '70vh' }}
             >
                 {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
@@ -479,19 +515,18 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 ONLY SHOW LOCATION-LOCKED NEARBY SHOPS ON TRENDING */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{ marginBottom: '25px', padding: '0 5px' }}>
                                         <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Nearby Active Shops (25km)</h2>
                                         
-                                        {(!activeLat) ? (
-                                            <div style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe' }} onClick={() => setShowLocModal(true)}>
+                                        {(!activeLat && !localUser) ? (
+                                            <div className="touch-scale" style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe' }} onClick={() => setShowLocModal(true)}>
                                                 <MapPin size={16} color="#2563eb"/> Click here to Set Location & discover nearby shops!
                                             </div>
                                         ) : nearbyShops.length > 0 ? (
                                             <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
                                                 {nearbyShops.map(shop => (
-                                                    <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '65px', flexShrink: 0, cursor: 'pointer' }}>
+                                                    <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '65px', flexShrink: 0, cursor: 'pointer' }}>
                                                         <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(45deg, #2874f0, #facc15)', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
                                                             <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid white' }} />
                                                         </div>
@@ -504,14 +539,13 @@ const Home = () => {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <p style={{fontSize: '12px', color: '#64748b', margin: 0, padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No active shops found strictly within 25km of {customLocation ? customLocation.address.split(',')[0] : 'your GPS'}.</p>
+                                            <p style={{fontSize: '12px', color: '#64748b', margin: 0, padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No active shops found strictly within 25km of {customLocation ? customLocation.address.split(',')[0] : 'your location'}.</p>
                                         )}
                                     </div>
                                 )}
 
                                 {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
 
-                                {/* 🏪 MAIN SHOPS LIST (🟢 STRICT 3-COLUMN WRAPPING GRID) */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div style={{padding: '0 5px'}}>
                                         <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
@@ -527,7 +561,7 @@ const Home = () => {
                                                     return false;
                                                 })
                                                 .map(shop => (
-                                                    <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
+                                                    <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
                                                         <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
                                                             {shop.is_online ? ht.open : ht.closed}
                                                         </span>
@@ -539,7 +573,7 @@ const Home = () => {
                                                                 <Store size={isMobile ? 20 : 30} color="#cbd5e1"/>
                                                             </div>
                                                         )}
-                                                        
+
                                                         <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
                                                             <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
                                                                 {shop.business_name}
@@ -559,7 +593,6 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 📁 CATEGORIES & SHOPS VIEW (🟢 STRICT 4-COLUMN CATEGORIES, 3-COLUMN SHOPS) */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div style={{padding: '0 5px'}}>
                                         {!selectedSubCategory ? (
@@ -581,7 +614,7 @@ const Home = () => {
                                                                 const imgSrc = adminCat ? adminCat.hd_image : 'https://via.placeholder.com/150/e2e8f0/64748b?text=' + catName.substring(0, 3);
 
                                                                 return (
-                                                                    <div key={index} onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: isMobile ? '100%' : '90px', cursor: 'pointer' }}>
+                                                                    <div key={index} className="touch-scale" onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: isMobile ? '100%' : '90px', cursor: 'pointer' }}>
                                                                         <img src={getOptimizedImage(imgSrc)} alt={catName} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: isMobile ? '55px' : '75px', height: isMobile ? '55px' : '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'}} />
                                                                         <span style={{ fontSize: isMobile ? '10px' : '13px', marginTop: '6px', fontWeight: '800', color: '#1e293b', textAlign: 'center', lineHeight: '1.2' }}>{tc(catName)}</span>
                                                                     </div>
@@ -594,7 +627,7 @@ const Home = () => {
                                         ) : (
                                             <>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-                                                    <button onClick={() => setSelectedSubCategory(null)} style={{ background: '#e2e8f0', border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                                                    <button className="touch-scale" onClick={() => setSelectedSubCategory(null)} style={{ background: '#e2e8f0', border: 'none', padding: '6px 10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
                                                         <X size={14} /> Back
                                                     </button>
                                                     <h2 style={{ fontSize: '18px', margin: 0, color: '#1e293b', fontWeight: '900' }}>
@@ -614,7 +647,7 @@ const Home = () => {
                                                             return matchesTab && matchesCategory;
                                                         })
                                                         .map(shop => (
-                                                            <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
+                                                            <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
                                                                 <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
                                                                     {shop.is_online ? ht.open : ht.closed}
                                                                 </span>
@@ -713,13 +746,16 @@ const styles = {
     locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
     locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' },
 
-    // 🟢 STRICT CSS GRID: minmax(0, 1fr) violently forces the boxes to stay equal size and prevents overflow stretching
+    ecoBanner: { cursor: 'pointer', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', gap: '10px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
+    ecoIcon: { fontSize: '20px', background: 'rgba(255,255,255,0.2)', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' },
+    ecoTitle: { fontSize: '12px', fontWeight: '900', letterSpacing: '0.5px' },
+    ecoSub: { fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+
     mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px', width: '100%' },
     mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' },
     desktopProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'flex-start' },
     desktopFolderGrid: { display: 'flex', flexDirection: 'row', gap: '20px', flexWrap: 'wrap', justifyContent: 'flex-start', width: '100%' },
 
-    // 🟢 SHOP CARDS: Overflow hidden locks the stretching
     shopCardMobile: { background: 'white', borderRadius: '8px', padding: '6px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', position: 'relative', width: '100%', boxSizing: 'border-box', overflow: 'hidden' },
     shopImageMobile: { width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' },
 
