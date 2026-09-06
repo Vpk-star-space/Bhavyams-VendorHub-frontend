@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder } from 'lucide-react'; 
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ExternalLink, Navigation } from 'lucide-react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify'; 
 import ProductCard from '../components/ProductCard';
@@ -22,7 +22,7 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
-// 🟢 REAL GPS MATH (Haversine Formula) - Checks Exact 25km Radius
+// 🟢 REAL GPS MATH (Haversine Formula) - Checks Exact Radius
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const l1 = parseFloat(lat1), ln1 = parseFloat(lon1);
     const l2 = parseFloat(lat2), ln2 = parseFloat(lon2);
@@ -88,12 +88,16 @@ const Home = () => {
     const [localUserStr, setLocalUserStr] = useState(localStorage.getItem('user'));
     const localUser = localUserStr && localUserStr !== 'undefined' ? JSON.parse(localUserStr) : null;
     
+    // 🟢 CUSTOM LOCATION STATE (Saves GPS auto-complete coordinates)
+    const [customLocation, setCustomLocation] = useState(() => JSON.parse(localStorage.getItem('custom_hub_location')));
+    const [showLocModal, setShowLocModal] = useState(false);
+    const [locSearch, setLocSearch] = useState('');
+    const [locResults, setLocResults] = useState([]);
+
     useEffect(() => {
         const checkUser = () => {
             const currentStr = localStorage.getItem('user');
-            if (currentStr !== localUserStr) {
-                setLocalUserStr(currentStr); 
-            }
+            if (currentStr !== localUserStr) setLocalUserStr(currentStr); 
         };
         window.addEventListener('storage', checkUser);
         const interval = setInterval(checkUser, 1000); 
@@ -126,13 +130,13 @@ const Home = () => {
     useEffect(() => {
         const fetchLocalFeed = async () => {
             setLoading(true);
-            const lat = appLocation?.lat || 0;
-            const lng = appLocation?.lng || 0;
+            const activeLat = customLocation?.lat || appLocation?.lat || 0;
+            const activeLng = customLocation?.lng || appLocation?.lng || 0;
             const BACKEND_URL = getBackendUrl();
             
             try {
                 const results = await Promise.allSettled([
-                    axios.get(`${BACKEND_URL}/products/feed?lat=${lat}&lng=${lng}`),
+                    axios.get(`${BACKEND_URL}/products/feed?lat=${activeLat}&lng=${activeLng}`),
                     axios.get(`${BACKEND_URL}/shops/active/all`),
                     axios.get(`${BACKEND_URL}/admin/categories`)
                 ]);
@@ -140,15 +144,63 @@ const Home = () => {
                 if (results[0].status === 'fulfilled') setProducts(results[0].value.data.products || []);
                 if (results[1].status === 'fulfilled') setActiveShops(results[1].value.data.shops || []);
                 if (results[2].status === 'fulfilled') setAdminCategories(results[2].value.data || []);
-                
             } catch (err) {
-                console.error("Critical Feed Error:", err);
+                console.error("Feed Error:", err);
             } finally {
                 setLoading(false);
             }
         };
         fetchLocalFeed(); 
-    }, [appLocation?.lat, appLocation?.lng]);
+    }, [appLocation?.lat, appLocation?.lng, customLocation]);
+
+    // 🟢 LOCATION AUTO-COMPLETE FETCHER (OpenStreetMap Free API)
+    const handleLocationSearch = async (query) => {
+        setLocSearch(query);
+        if (query.length < 3) return setLocResults([]);
+        try {
+            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`);
+            setLocResults(res.data);
+        } catch (e) { console.log(e); }
+    };
+
+    const selectCustomLocation = (loc) => {
+        const customLoc = { lat: loc.lat, lng: loc.lon, address: loc.display_name };
+        localStorage.setItem('custom_hub_location', JSON.stringify(customLoc));
+        setCustomLocation(customLoc);
+        setShowLocModal(false);
+        toast.success(`Location set to ${loc.display_name.split(',')[0]}`);
+    };
+
+    // 🟢 TOUCH GESTURE ENGINE (Swipe Left/Right to change menus)
+    const [touchStart, setTouchStart] = useState(null);
+    const [touchStartY, setTouchStartY] = useState(null);
+    
+    const onTouchStart = (e) => {
+        setTouchStart(e.targetTouches[0].clientX);
+        setTouchStartY(e.targetTouches[0].clientY);
+    };
+
+    const onTouchEnd = (e) => {
+        if (!touchStart || !touchStartY) return;
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const distanceX = touchStart - touchEndX;
+        const distanceY = Math.abs(touchStartY - touchEndY);
+        
+        // Ensure they are swiping left/right and not scrolling up/down
+        if (Math.abs(distanceX) > 60 && Math.abs(distanceX) > distanceY * 2) {
+            const currentIndex = CATEGORIES.indexOf(selectedCategory);
+            if (distanceX > 0 && currentIndex < CATEGORIES.length - 1) {
+                // Swipe Left -> Next Tab
+                handleCategoryClick(CATEGORIES[currentIndex + 1]);
+            } else if (distanceX < 0 && currentIndex > 0) {
+                // Swipe Right -> Previous Tab
+                handleCategoryClick(CATEGORIES[currentIndex - 1]);
+            }
+        }
+        setTouchStart(null);
+        setTouchStartY(null);
+    };
 
     const requireLogin = (actionMsg) => {
         toast.info(`Please login to ${actionMsg}!`);
@@ -164,34 +216,27 @@ const Home = () => {
         setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
     };
 
+    // 🟢 EXACT DISTANCE USING MATHEMATICS
     const getDistanceTag = (shop) => {
-        if (appLocation?.lat && appLocation?.lng && shop.lat && shop.lng) {
-            const dist = calculateDistance(appLocation.lat, appLocation.lng, shop.lat, shop.lng);
+        const activeLat = customLocation?.lat || appLocation?.lat;
+        const activeLng = customLocation?.lng || appLocation?.lng;
+
+        if (activeLat && activeLng && shop.lat && shop.lng) {
+            const dist = calculateDistance(activeLat, activeLng, shop.lat, shop.lng);
             if (dist !== null) return `📍 ~${dist} km`;
         }
-        if (localUser && localUser.address && shop.address) {
-            const uCity = localUser.address.split(',')[0].toLowerCase().trim();
-            const sAddr = shop.address.toLowerCase();
-            if (sAddr.includes(uCity)) return `📍 Near ${localUser.address.split(',')[0]}`;
-        }
-        if (!localUser && !appLocation?.lat) return "📍 Login for distance";
-        if (localUser && !appLocation?.lat) return "📍 Turn on GPS";
         if (shop.address) return `📍 ${shop.address.split(',')[0]}`;
-        
         return "📍 Nearby"; 
     };
 
+    const activeLat = customLocation?.lat || appLocation?.lat;
+    const activeLng = customLocation?.lng || appLocation?.lng;
+
     const nearbyShops = activeShops.filter(shop => {
-        if (appLocation?.lat && appLocation?.lng && shop.lat && shop.lng) {
-            const dist = calculateDistance(appLocation.lat, appLocation.lng, shop.lat, shop.lng);
+        // If we have mathematical coordinates, strictly check 25km radius
+        if (activeLat && activeLng && shop.lat && shop.lng) {
+            const dist = calculateDistance(activeLat, activeLng, shop.lat, shop.lng);
             if (dist !== null && dist <= 25.0) return true; 
-        }
-        const uAddr = (localUser?.address || localUser?.location || '').toLowerCase();
-        const sAddr = (shop.address || shop.location || '').toLowerCase();
-        
-        if (uAddr && sAddr) {
-            const uParts = uAddr.split(/[\s,]+/); 
-            if (uParts.some(part => part.length > 3 && sAddr.includes(part))) return true;
         }
         return false;
     });
@@ -239,7 +284,6 @@ const Home = () => {
         <div style={styles.page}>
             <style>
                 {`
-                    /* 🟢 NEW: Golden Shine Animation for Main Logo */
                     @keyframes logo-shine {
                         0% { background-position: -200% center; }
                         100% { background-position: 200% center; }
@@ -254,10 +298,8 @@ const Home = () => {
                         animation: logo-shine 3s linear infinite;
                     }
 
-                    @keyframes scroll-left { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
                     @keyframes pulse-logo { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.8; } }
                     
-                    /* 🟢 FIX: Perfect running text that stays inside its box */
                     @keyframes running-text {
                         0%   { transform: translateX(100%); }
                         100% { transform: translateX(-120%); }
@@ -273,7 +315,6 @@ const Home = () => {
                         animation: running-text 5s linear infinite;
                     }
 
-                    .warning-text { display: inline-block; white-space: nowrap; animation: scroll-left 15s linear infinite; color: #b91c1c; font-weight: 900; font-size: 15px; letter-spacing: 1px; }
                     .hide-scroll::-webkit-scrollbar { display: none; }
                     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
                 `}
@@ -283,7 +324,6 @@ const Home = () => {
                 <div style={styles.headerTopRow}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
                         <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                            {/* 🟢 Animated Premium Logo */}
                             <span className="animated-logo" style={{ fontSize: '26px', fontWeight: '900', letterSpacing: '-0.5px' }}>SUBHAMS</span>
                             <span style={{ fontSize: '14px', color: '#ffffff', fontWeight: '800', letterSpacing: '2px' }}>HUB</span>
                         </h1>
@@ -302,6 +342,13 @@ const Home = () => {
 
                 <div style={styles.headerSearchRow}>
                     <div style={styles.searchBarWrapper}>
+                        {/* 🟢 LOCATION DROP-DOWN LAUNCHER */}
+                        <div style={{display: 'flex', alignItems: 'center', background: '#1e3a8a', padding: '6px 12px', borderRadius: '8px', color: 'white', fontSize: '12px', fontWeight: 'bold', marginBottom: '10px', cursor: 'pointer', width: 'fit-content'}} onClick={() => setShowLocModal(true)}>
+                            <MapPin size={14} color="#facc15" style={{marginRight: '6px'}}/> 
+                            {customLocation ? customLocation.address.split(',')[0] : (appLocation?.lat ? "GPS Active - Nearby" : "Set Delivery Location")}
+                            <span style={{marginLeft: '8px', opacity: 0.7}}>▾</span>
+                        </div>
+
                         <div style={styles.searchBar}>
                             <input 
                                 type="text" 
@@ -324,16 +371,13 @@ const Home = () => {
                                                 <Folder size={18} color="#f59e0b" style={{flexShrink: 0}}/>
                                                 <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
                                                     <span style={{fontWeight: '900', color: '#0f172a', fontSize: '15px'}}>{tc(sug.name)} Category</span>
-                                                    <span style={{fontSize: '11px', color: '#64748b'}}>Found in {sug.section === 'Products' ? 'Shopping' : 'Services'}</span>
                                                 </div>
-                                                <span style={{fontSize: '11px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold'}}>{sug.count} Shops Inside</span>
                                             </>
                                         ) : (
                                             <>
                                                 <Store size={18} color="#2874f0" style={{flexShrink: 0}}/>
                                                 <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
                                                     <span style={{fontWeight: '900', color: '#0f172a', fontSize: '15px'}}>{sug.name}</span>
-                                                    <span style={{fontSize: '11px', color: '#16a34a', fontWeight: 'bold'}}>{getDistanceTag(sug)}</span>
                                                 </div>
                                                 <span style={{fontSize: '11px', background: '#f0fdf4', color: '#16a34a', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold'}}>Visit Shop</span>
                                             </>
@@ -367,21 +411,54 @@ const Home = () => {
                 </div>
             </div>
 
-            {localUser?.account_status === 'warned' && (
-                <div style={{ background: '#fef2f2', borderBottom: '2px solid #ef4444', padding: '10px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'sticky', top: '150px', zIndex: 99, overflow: 'hidden' }}>
-                    <div className="warning-text">
-                        ⚠️ OFFICIAL WARNING: {localUser.ban_reason || 'Please adhere to our community guidelines.'}
+            {/* 🟢 LOCATION AUTO-COMPLETE MODAL */}
+            {showLocModal && (
+                <div style={styles.overlay}>
+                    <div style={styles.locModal}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                            <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>Set Delivery Location</h3>
+                            <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLocModal(false)} />
+                        </div>
+                        
+                        <button onClick={() => { localStorage.removeItem('custom_hub_location'); setCustomLocation(null); setShowLocModal(false); toast.success("Using Automatic GPS"); }} style={styles.gpsBtn}>
+                            <Navigation size={16} /> Use my current GPS location
+                        </button>
+
+                        <div style={{position: 'relative', marginTop: '15px'}}>
+                            <input 
+                                type="text" 
+                                placeholder="Type your area, city, or pincode (e.g. konanki)..." 
+                                style={styles.locInput} 
+                                value={locSearch} 
+                                onChange={(e) => handleLocationSearch(e.target.value)} 
+                            />
+                        </div>
+
+                        {locResults.length > 0 && (
+                            <div style={styles.locResultsBox}>
+                                {locResults.map((loc, i) => (
+                                    <div key={i} style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
+                                        <MapPin size={16} color="#2563eb" style={{flexShrink: 0}} />
+                                        <span style={{fontSize: '13px', color: '#334155'}}>{loc.display_name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
-            <div style={{ maxWidth: '1000px', margin: '15px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box' }}>
-                
+            {/* 🟢 MAIN SWIPEABLE CONTENT WRAPPER */}
+            <div 
+                onTouchStart={onTouchStart} 
+                onTouchEnd={onTouchEnd} 
+                style={{ maxWidth: '1000px', margin: '15px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box' }}
+            >
                 {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
                         <div style={{ animation: 'pulse-logo 1.5s ease-in-out infinite', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                                <span style={{ fontSize: '36px', fontWeight: '900', letterSpacing: '-1px', color: '#0f172a' }}>SUBHAMS</span>
+                                <span className="animated-logo" style={{ fontSize: '36px', fontWeight: '900', letterSpacing: '-1px' }}>SUBHAMS</span>
                                 <span style={{ fontSize: '16px', color: '#facc15', fontWeight: '900', letterSpacing: '3px' }}>HUB</span>
                             </h1>
                             <p style={{marginTop: '10px', color: '#64748b', fontWeight: 'bold', fontSize: '12px', letterSpacing: '2px', textTransform: 'uppercase'}}>{ht.syncing}</p>
@@ -402,14 +479,14 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS */}
+                                {/* 🟢 ONLY SHOW LOCATION-LOCKED NEARBY SHOPS ON TRENDING */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{ marginBottom: '25px', padding: '0 5px' }}>
-                                        <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Nearby Active Shops</h2>
+                                        <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Nearby Active Shops (25km)</h2>
                                         
-                                        {(!appLocation?.lat && !localUser) ? (
-                                            <div style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe' }} onClick={() => navigate('/welcome')}>
-                                                <MapPin size={16} color="#2563eb"/> Login or Turn on GPS to see shops near you!
+                                        {(!activeLat) ? (
+                                            <div style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe' }} onClick={() => setShowLocModal(true)}>
+                                                <MapPin size={16} color="#2563eb"/> Click here to Set Location & discover nearby shops!
                                             </div>
                                         ) : nearbyShops.length > 0 ? (
                                             <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
@@ -418,7 +495,6 @@ const Home = () => {
                                                         <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(45deg, #2874f0, #facc15)', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
                                                             <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid white' }} />
                                                         </div>
-                                                        
                                                         <div className="scroll-container" style={{ marginTop: '6px' }}>
                                                             <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b' }}>
                                                                 {shop.business_name}
@@ -428,14 +504,14 @@ const Home = () => {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <p style={{fontSize: '12px', color: '#64748b', margin: 0, padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No active shops found within 25km of your location.</p>
+                                            <p style={{fontSize: '12px', color: '#64748b', margin: 0, padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No active shops found strictly within 25km of {customLocation ? customLocation.address.split(',')[0] : 'your GPS'}.</p>
                                         )}
                                     </div>
                                 )}
 
                                 {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
 
-                                {/* 🏪 MAIN SHOPS LIST (🟢 STRICT 3-COLUMN GRID FIX: minmax(0,1fr)) */}
+                                {/* 🏪 MAIN SHOPS LIST (🟢 STRICT 3-COLUMN WRAPPING GRID) */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div style={{padding: '0 5px'}}>
                                         <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
@@ -464,7 +540,6 @@ const Home = () => {
                                                             </div>
                                                         )}
                                                         
-                                                        {/* 🟢 PERFECT RUNNING TEXT THAT DOES NOT STRETCH THE BOX */}
                                                         <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
                                                             <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
                                                                 {shop.business_name}
@@ -484,7 +559,7 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 📁 CATEGORIES & SHOPS VIEW (4-COLUMN CATEGORIES, 3-COLUMN SHOPS) */}
+                                {/* 📁 CATEGORIES & SHOPS VIEW (🟢 STRICT 4-COLUMN CATEGORIES, 3-COLUMN SHOPS) */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div style={{padding: '0 5px'}}>
                                         {!selectedSubCategory ? (
@@ -631,6 +706,13 @@ const styles = {
     catContent: { display: 'flex', gap: '22px', padding: '14px 20px', width: 'max-content', margin: '0 auto' },
     catItem: { flexShrink: 0, fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
     
+    overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 },
+    locModal: { background: 'white', padding: '25px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' },
+    locInput: { padding: '14px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '14px', width: '100%', boxSizing: 'border-box', outline: 'none' },
+    gpsBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' },
+    locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
+    locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' },
+
     // 🟢 STRICT CSS GRID: minmax(0, 1fr) violently forces the boxes to stay equal size and prevents overflow stretching
     mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px', width: '100%' },
     mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' },
