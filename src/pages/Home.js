@@ -56,6 +56,14 @@ const categoryTranslations = {
     'Services': 'సేవలు'
 };
 
+// 🟢 LOCATION ALIAS DICTIONARY (Bridges English and Telugu spelling gaps)
+const locationAliases = {
+    'konanki': ['konanki', 'కోణంకి', 'kona'],
+    'martur': ['martur', 'మార్టూరు'],
+    'bapatla': ['bapatla', 'బాపట్ల'],
+    'tirupati': ['tirupati', 'తిరుపతి']
+};
+
 const Home = () => {
     const { t, language, location: appLocation } = useContext(AppContext);
     const navigate = useNavigate();
@@ -88,7 +96,6 @@ const Home = () => {
     const [localUserStr, setLocalUserStr] = useState(localStorage.getItem('user'));
     const localUser = localUserStr && localUserStr !== 'undefined' ? JSON.parse(localUserStr) : null;
     
-    // 🟢 CUSTOM LOCATION STATE
     const [customLocation, setCustomLocation] = useState(() => JSON.parse(localStorage.getItem('custom_hub_location')));
     const [showLocModal, setShowLocModal] = useState(false);
     const [locSearch, setLocSearch] = useState('');
@@ -129,10 +136,7 @@ const Home = () => {
 
     useEffect(() => {
         const fetchLocalFeed = async () => {
-            // 🟢 FIX: Only show full loading screen on the VERY FIRST load.
-            // If GPS connects later, it updates silently in the background!
             if (activeShops.length === 0) setLoading(true);
-            
             const activeLat = customLocation?.lat || appLocation?.lat || 0;
             const activeLng = customLocation?.lng || appLocation?.lng || 0;
             const BACKEND_URL = getBackendUrl();
@@ -156,7 +160,6 @@ const Home = () => {
         fetchLocalFeed(); 
     }, [appLocation?.lat, appLocation?.lng, customLocation]);
 
-    // 🟢 LOCATION AUTO-COMPLETE FETCHER
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
         if (query.length < 3) return setLocResults([]);
@@ -174,7 +177,6 @@ const Home = () => {
         toast.success(`Location set to ${loc.display_name.split(',')[0]}`);
     };
 
-    // 🟢 BUTTERY SMOOTH TOUCH GESTURE ENGINE (Swipe Left/Right)
     const [touchStart, setTouchStart] = useState(null);
     const [touchStartY, setTouchStartY] = useState(null);
     
@@ -216,37 +218,45 @@ const Home = () => {
         setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
     };
 
-    // 🟢 DUAL LOCATION ENGINE (Math GPS + Text Fallback)
     const activeLat = customLocation?.lat || appLocation?.lat;
     const activeLng = customLocation?.lng || appLocation?.lng;
 
     const getDistanceTag = (shop) => {
-        // 1. Math Distance
         if (activeLat && activeLng && shop.lat && shop.lng) {
             const dist = calculateDistance(activeLat, activeLng, shop.lat, shop.lng);
             if (dist !== null) return `📍 ~${dist} km`;
         }
-        // 2. Exact City Fallback
         if (shop.address) return `📍 ${shop.address.split(',')[0]}`;
-        
         return "📍 Nearby"; 
     };
 
+    // 🟢 SMART NEARBY SHOPS ALGORITHM (Math + Multi-Lang Alias)
     const nearbyShops = activeShops.filter(shop => {
-        // 1. Try mathematical GPS checking (within 25km)
+        // 1. GPS MATH CHECK: If we have coordinates, check exactly 25km
         if (activeLat && activeLng && shop.lat && shop.lng) {
             const dist = calculateDistance(activeLat, activeLng, shop.lat, shop.lng);
             if (dist !== null && dist <= 25.0) return true; 
         }
         
-        // 2. Try Smart Text Scanning (Finds matches even if user types "Kona" and shop says "Konanki, AP")
-        const searchAddr = (customLocation?.address || localUser?.address || localUser?.location || '').toLowerCase();
-        const shopAddr = (shop.address || shop.location || '').toLowerCase();
+        // 2. MULTI-LANG TEXT FALLBACK: If no GPS, match words intelligently
+        const searchAddrRaw = (customLocation?.address || localUser?.address || localUser?.location || '').toLowerCase();
+        const shopAddrRaw = (shop.address || shop.location || '').toLowerCase();
         
-        if (searchAddr && shopAddr) {
-            const uParts = searchAddr.split(/[\s,]+/); 
-            // If any word longer than 3 letters matches (like "konanki"), show the shop!
-            if (uParts.some(part => part.length >= 4 && shopAddr.includes(part))) return true;
+        if (searchAddrRaw && shopAddrRaw) {
+            // Flatten the shop address against aliases to find matches across languages
+            let isMatch = false;
+            Object.keys(locationAliases).forEach(key => {
+                const aliases = locationAliases[key];
+                const searchHasAlias = aliases.some(alias => searchAddrRaw.includes(alias));
+                const shopHasAlias = aliases.some(alias => shopAddrRaw.includes(alias));
+                if (searchHasAlias && shopHasAlias) isMatch = true;
+            });
+
+            if (isMatch) return true;
+
+            // Basic Word Match
+            const uParts = searchAddrRaw.split(/[\s,]+/); 
+            if (uParts.some(part => part.length >= 4 && shopAddrRaw.includes(part))) return true;
         }
         
         return false;
@@ -515,6 +525,28 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
+                                {/* 🟢 PREMIUM BANNERS ADDED TO TRENDING (Side by Side) */}
+                                {selectedCategory === CATEGORIES[1] && (
+                                    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '20px', scrollSnapType: 'x mandatory' }} className="hide-scroll">
+                                        <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
+                                            <div style={styles.ecoIcon}>💰</div>
+                                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                                <span style={styles.ecoTitle}>Subhams PMMS</span>
+                                                <span style={styles.ecoSub}>Secure Finances</span>
+                                            </div>
+                                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
+                                        </div>
+                                        <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}>
+                                            <div style={styles.ecoIcon}>🖨️</div>
+                                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                                <span style={styles.ecoTitle}>Subhams Agent</span>
+                                                <span style={styles.ecoSub}>Cloud Printing</span>
+                                            </div>
+                                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{ marginBottom: '25px', padding: '0 5px' }}>
                                         <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Nearby Active Shops (25km)</h2>
@@ -573,7 +605,7 @@ const Home = () => {
                                                                 <Store size={isMobile ? 20 : 30} color="#cbd5e1"/>
                                                             </div>
                                                         )}
-
+                                                        
                                                         <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
                                                             <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
                                                                 {shop.business_name}
