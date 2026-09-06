@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../context/AppContext';
 import axios from 'axios';
 import { AppContext } from '../context/AppContext';
-import { Phone, Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, Megaphone, User } from 'lucide-react';
+import { Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, Megaphone, User } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const getBackendUrl = () => {
@@ -40,8 +40,9 @@ const ShopProfile = () => {
     const [imageFile, setImageFile] = useState(null); 
     const [uploadError, setUploadError] = useState('');
     
+    // 🟢 ADDED: 'address' field separated from user profile
     const [editForm, setEditForm] = useState({ 
-        business_name: '', category: '', shop_type: 'Products', is_online: true 
+        business_name: '', category: '', shop_type: 'Products', is_online: true, address: '' 
     });
 
     const userStr = localStorage.getItem('user');
@@ -60,11 +61,13 @@ const ShopProfile = () => {
                 setShopData(res.data.shop);
                 setProducts(res.data.products || []);
 
+                // 🟢 UPDATE: Load the exact shop address into the edit form
                 setEditForm({
-                    business_name: res.data.shop.business_name,
-                    category: res.data.shop.category,
+                    business_name: res.data.shop.business_name || '',
+                    category: res.data.shop.category || '',
                     shop_type: res.data.shop.shop_type || 'Products', 
-                    is_online: res.data.shop.is_online
+                    is_online: res.data.shop.is_online,
+                    address: res.data.shop.address || res.data.shop.location || ''
                 });
 
                 const catRes = await axios.get(`${BACKEND_URL}/admin/categories`);
@@ -101,6 +104,9 @@ const ShopProfile = () => {
             formData.append('shop_type', editForm.shop_type);
             formData.append('is_online', editForm.is_online);
             
+            // 🟢 UPDATE: Send the new shop address to the backend
+            formData.append('address', editForm.address);
+            
             if (imageFile) {
                 formData.append('shop_logo', imageFile);
             }
@@ -115,7 +121,7 @@ const ShopProfile = () => {
             setShopData(res.data.shop);
             setShowEditModal(false);
             setImageFile(null);
-            alert("✅ Store updated successfully!");
+            toast.success("✅ Store updated successfully!");
         } catch (err) {
             console.error(err);
             setUploadError("❌ Update failed! Please check your connection.");
@@ -133,7 +139,6 @@ const ShopProfile = () => {
 
     const filteredCatalog = products.filter(item => (item.name || '').toLowerCase().includes(shopSearch.toLowerCase()));
 
-    // 🟢 SECURE ACTION HANDLER
     const requireLogin = (actionMsg) => {
         toast.info(`Please login to ${actionMsg}!`);
         navigate('/welcome');
@@ -152,7 +157,6 @@ const ShopProfile = () => {
             <div style={styles.navBar}>
                 <button onClick={() => navigate(-1)} style={styles.backBtn}><ArrowLeft size={20} /> Back</button>
                 <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
-                    {/* 🟢 LOGIN BUTTON VISIBLE TO GUESTS */}
                     {!currentUser && (
                         <button onClick={() => navigate('/welcome')} style={styles.loginBtnSmall}>
                             <User size={14} /> Login
@@ -210,15 +214,16 @@ const ShopProfile = () => {
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                             <button onClick={() => { setShowEditModal(true); setUploadError(''); }} style={styles.adminBtn}><Edit size={16}/> Edit Store Info</button>
                             <button onClick={() => navigate(`/manage-catalog/${id}`)} style={styles.primaryAdminBtn}><Package size={16}/> Manage Catalog</button>
-                            <button onClick={() => alert("Promotion request sent to Admin Panel!")} style={{...styles.primaryAdminBtn, background: '#f59e0b'}}><Megaphone size={16}/> Promote Shop</button>
+                            <button onClick={() => toast.success("Promotion request sent to Admin Panel!")} style={{...styles.primaryAdminBtn, background: '#f59e0b'}}><Megaphone size={16}/> Promote Shop</button>
                         </div>
                     </div>
                 )}
 
                 {!(isOwner || isMasterAdmin) && (
                     <div style={styles.actionButtonsRow}>
-                        <button style={isFollowing ? styles.followingBtn : styles.primaryActionBtn} onClick={() => currentUser ? setIsFollowing(!isFollowing) : requireLogin('follow this shop')}>
-                            {isFollowing ? <Check size={18} /> : <Users size={18} />} {isFollowing ? 'Following' : 'Follow'}
+                        {/* 🟢 REMOVED CALL BUTTON & ADJUSTED FOLLOW BUTTON WIDTH */}
+                        <button style={{...isFollowing ? styles.followingBtn : styles.primaryActionBtn, flex: 1}} onClick={() => currentUser ? setIsFollowing(!isFollowing) : requireLogin('follow this shop')}>
+                            {isFollowing ? <Check size={18} /> : <Users size={18} />} {isFollowing ? 'Following' : 'Follow Store'}
                         </button>
                         
                         {isFollowing && (
@@ -237,7 +242,6 @@ const ShopProfile = () => {
                                 )}
                             </div>
                         )}
-                        <button style={styles.secondaryActionBtn} onClick={() => currentUser ? alert("Calling coming soon!") : requireLogin('call the vendor')}><Phone size={18} /> Call</button>
                     </div>
                 )}
             </div>
@@ -284,7 +288,7 @@ const ShopProfile = () => {
                                     </div>
                                     {!(isOwner || isMasterAdmin) && (
                                         <div style={styles.listActionBox}>
-                                            <button style={styles.addBtn} onClick={() => currentUser ? alert("Added to cart/booking!") : requireLogin('book this item')}>{dbShopType.includes('Services') ? 'Book' : 'Add +'}</button>
+                                            <button style={styles.addBtn} onClick={() => currentUser ? toast.success("Added to cart/booking!") : requireLogin('book this item')}>{dbShopType.includes('Services') ? 'Book' : 'Add +'}</button>
                                         </div>
                                     )}
                                 </div>
@@ -315,6 +319,18 @@ const ShopProfile = () => {
                                 <input style={styles.input} value={editForm.business_name} onChange={e => setEditForm({...editForm, business_name: e.target.value})} required />
                             </div>
 
+                            {/* 🟢 NEW FIELD: Separate Shop Address Input */}
+                            <div>
+                                <label style={styles.modalLabel}>Shop Address / Location</label>
+                                <input 
+                                    style={styles.input} 
+                                    value={editForm.address} 
+                                    onChange={e => setEditForm({...editForm, address: e.target.value})} 
+                                    placeholder="e.g. Konanki, AP"
+                                    required 
+                                />
+                            </div>
+
                             <div>
                                 <label style={styles.modalLabel}>Category / Industry</label>
                                 <input 
@@ -330,7 +346,7 @@ const ShopProfile = () => {
                                         <option key={cat.id} value={cat.name} />
                                     ))}
                                 </datalist>
-                                <p style={{fontSize: '11px', color: '#64748b', marginTop: '-5px', marginBottom: '10px'}}>*Select an existing category, or type a new one (requires Admin approval to become a folder).</p>
+                                <p style={{fontSize: '11px', color: '#64748b', marginTop: '-5px', marginBottom: '10px'}}>*Select an existing category, or type a new one.</p>
                             </div>
 
                             {isMasterAdmin && (

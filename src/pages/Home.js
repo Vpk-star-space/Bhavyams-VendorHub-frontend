@@ -431,7 +431,7 @@ const Home = () => {
                 <div style={styles.overlay}>
                     <div className="touch-scale" style={styles.locModal}>
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
-                            <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>Set Delivery Location</h3>
+                            <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>Search Shop Location</h3>
                             <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLocModal(false)} />
                         </div>
 
