@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ExternalLink } from 'lucide-react'; 
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder } from 'lucide-react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify'; 
 import ProductCard from '../components/ProductCard';
@@ -44,7 +44,6 @@ const homeTranslations = {
     te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "అన్ని దుకాణాలు, వర్గాలు & వస్తువుల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
 };
 
-// 🟢 CATEGORY TRANSLATION DICTIONARY (Expands based on your needs)
 const categoryTranslations = {
     'Vegetables': 'కూరగాయలు',
     'Fruits': 'పండ్లు',
@@ -67,11 +66,9 @@ const Home = () => {
 
     const CATEGORIES = [t('Expo') || 'Expo', t('Trending') || 'Trending', t('Shopping') || 'Shopping', t('Services') || 'Services', t('Business') || 'Business'];
 
-    // 🟢 SMART CATEGORY TRANSLATOR
     const tc = (word) => {
         if (!word) return '';
         if (lang === 'te') {
-            // Split by comma in case a shop has multiple categories "Vegetables, Fruits"
             return word.split(',').map(w => categoryTranslations[w.trim()] || t(w.trim())).join(', ');
         }
         return word;
@@ -170,7 +167,7 @@ const Home = () => {
     const getDistanceTag = (shop) => {
         if (appLocation?.lat && appLocation?.lng && shop.lat && shop.lng) {
             const dist = calculateDistance(appLocation.lat, appLocation.lng, shop.lat, shop.lng);
-            if (dist !== null) return `📍 ~${dist} km away`;
+            if (dist !== null) return `📍 ~${dist} km`;
         }
         if (localUser && localUser.address && shop.address) {
             const uCity = localUser.address.split(',')[0].toLowerCase().trim();
@@ -242,12 +239,28 @@ const Home = () => {
         <div style={styles.page}>
             <style>
                 {`
+                    /* 🟢 NEW: Golden Shine Animation for Main Logo */
+                    @keyframes logo-shine {
+                        0% { background-position: -200% center; }
+                        100% { background-position: 200% center; }
+                    }
+                    .animated-logo {
+                        background: linear-gradient(to right, #facc15 20%, #ffffff 40%, #ffffff 60%, #facc15 80%);
+                        background-size: 200% auto;
+                        color: #000;
+                        background-clip: text;
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        animation: logo-shine 3s linear infinite;
+                    }
+
                     @keyframes scroll-left { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
                     @keyframes pulse-logo { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.8; } }
                     
+                    /* 🟢 FIX: Perfect running text that stays inside its box */
                     @keyframes running-text {
-                        0%   { transform: translate(0, 0); }
-                        100% { transform: translate(-100%, 0); }
+                        0%   { transform: translateX(100%); }
+                        100% { transform: translateX(-120%); }
                     }
                     .scroll-container {
                         width: 100%;
@@ -257,8 +270,7 @@ const Home = () => {
                     }
                     .scroll-text {
                         display: inline-block;
-                        padding-left: 100%;
-                        animation: running-text 7s linear infinite;
+                        animation: running-text 5s linear infinite;
                     }
 
                     .warning-text { display: inline-block; white-space: nowrap; animation: scroll-left 15s linear infinite; color: #b91c1c; font-weight: 900; font-size: 15px; letter-spacing: 1px; }
@@ -271,7 +283,8 @@ const Home = () => {
                 <div style={styles.headerTopRow}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
                         <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                            <span style={{ fontSize: '26px', fontWeight: '900', letterSpacing: '-0.5px', color: '#facc15', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>SUBHAMS</span>
+                            {/* 🟢 Animated Premium Logo */}
+                            <span className="animated-logo" style={{ fontSize: '26px', fontWeight: '900', letterSpacing: '-0.5px' }}>SUBHAMS</span>
                             <span style={{ fontSize: '14px', color: '#ffffff', fontWeight: '800', letterSpacing: '2px' }}>HUB</span>
                         </h1>
                     </div>
@@ -364,28 +377,6 @@ const Home = () => {
 
             <div style={{ maxWidth: '1000px', margin: '15px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box' }}>
                 
-                {/* 🟢 PREMIUM ECOSYSTEM BANNERS (Only PMMS & Agent to fit perfectly) */}
-                {!loading && !searchQuery && !selectedSubCategory && selectedCategory === CATEGORIES[1] && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingBottom: '15px' }}>
-                        <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} style={{ ...styles.ecoBanner, width: '100%', background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
-                            <div style={styles.ecoIcon}>💰</div>
-                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                <span style={styles.ecoTitle}>Subhams PMMS</span>
-                                <span style={styles.ecoSub}>Secure Finances</span>
-                            </div>
-                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
-                        </div>
-                        <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} style={{ ...styles.ecoBanner, width: '100%', background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}>
-                            <div style={styles.ecoIcon}>🖨️</div>
-                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                <span style={styles.ecoTitle}>Subhams Agent</span>
-                                <span style={styles.ecoSub}>Cloud Printing</span>
-                            </div>
-                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
-                        </div>
-                    </div>
-                )}
-
                 {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
                         <div style={{ animation: 'pulse-logo 1.5s ease-in-out infinite', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -428,13 +419,11 @@ const Home = () => {
                                                             <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid white' }} />
                                                         </div>
                                                         
-                                                        {shop.business_name.length > 10 ? (
-                                                            <div className="scroll-container" style={{ marginTop: '6px' }}>
-                                                                <span className="scroll-text" style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b' }}>{shop.business_name}</span>
-                                                            </div>
-                                                        ) : (
-                                                            <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b', textAlign: 'center', marginTop: '6px', whiteSpace: 'nowrap', width: '100%' }}>{shop.business_name}</span>
-                                                        )}
+                                                        <div className="scroll-container" style={{ marginTop: '6px' }}>
+                                                            <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b' }}>
+                                                                {shop.business_name}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -446,7 +435,7 @@ const Home = () => {
 
                                 {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
 
-                                {/* 🏪 MAIN SHOPS LIST (3-COLUMN GRID) */}
+                                {/* 🏪 MAIN SHOPS LIST (🟢 STRICT 3-COLUMN GRID FIX: minmax(0,1fr)) */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div style={{padding: '0 5px'}}>
                                         <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
@@ -475,17 +464,12 @@ const Home = () => {
                                                             </div>
                                                         )}
                                                         
-                                                        {shop.business_name.length > 11 ? (
-                                                            <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
-                                                                <h4 className="scroll-text" style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
-                                                                    {shop.business_name}
-                                                                </h4>
-                                                            </div>
-                                                        ) : (
-                                                            <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                        {/* 🟢 PERFECT RUNNING TEXT THAT DOES NOT STRETCH THE BOX */}
+                                                        <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
+                                                            <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
                                                                 {shop.business_name}
                                                             </h4>
-                                                        )}
+                                                        </div>
 
                                                         <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                                                             {tc(shop.category)}
@@ -568,17 +552,11 @@ const Home = () => {
                                                                     </div>
                                                                 )}
 
-                                                                {shop.business_name.length > 11 ? (
-                                                                    <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
-                                                                        <h4 className="scroll-text" style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
-                                                                            {shop.business_name}
-                                                                        </h4>
-                                                                    </div>
-                                                                ) : (
-                                                                    <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                                <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
+                                                                    <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
                                                                         {shop.business_name}
                                                                     </h4>
-                                                                )}
+                                                                </div>
 
                                                                 <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                                                                     {tc(shop.category)}
@@ -653,21 +631,17 @@ const styles = {
     catContent: { display: 'flex', gap: '22px', padding: '14px 20px', width: 'max-content', margin: '0 auto' },
     catItem: { flexShrink: 0, fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
     
-    ecoBanner: { cursor: 'pointer', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', gap: '10px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
-    ecoIcon: { fontSize: '20px', background: 'rgba(255,255,255,0.2)', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' },
-    ecoTitle: { fontSize: '12px', fontWeight: '900', letterSpacing: '0.5px' },
-    ecoSub: { fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
-
-    mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', width: '100%' },
-    mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', width: '100%' },
+    // 🟢 STRICT CSS GRID: minmax(0, 1fr) violently forces the boxes to stay equal size and prevents overflow stretching
+    mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px', width: '100%' },
+    mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' },
     desktopProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'flex-start' },
-    // 🟢 FIXED: Desktop Folders now render in a perfect row layout instead of 1-by-1 stacking!
     desktopFolderGrid: { display: 'flex', flexDirection: 'row', gap: '20px', flexWrap: 'wrap', justifyContent: 'flex-start', width: '100%' },
 
-    shopCardMobile: { background: 'white', borderRadius: '8px', padding: '6px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', position: 'relative', width: '100%', boxSizing: 'border-box' },
+    // 🟢 SHOP CARDS: Overflow hidden locks the stretching
+    shopCardMobile: { background: 'white', borderRadius: '8px', padding: '6px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', position: 'relative', width: '100%', boxSizing: 'border-box', overflow: 'hidden' },
     shopImageMobile: { width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' },
 
-    shopCardDesktop: { width: '240px', background: 'white', borderRadius: '16px', padding: '16px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', position: 'relative' },
+    shopCardDesktop: { width: '240px', background: 'white', borderRadius: '16px', padding: '16px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' },
     shopImageDesktop: { width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginBottom: '12px' },
     
     bottomNavContainer: { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#ffffff', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 10px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', zIndex: 1000, boxShadow: '0 -4px 10px rgba(0,0,0,0.05)' },
