@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder } from 'lucide-react'; 
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ExternalLink } from 'lucide-react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify'; 
 import ProductCard from '../components/ProductCard';
 import { AppContext } from '../context/AppContext'; 
 
+import TrendingSection from '../components/TrendingSection';
 import PromotionsSection from '../components/PromotionsSection'; 
 
 const getBackendUrl = () => {
@@ -22,15 +23,18 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
-// 🟢 EXACT GPS MATHEMATICS (Haversine Formula)
+// 🟢 REAL GPS MATH (Haversine Formula) - Converts Lat/Lng into Exact Kilometers
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-    const R = 6371; 
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const l1 = parseFloat(lat1), ln1 = parseFloat(lon1);
+    const l2 = parseFloat(lat2), ln2 = parseFloat(lon2);
+    if (isNaN(l1) || isNaN(ln1) || isNaN(l2) || isNaN(ln2)) return null;
+
+    const R = 6371; // Earth's radius in km
+    const dLat = (l2 - l1) * (Math.PI / 180);
+    const dLon = (ln2 - ln1) * (Math.PI / 180);
     const a = 
         Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+        Math.cos(l1 * (Math.PI / 180)) * Math.cos(l2 * (Math.PI / 180)) * 
         Math.sin(dLon/2) * Math.sin(dLon/2); 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
     return (R * c).toFixed(1); 
@@ -141,29 +145,41 @@ const Home = () => {
         setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
     };
 
-    // 🟢 SMART LOCATION TAG: Real Math + Profile Syncing
+    // 🟢 DYNAMIC LOCATION TAG (GPS + Fallback Profile Address)
     const getDistanceTag = (shop) => {
-        // 1. If GPS is on, show exact km
         if (appLocation?.lat && appLocation?.lng && shop.lat && shop.lng) {
-            const distance = calculateDistance(appLocation.lat, appLocation.lng, shop.lat, shop.lng);
-            if (distance) return `📍 ~${distance} km`;
+            const dist = calculateDistance(appLocation.lat, appLocation.lng, shop.lat, shop.lng);
+            if (dist !== null) return `📍 ${dist} km away`;
         }
         
-        // 2. If no GPS, match user's profile address with the shop's address
-        const sAddr = shop.address || shop.location || '';
-        const uAddr = localUser?.address || localUser?.location || '';
+        if (localUser && localUser.address && shop.address) {
+            const uCity = localUser.address.split(',')[0].toLowerCase().trim();
+            const sAddr = shop.address.toLowerCase();
+            if (sAddr.includes(uCity)) return `📍 Near ${localUser.address.split(',')[0]}`;
+        }
         
-        if (uAddr && sAddr.toLowerCase().includes(uAddr.toLowerCase())) {
-            return `📍 In ${uAddr.split(',')[0]}`;
-        }
-
-        // 3. Fallback to just the shop's city name
-        if (sAddr) {
-            return `📍 ${sAddr.split(',')[0]}`;
-        }
-
+        if (!localUser && !appLocation?.lat) return "📍 Login for distance";
+        if (localUser && !appLocation?.lat) return "📍 Turn on GPS";
+        if (shop.address) return `📍 ${shop.address.split(',')[0]}`;
+        
         return "📍 Nearby"; 
     };
+
+    // 🟢 25km RADIUS FILTER FOR "NEARBY ACTIVE SHOPS"
+    const nearbyShops = activeShops.filter(shop => {
+        // Condition 1: GPS is exact
+        if (appLocation?.lat && appLocation?.lng && shop.lat && shop.lng) {
+            const dist = calculateDistance(appLocation.lat, appLocation.lng, shop.lat, shop.lng);
+            return dist !== null && dist <= 25.0; // Strictly within 25km
+        }
+        // Condition 2: Fallback to Profile City matching
+        if (localUser && localUser.address && shop.address) {
+            const uCity = localUser.address.split(',')[0].toLowerCase().trim();
+            const sAddr = shop.address.toLowerCase();
+            return sAddr.includes(uCity);
+        }
+        return false;
+    });
 
     const folderStats = adminCategories.map(adminCat => {
         const shopCount = activeShops.filter(shop => {
@@ -312,34 +328,6 @@ const Home = () => {
             )}
 
             <div style={{ maxWidth: '1000px', margin: '15px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box' }}>
-                
-                {/* 🟢 PREMIUM ECOSYSTEM BANNERS */}
-                {!loading && !searchQuery && !selectedSubCategory && (
-                    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '15px', scrollSnapType: 'x mandatory' }} className="hide-scroll">
-                        <div style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #2874f0, #1e3a8a)' }}>
-                            <div style={styles.ecoIcon}>🏪</div>
-                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                <span style={styles.ecoTitle}>Subhams Hub</span>
-                                <span style={styles.ecoSub}>Local Marketplace</span>
-                            </div>
-                        </div>
-                        <div style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
-                            <div style={styles.ecoIcon}>💰</div>
-                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                <span style={styles.ecoTitle}>Subhams PMMS</span>
-                                <span style={styles.ecoSub}>Secure Finances</span>
-                            </div>
-                        </div>
-                        <div style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}>
-                            <div style={styles.ecoIcon}>🖨️</div>
-                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                <span style={styles.ecoTitle}>Subhams Agent</span>
-                                <span style={styles.ecoSub}>Cloud Printing</span>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
                         <div style={{ animation: 'pulse-logo 1.5s ease-in-out infinite', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -365,22 +353,58 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 COMPACT NEARBY ACTIVE SHOPS (Small Circular Icons) */}
-                                {selectedCategory === CATEGORIES[1] && activeShops.length > 0 && (
-                                    <div style={{ marginBottom: '25px', padding: '0 5px' }}>
-                                        <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>
-                                            📍 Nearby Active Shops
-                                        </h2>
-                                        <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
-                                            {activeShops.map(shop => (
-                                                <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '65px', flexShrink: 0, cursor: 'pointer' }}>
-                                                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(45deg, #2874f0, #facc15)', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                                                        <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid white' }} />
-                                                    </div>
-                                                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b', textAlign: 'center', marginTop: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{shop.business_name}</span>
-                                                </div>
-                                            ))}
+                                {/* 🟢 SMALL PREMIUM BANNERS (ONLY ON TRENDING PAGE) */}
+                                {selectedCategory === CATEGORIES[1] && (
+                                    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '20px', scrollSnapType: 'x mandatory' }} className="hide-scroll">
+                                        <div onClick={() => window.open('https://hub.subhamsnetworks.in', '_self')} style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #2874f0, #1e3a8a)' }}>
+                                            <div style={styles.ecoIcon}>🏪</div>
+                                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                                <span style={styles.ecoTitle}>Subhams Hub</span>
+                                                <span style={styles.ecoSub}>Explore Local Market</span>
+                                            </div>
                                         </div>
+                                        <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
+                                            <div style={styles.ecoIcon}>💰</div>
+                                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                                <span style={styles.ecoTitle}>Subhams PMMS</span>
+                                                <span style={styles.ecoSub}>Secure Finances</span>
+                                            </div>
+                                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
+                                        </div>
+                                        <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}>
+                                            <div style={styles.ecoIcon}>🖨️</div>
+                                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                                <span style={styles.ecoTitle}>Subhams Agent</span>
+                                                <span style={styles.ecoSub}>Cloud Printing</span>
+                                            </div>
+                                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS (25KM RADIUS) */}
+                                {selectedCategory === CATEGORIES[1] && (
+                                    <div style={{ marginBottom: '25px', padding: '0 5px' }}>
+                                        <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Nearby Active Shops</h2>
+                                        
+                                        {(!appLocation?.lat && !localUser) ? (
+                                            <div style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe' }} onClick={() => navigate('/welcome')}>
+                                                <MapPin size={16} color="#2563eb"/> Login or Turn on GPS to see shops near you!
+                                            </div>
+                                        ) : nearbyShops.length > 0 ? (
+                                            <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
+                                                {nearbyShops.map(shop => (
+                                                    <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '65px', flexShrink: 0, cursor: 'pointer' }}>
+                                                        <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(45deg, #2874f0, #facc15)', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                                                            <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid white' }} />
+                                                        </div>
+                                                        <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b', textAlign: 'center', marginTop: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{shop.business_name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p style={{fontSize: '12px', color: '#64748b', margin: 0, padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No active shops found within 25km of your location.</p>
+                                        )}
                                     </div>
                                 )}
 
@@ -451,7 +475,8 @@ const Home = () => {
                                                                 const imgSrc = adminCat ? adminCat.hd_image : 'https://via.placeholder.com/150/e2e8f0/64748b?text=' + catName.substring(0, 3);
 
                                                                 return (
-                                                                    <div key={index} onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', cursor: 'pointer' }}>
+                                                                    // 🟢 FIXED: Removed width: 100% so it behaves on Desktop!
+                                                                    <div key={index} onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: isMobile ? '100%' : '90px', cursor: 'pointer' }}>
                                                                         <img src={getOptimizedImage(imgSrc)} alt={catName} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: isMobile ? '55px' : '75px', height: isMobile ? '55px' : '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'}} />
                                                                         <span style={{ fontSize: isMobile ? '10px' : '13px', marginTop: '6px', fontWeight: '800', color: '#1e293b', textAlign: 'center', lineHeight: '1.2' }}>{catName}</span>
                                                                     </div>
@@ -571,10 +596,10 @@ const styles = {
     catContent: { display: 'flex', gap: '22px', padding: '14px 20px', width: 'max-content', margin: '0 auto' },
     catItem: { flexShrink: 0, fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
     
-    // 🟢 PREMIUM ECOSYSTEM BANNERS
-    ecoBanner: { flexShrink: 0, width: '220px', scrollSnapAlign: 'start', borderRadius: '12px', padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
-    ecoIcon: { fontSize: '24px', background: 'rgba(255,255,255,0.2)', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' },
-    ecoTitle: { fontSize: '13px', fontWeight: '900', letterSpacing: '0.5px' },
+    // 🟢 PREMIUM CLICKABLE ECOSYSTEM BANNERS (Smaller width)
+    ecoBanner: { flexShrink: 0, width: '180px', cursor: 'pointer', scrollSnapAlign: 'start', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', gap: '10px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
+    ecoIcon: { fontSize: '20px', background: 'rgba(255,255,255,0.2)', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' },
+    ecoTitle: { fontSize: '12px', fontWeight: '900', letterSpacing: '0.5px' },
     ecoSub: { fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
 
     // 🟢 3-COLUMN & 4-COLUMN STRICT WRAPPING GRIDS
