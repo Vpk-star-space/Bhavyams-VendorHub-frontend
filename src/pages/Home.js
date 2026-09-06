@@ -22,26 +22,9 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
-// 🟢 REAL GPS MATH (Haversine Formula) - Checks Exact 25km Radius
-const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const l1 = parseFloat(lat1), ln1 = parseFloat(lon1);
-    const l2 = parseFloat(lat2), ln2 = parseFloat(lon2);
-    if (isNaN(l1) || isNaN(ln1) || isNaN(l2) || isNaN(ln2)) return null;
-
-    const R = 6371; 
-    const dLat = (l2 - l1) * (Math.PI / 180);
-    const dLon = (ln2 - ln1) * (Math.PI / 180);
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(l1 * (Math.PI / 180)) * Math.cos(l2 * (Math.PI / 180)) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2); 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    return (R * c).toFixed(1); 
-};
-
 const homeTranslations = {
-    en: { syncing: "Syncing Market...", searchFor: "Search across all shops, categories & items...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin" },
-    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "అన్ని దుకాణాలు, వర్గాలు & వస్తువుల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
+    en: { syncing: "Syncing Market...", searchFor: "Search shops & items...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin" },
+    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "దుకాణాలు, వస్తువుల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
 };
 
 const categoryTranslations = {
@@ -56,7 +39,7 @@ const categoryTranslations = {
     'Services': 'సేవలు'
 };
 
-// 🟢 LOCATION ALIAS DICTIONARY (Bridges English and Telugu spelling gaps)
+// 🟢 SMART LOCATION ALIAS DICTIONARY (Ensures English and Telugu addresses match perfectly)
 const locationAliases = {
     'konanki': ['konanki', 'కోణంకి', 'kona'],
     'martur': ['martur', 'మార్టూరు'],
@@ -96,6 +79,7 @@ const Home = () => {
     const [localUserStr, setLocalUserStr] = useState(localStorage.getItem('user'));
     const localUser = localUserStr && localUserStr !== 'undefined' ? JSON.parse(localUserStr) : null;
     
+    // 🟢 CUSTOM LOCATION STATE
     const [customLocation, setCustomLocation] = useState(() => JSON.parse(localStorage.getItem('custom_hub_location')));
     const [showLocModal, setShowLocModal] = useState(false);
     const [locSearch, setLocSearch] = useState('');
@@ -177,6 +161,7 @@ const Home = () => {
         toast.success(`Location set to ${loc.display_name.split(',')[0]}`);
     };
 
+    // 🟢 BUTTERY SMOOTH TOUCH GESTURE ENGINE (Swipe Left/Right)
     const [touchStart, setTouchStart] = useState(null);
     const [touchStartY, setTouchStartY] = useState(null);
     
@@ -218,32 +203,19 @@ const Home = () => {
         setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
     };
 
-    const activeLat = customLocation?.lat || appLocation?.lat;
-    const activeLng = customLocation?.lng || appLocation?.lng;
-
+    // 🟢 SIMPLE CITY DISPLAY LOGIC (No exact distance math)
     const getDistanceTag = (shop) => {
-        if (activeLat && activeLng && shop.lat && shop.lng) {
-            const dist = calculateDistance(activeLat, activeLng, shop.lat, shop.lng);
-            if (dist !== null) return `📍 ~${dist} km`;
-        }
         if (shop.address) return `📍 ${shop.address.split(',')[0]}`;
         return "📍 Nearby"; 
     };
 
-    // 🟢 SMART NEARBY SHOPS ALGORITHM (Math + Multi-Lang Alias)
+    // 🟢 NEARBY SHOPS ALGORITHM (Smart Address Matching ONLY)
     const nearbyShops = activeShops.filter(shop => {
-        // 1. GPS MATH CHECK: If we have coordinates, check exactly 25km
-        if (activeLat && activeLng && shop.lat && shop.lng) {
-            const dist = calculateDistance(activeLat, activeLng, shop.lat, shop.lng);
-            if (dist !== null && dist <= 25.0) return true; 
-        }
-        
-        // 2. MULTI-LANG TEXT FALLBACK: If no GPS, match words intelligently
         const searchAddrRaw = (customLocation?.address || localUser?.address || localUser?.location || '').toLowerCase();
         const shopAddrRaw = (shop.address || shop.location || '').toLowerCase();
         
         if (searchAddrRaw && shopAddrRaw) {
-            // Flatten the shop address against aliases to find matches across languages
+            // Check Aliases First (e.g. Konanki = కోణంకి)
             let isMatch = false;
             Object.keys(locationAliases).forEach(key => {
                 const aliases = locationAliases[key];
@@ -251,14 +223,12 @@ const Home = () => {
                 const shopHasAlias = aliases.some(alias => shopAddrRaw.includes(alias));
                 if (searchHasAlias && shopHasAlias) isMatch = true;
             });
-
             if (isMatch) return true;
 
-            // Basic Word Match
+            // Basic Word Match (Finds matching words longer than 3 letters)
             const uParts = searchAddrRaw.split(/[\s,]+/); 
             if (uParts.some(part => part.length >= 4 && shopAddrRaw.includes(part))) return true;
         }
-        
         return false;
     });
 
@@ -301,6 +271,9 @@ const Home = () => {
 
     const currentTabEnglish = selectedCategory === (t('Services') || 'Services') ? 'Services' : (selectedCategory === (t('Shopping') || 'Shopping') ? 'Products' : selectedCategory);
 
+    // Get exact active location name for UI
+    const activeLocationName = customLocation ? customLocation.address.split(',')[0] : (localUser?.address ? localUser.address.split(',')[0] : "Set Loc");
+
     return (
         <div style={styles.page}>
             <style>
@@ -339,12 +312,11 @@ const Home = () => {
                     }
 
                     .touch-scale {
-                        transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+                        transition: transform 0.15s cubic-bezier(0.25, 0.8, 0.25, 1);
                     }
                     @media (hover: hover) {
                         .touch-scale:hover {
                             transform: scale(1.04);
-                            box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
                             z-index: 10;
                         }
                     }
@@ -362,8 +334,8 @@ const Home = () => {
                 <div style={styles.headerTopRow}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
                         <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                            <span className="animated-logo" style={{ fontSize: '26px', fontWeight: '900', letterSpacing: '-0.5px' }}>SUBHAMS</span>
-                            <span style={{ fontSize: '14px', color: '#ffffff', fontWeight: '800', letterSpacing: '2px' }}>HUB</span>
+                            <span className="animated-logo" style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '-0.5px' }}>SUBHAMS</span>
+                            <span style={{ fontSize: '13px', color: '#ffffff', fontWeight: '800', letterSpacing: '1px' }}>HUB</span>
                         </h1>
                     </div>
                     
@@ -378,47 +350,44 @@ const Home = () => {
                     ) : null}
                 </div>
 
-                <div style={styles.headerSearchRow}>
-                    <div style={styles.searchBarWrapper}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', marginBottom: '10px' }}>
-                            <div className="touch-scale" style={{display: 'flex', alignItems: 'center', background: '#1e3a8a', padding: '6px 12px', borderRadius: '8px', color: 'white', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer'}} onClick={() => setShowLocModal(true)}>
-                                <MapPin size={14} color="#facc15" style={{marginRight: '6px'}}/> 
-                                {customLocation ? customLocation.address.split(',')[0] : (appLocation?.lat ? "GPS Active - Nearby" : "Set Location")}
-                                <span style={{marginLeft: '8px', opacity: 0.7}}>▾</span>
-                            </div>
-                        </div>
+                {/* 🟢 COMPACT HEADER: Location and Search Bar together! */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 15px 12px 15px', background: '#2874f0', width: '100%', boxSizing: 'border-box' }}>
+                    <div className="touch-scale" style={styles.locationPill} onClick={() => setShowLocModal(true)}>
+                        <MapPin size={14} color="#facc15" style={{flexShrink: 0}} />
+                        <span style={{maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{activeLocationName}</span>
+                        <span style={{opacity: 0.7, fontSize: '10px'}}>▾</span>
+                    </div>
 
-                        <div style={styles.searchBar}>
-                            <input 
-                                type="text" 
-                                placeholder={selectedSubCategory ? `Search in ${tc(selectedSubCategory)}...` : ht.searchFor} 
-                                style={styles.searchInput} 
-                                value={searchQuery} 
-                                onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
-                                onFocus={() => setShowSuggestions(true)}
-                                onBlur={() => setTimeout(() => setShowSuggestions(false), 250)}
-                            />
-                            <Search size={18} color="#2874f0" style={styles.searchIcon} />
-                        </div>
-
+                    <div style={{ flex: 1, position: 'relative' }}>
+                        <input 
+                            type="text" 
+                            placeholder={selectedSubCategory ? `Search in ${tc(selectedSubCategory)}...` : ht.searchFor} 
+                            style={styles.searchInputCompact} 
+                            value={searchQuery} 
+                            onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
+                            onFocus={() => setShowSuggestions(true)}
+                            onBlur={() => setTimeout(() => setShowSuggestions(false), 250)}
+                        />
+                        <Search size={16} color="#2874f0" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer' }} />
+                        
                         {showSuggestions && searchSuggestions.length > 0 && (
                             <div style={styles.suggestionsBox}>
                                 {searchSuggestions.map((sug, i) => (
                                     <div key={i} style={styles.suggestionItem} onClick={() => handleSuggestionClick(sug)}>
                                         {sug.type === 'category' ? (
                                             <>
-                                                <Folder size={18} color="#f59e0b" style={{flexShrink: 0}}/>
+                                                <Folder size={16} color="#f59e0b" style={{flexShrink: 0}}/>
                                                 <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
-                                                    <span style={{fontWeight: '900', color: '#0f172a', fontSize: '15px'}}>{tc(sug.name)} Category</span>
+                                                    <span style={{fontWeight: '900', color: '#0f172a', fontSize: '14px'}}>{tc(sug.name)} Category</span>
                                                 </div>
                                             </>
                                         ) : (
                                             <>
-                                                <Store size={18} color="#2874f0" style={{flexShrink: 0}}/>
+                                                <Store size={16} color="#2874f0" style={{flexShrink: 0}}/>
                                                 <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
-                                                    <span style={{fontWeight: '900', color: '#0f172a', fontSize: '15px'}}>{sug.name}</span>
+                                                    <span style={{fontWeight: '900', color: '#0f172a', fontSize: '14px'}}>{sug.name}</span>
                                                 </div>
-                                                <span style={{fontSize: '11px', background: '#f0fdf4', color: '#16a34a', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold'}}>Visit Shop</span>
+                                                <span style={{fontSize: '10px', background: '#f0fdf4', color: '#16a34a', padding: '3px 8px', borderRadius: '10px', fontWeight: 'bold'}}>Visit Shop</span>
                                             </>
                                         )}
                                     </div>
@@ -465,10 +434,6 @@ const Home = () => {
                             <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>Set Delivery Location</h3>
                             <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLocModal(false)} />
                         </div>
-                        
-                        <button onClick={() => { localStorage.removeItem('custom_hub_location'); setCustomLocation(null); setShowLocModal(false); toast.success("Using Automatic GPS"); }} style={styles.gpsBtn}>
-                            <Navigation size={16} /> Use my current GPS location
-                        </button>
 
                         <div style={{position: 'relative', marginTop: '15px'}}>
                             <input 
@@ -525,35 +490,34 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 PREMIUM BANNERS ADDED TO TRENDING (Side by Side) */}
+                                {/* 🟢 PREMIUM BANNERS (Icon Top, Text Bottom) */}
                                 {selectedCategory === CATEGORIES[1] && (
-                                    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '20px', scrollSnapType: 'x mandatory' }} className="hide-scroll">
+                                    <div style={{ display: 'flex', gap: '10px', paddingBottom: '20px' }}>
                                         <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
                                             <div style={styles.ecoIcon}>💰</div>
-                                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'}}>
                                                 <span style={styles.ecoTitle}>Subhams PMMS</span>
                                                 <span style={styles.ecoSub}>Secure Finances</span>
                                             </div>
-                                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
                                         </div>
                                         <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}>
                                             <div style={styles.ecoIcon}>🖨️</div>
-                                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'}}>
                                                 <span style={styles.ecoTitle}>Subhams Agent</span>
                                                 <span style={styles.ecoSub}>Cloud Printing</span>
                                             </div>
-                                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
                                         </div>
                                     </div>
                                 )}
 
+                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{ marginBottom: '25px', padding: '0 5px' }}>
-                                        <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Nearby Active Shops (25km)</h2>
+                                        <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Shops In Your Area</h2>
                                         
-                                        {(!activeLat && !localUser) ? (
+                                        {!customLocation && !localUser?.address ? (
                                             <div className="touch-scale" style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe' }} onClick={() => setShowLocModal(true)}>
-                                                <MapPin size={16} color="#2563eb"/> Click here to Set Location & discover nearby shops!
+                                                <MapPin size={16} color="#2563eb"/> Set Location to discover nearby shops!
                                             </div>
                                         ) : nearbyShops.length > 0 ? (
                                             <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
@@ -571,13 +535,14 @@ const Home = () => {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <p style={{fontSize: '12px', color: '#64748b', margin: 0, padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No active shops found strictly within 25km of {customLocation ? customLocation.address.split(',')[0] : 'your location'}.</p>
+                                            <p style={{fontSize: '12px', color: '#64748b', margin: 0, padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No shops matched in {activeLocationName} yet.</p>
                                         )}
                                     </div>
                                 )}
 
                                 {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
 
+                                {/* 🏪 MAIN SHOPS LIST (🟢 STRICT 3-COLUMN WRAPPING GRID) */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div style={{padding: '0 5px'}}>
                                         <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
@@ -625,6 +590,7 @@ const Home = () => {
                                     </div>
                                 )}
 
+                                {/* 📁 CATEGORIES & SHOPS VIEW (🟢 STRICT 4-COLUMN CATEGORIES, 3-COLUMN SHOPS) */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div style={{padding: '0 5px'}}>
                                         {!selectedSubCategory ? (
@@ -753,21 +719,19 @@ const styles = {
     page: { background: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' },
     
     headerStack: { display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' },
-    headerTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: '#2874f0', width: '100%', boxSizing: 'border-box' },
-    headerSearchRow: { padding: '0 20px 15px 20px', background: '#2874f0', width: '100%', boxSizing: 'border-box' },
-    headerCatStrip: { background: '#ffffff', borderBottom: '1px solid #e2e8f0', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 10px' },
-
-    adminBtn: { background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '6px 14px', borderRadius: '20px', fontWeight: '900', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)' },
-    loginHeaderBtn: { background: '#ffffff', color: '#2874f0', border: 'none', padding: '8px 16px', borderRadius: '20px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)' },
+    headerTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px 5px 15px', background: '#2874f0', width: '100%', boxSizing: 'border-box' },
     
-    searchBarWrapper: { position: 'relative', maxWidth: '800px', margin: '0 auto' },
-    searchBar: { width: '100%', display: 'flex', position: 'relative', alignItems: 'center' },
-    searchInput: { width: '100%', padding: '14px 45px 14px 15px', borderRadius: '12px', border: 'none', outline: 'none', fontSize: '15px', background: '#ffffff', fontWeight: '600', transition: '0.2s', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
-    searchIcon: { position: 'absolute', right: '15px', cursor: 'pointer' },
+    adminBtn: { background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '5px 12px', borderRadius: '20px', fontWeight: '900', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)' },
+    loginHeaderBtn: { background: '#ffffff', color: '#2874f0', border: 'none', padding: '5px 12px', borderRadius: '20px', fontWeight: '900', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)' },
+    
+    locationPill: { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.15)', padding: '8px 12px', borderRadius: '8px', color: 'white', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.2)' },
+    
+    searchInputCompact: { width: '100%', padding: '8px 35px 8px 12px', borderRadius: '8px', border: 'none', outline: 'none', fontSize: '14px', background: '#ffffff', fontWeight: '600', transition: '0.2s', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' },
     
     suggestionsBox: { position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #cbd5e1', zIndex: 150, overflow: 'hidden' },
     suggestionItem: { padding: '14px 15px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: '0.2s', background: 'white' },
 
+    headerCatStrip: { background: '#ffffff', borderBottom: '1px solid #e2e8f0', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 10px' },
     catContent: { display: 'flex', gap: '22px', padding: '14px 20px', width: 'max-content', margin: '0 auto' },
     catItem: { flexShrink: 0, fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
     
@@ -778,10 +742,10 @@ const styles = {
     locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
     locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' },
 
-    ecoBanner: { cursor: 'pointer', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', gap: '10px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
-    ecoIcon: { fontSize: '20px', background: 'rgba(255,255,255,0.2)', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' },
-    ecoTitle: { fontSize: '12px', fontWeight: '900', letterSpacing: '0.5px' },
-    ecoSub: { fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+    ecoBanner: { cursor: 'pointer', borderRadius: '12px', padding: '15px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', flex: 1, textAlign: 'center' },
+    ecoIcon: { fontSize: '24px', background: 'rgba(255,255,255,0.2)', width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' },
+    ecoTitle: { fontSize: '13px', fontWeight: '900', letterSpacing: '0.5px' },
+    ecoSub: { fontSize: '11px', color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
 
     mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px', width: '100%' },
     mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' },
