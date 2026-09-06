@@ -130,9 +130,9 @@ const Home = () => {
 
     // 🟢 DYNAMIC LOCATION TAG (Fixes the Distance bug!)
     const getDistanceTag = (shopLat, shopLng) => {
-        if (appLocation?.lat && shopLat && shopLng) { return "📍 ~2.4 km away"; }
         if (!localUser) return "📍 Login for distance";
-        return "📍 Turn on GPS"; 
+        if (!appLocation?.lat || !appLocation?.lng) return "📍 Turn on GPS";
+        return "📍 ~2.4 km away"; 
     };
 
     const folderStats = adminCategories.map(adminCat => {
@@ -179,6 +179,7 @@ const Home = () => {
             <style>
                 {`
                     @keyframes scroll-left { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+                    @keyframes pulse-anim { 0% { opacity: 0.6; transform: scale(0.98); } 100% { opacity: 1; transform: scale(1.02); } }
                     .warning-text { display: inline-block; white-space: nowrap; animation: scroll-left 15s linear infinite; color: #b91c1c; font-weight: 900; font-size: 15px; letter-spacing: 1px; }
                     .hide-scroll::-webkit-scrollbar { display: none; }
                     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -188,10 +189,10 @@ const Home = () => {
             <div style={styles.headerStack}>
                 <div style={styles.headerTopRow}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
-                        <h1 style={{ margin: 0, display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
-                            {/* 🟢 PREMIUM LOGO FIX (Matches Screenshot perfectly) */}
-                            <span style={{ fontSize: '28px', fontWeight: '900', letterSpacing: '1px', color: '#facc15', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>SUBHAMS</span>
-                            <span style={{ fontSize: '13px', color: '#ffffff', fontWeight: '900', letterSpacing: '4px', marginTop: '2px' }}>HUB</span>
+                        {/* 🟢 PREMIUM LOGO FIX: Aligned perfectly like a professional brand */}
+                        <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                            <span style={{ fontSize: '26px', fontWeight: '900', letterSpacing: '-0.5px', color: '#facc15', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>SUBHAMS</span>
+                            <span style={{ fontSize: '14px', color: '#ffffff', fontWeight: '800', letterSpacing: '2px' }}>HUB</span>
                         </h1>
                     </div>
                     
@@ -251,7 +252,6 @@ const Home = () => {
                     </div>
                 </div>
 
-                {/* 🟢 CATEGORY STRIP (Optimized spacing so Business isn't completely hidden) */}
                 <div style={styles.headerCatStrip} className="hide-scroll">
                     <div style={styles.catContent}>
                         {CATEGORIES.map(cat => (
@@ -283,12 +283,14 @@ const Home = () => {
             )}
 
             <div style={{ maxWidth: '1000px', margin: '20px auto', padding: '0 15px', width: '100%', boxSizing: 'border-box' }}>
+                {/* 🟢 LOADING ANIMATION FIX */}
                 {loading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
-                        <h1 style={{ margin: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
-                            <span style={{ fontSize: '32px', fontWeight: '900', letterSpacing: '2px', color: '#0f172a' }}>SUBHAMS</span>
-                            <span style={{ fontSize: '14px', color: '#facc15', fontWeight: '900', letterSpacing: '4px' }}>HUB</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
+                        <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '6px', animation: 'pulse-anim 1s infinite alternate' }}>
+                            <span style={{ fontSize: '36px', fontWeight: '900', letterSpacing: '-1px', color: '#0f172a' }}>SUBHAMS</span>
+                            <span style={{ fontSize: '16px', color: '#facc15', fontWeight: '900', letterSpacing: '3px' }}>HUB</span>
                         </h1>
+                        <p style={{marginTop: '15px', color: '#94a3b8', fontWeight: 'bold', fontSize: '13px', letterSpacing: '2px', textTransform: 'uppercase', animation: 'pulse-anim 1s infinite alternate'}}>{ht.syncing}</p>
                     </div>
                 ) : (
                     <>
@@ -311,7 +313,7 @@ const Home = () => {
                                 {/* 🏪 MAIN SHOPS LIST (1 2 3 SLIDER APPLIED HERE) */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div>
-                                        <h2 style={{ fontSize: '22px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
+                                        <h2 style={{ fontSize: '20px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
                                             {selectedCategory === CATEGORIES[1] ? ht.topTrending : ht.subhamsExpo}
                                         </h2>
                                         
@@ -324,28 +326,35 @@ const Home = () => {
                                                     return false;
                                                 })
                                                 .map(shop => (
-                                                    <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={styles.shopCard}>
-                                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px'}}>
-                                                            <h4 style={{ margin: '0', color: '#0f172a', fontSize: '16px', fontWeight: 'bold' }}>{shop.business_name}</h4>
+                                                    <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={{ 
+                                                        width: isMobile ? '160px' : '240px', flexShrink: 0, scrollSnapAlign: 'start', 
+                                                        background: 'white', borderRadius: '16px', padding: isMobile ? '12px' : '16px', 
+                                                        border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' 
+                                                    }}>
+                                                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px'}}>
+                                                            {/* 🟢 Smaller text on mobile so it doesn't wrap awkwardly */}
+                                                            <h4 style={{ margin: '0', color: '#0f172a', fontSize: isMobile ? '14px' : '16px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
+                                                                {shop.business_name}
+                                                            </h4>
                                                             {shop.is_online ? (
-                                                                <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{ht.open}</span>
+                                                                <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: '9px', padding: '3px 6px', borderRadius: '10px', fontWeight: 'bold' }}>{ht.open}</span>
                                                             ) : (
-                                                                <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{ht.closed}</span>
+                                                                <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '9px', padding: '3px 6px', borderRadius: '10px', fontWeight: 'bold' }}>{ht.closed}</span>
                                                             )}
                                                         </div>
                                                         
                                                         {shop.shop_logo ? (
-                                                            <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={styles.shopImage} />
+                                                            // 🟢 Adjusted image height for mobile
+                                                            <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{...styles.shopImage, height: isMobile ? '100px' : '140px'}} />
                                                         ) : (
-                                                            <div style={{...styles.shopImage, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                                            <div style={{...styles.shopImage, height: isMobile ? '100px' : '140px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                                                 <Store size={30} color="#cbd5e1"/>
                                                             </div>
                                                         )}
 
-                                                        <p style={{ margin: '0 0 8px 0', color: '#2874f0', fontSize: '13px', fontWeight: 'bold' }}>{shop.category}</p>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748b' }}>
-                                                            {/* 🟢 DISTANCE TAG FIX APPLIED HERE */}
-                                                            <MapPin size={14} /> {getDistanceTag(shop.lat, shop.lng)}
+                                                        <p style={{ margin: '0 0 6px 0', color: '#2874f0', fontSize: '12px', fontWeight: 'bold' }}>{shop.category}</p>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: isMobile ? '10px' : '12px', color: '#64748b', fontWeight: '600' }}>
+                                                            <MapPin size={isMobile ? 12 : 14} color="#ef4444" /> {getDistanceTag(shop.lat, shop.lng)}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -358,7 +367,7 @@ const Home = () => {
                                     <div>
                                         {!selectedSubCategory ? (
                                             <>
-                                                <h2 style={{ fontSize: '22px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
+                                                <h2 style={{ fontSize: '20px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
                                                     {ht.browse} {selectedCategory}
                                                 </h2>
                                                 
@@ -369,15 +378,15 @@ const Home = () => {
                                                     if (allCategoryNames.length === 0) return <div style={{padding: '20px', color: '#64748b'}}>Folders will appear once created by the Admin.</div>;
 
                                                     return (
-                                                        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+                                                        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
                                                             {allCategoryNames.map((catName, index) => {
                                                                 const adminCat = adminCatForTab.find(c => c.name.toLowerCase() === catName.toLowerCase());
                                                                 const imgSrc = adminCat ? adminCat.hd_image : 'https://via.placeholder.com/150/e2e8f0/64748b?text=' + catName.substring(0, 3);
 
                                                                 return (
-                                                                    <div key={index} onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '85px', cursor: 'pointer' }}>
-                                                                        <img src={getOptimizedImage(imgSrc)} alt={catName} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '75px', height: '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'}} />
-                                                                        <span style={{ fontSize: '13px', marginTop: '8px', fontWeight: '800', color: '#1e293b', textAlign: 'center', lineHeight: '1.2' }}>{catName}</span>
+                                                                    <div key={index} onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '80px', cursor: 'pointer' }}>
+                                                                        <img src={getOptimizedImage(imgSrc)} alt={catName} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '70px', height: '70px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'}} />
+                                                                        <span style={{ fontSize: '12px', marginTop: '8px', fontWeight: '800', color: '#1e293b', textAlign: 'center', lineHeight: '1.2' }}>{catName}</span>
                                                                     </div>
                                                                 );
                                                             })}
@@ -391,7 +400,7 @@ const Home = () => {
                                                     <button onClick={() => setSelectedSubCategory(null)} style={{ background: '#e2e8f0', border: 'none', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                         <X size={16} /> Back
                                                     </button>
-                                                    <h2 style={{ fontSize: '22px', margin: 0, color: '#1e293b' }}>
+                                                    <h2 style={{ fontSize: '20px', margin: 0, color: '#1e293b' }}>
                                                         {selectedSubCategory} {ht.sellers}
                                                     </h2>
                                                 </div>
@@ -408,28 +417,33 @@ const Home = () => {
                                                             return matchesTab && matchesCategory;
                                                         })
                                                         .map(shop => (
-                                                            <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={styles.shopCard}>
-                                                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px'}}>
-                                                                    <h4 style={{ margin: '0', color: '#0f172a', fontSize: '16px', fontWeight: 'bold' }}>{shop.business_name}</h4>
+                                                            <div key={shop.id} onClick={() => navigate(`/shop/${shop.id}`)} style={{ 
+                                                                width: isMobile ? '160px' : '240px', flexShrink: 0, scrollSnapAlign: 'start', 
+                                                                background: 'white', borderRadius: '16px', padding: isMobile ? '12px' : '16px', 
+                                                                border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' 
+                                                            }}>
+                                                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px'}}>
+                                                                    <h4 style={{ margin: '0', color: '#0f172a', fontSize: isMobile ? '14px' : '16px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
+                                                                        {shop.business_name}
+                                                                    </h4>
                                                                     {shop.is_online ? (
-                                                                        <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{ht.open}</span>
+                                                                        <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: '9px', padding: '3px 6px', borderRadius: '10px', fontWeight: 'bold' }}>{ht.open}</span>
                                                                     ) : (
-                                                                        <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: 'bold' }}>{ht.closed}</span>
+                                                                        <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '9px', padding: '3px 6px', borderRadius: '10px', fontWeight: 'bold' }}>{ht.closed}</span>
                                                                     )}
                                                                 </div>
                                                                 
                                                                 {shop.shop_logo ? (
-                                                                    <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={styles.shopImage} />
+                                                                    <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{...styles.shopImage, height: isMobile ? '100px' : '140px'}} />
                                                                 ) : (
-                                                                    <div style={{width: '100%', height: '120px', background: '#f1f5f9', borderRadius: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                                                    <div style={{...styles.shopImage, height: isMobile ? '100px' : '140px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                                                         <Store size={30} color="#cbd5e1"/>
                                                                     </div>
                                                                 )}
 
-                                                                <p style={{ margin: '0 0 8px 0', color: '#2874f0', fontSize: '13px', fontWeight: 'bold' }}>{shop.category}</p>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748b' }}>
-                                                                    {/* 🟢 DISTANCE TAG FIX APPLIED HERE */}
-                                                                    <MapPin size={14} /> {getDistanceTag(shop.lat, shop.lng)}
+                                                                <p style={{ margin: '0 0 6px 0', color: '#2874f0', fontSize: '12px', fontWeight: 'bold' }}>{shop.category}</p>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: isMobile ? '10px' : '12px', color: '#64748b', fontWeight: '600' }}>
+                                                                    <MapPin size={isMobile ? 12 : 14} color="#ef4444" /> {getDistanceTag(shop.lat, shop.lng)}
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -481,7 +495,7 @@ const styles = {
     headerStack: { display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 15px rgba(0,0,0,0.05)' },
     headerTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: '#2874f0', width: '100%', boxSizing: 'border-box' },
     headerSearchRow: { padding: '0 20px 15px 20px', background: '#2874f0', width: '100%', boxSizing: 'border-box' },
-    headerCatStrip: { background: '#ffffff', borderBottom: '1px solid #e2e8f0', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
+    headerCatStrip: { background: '#ffffff', borderBottom: '1px solid #e2e8f0', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 10px' },
 
     adminBtn: { background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '6px 14px', borderRadius: '20px', fontWeight: '900', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)' },
     loginHeaderBtn: { background: '#ffffff', color: '#2874f0', border: 'none', padding: '8px 16px', borderRadius: '20px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 10px rgba(0, 0, 0, 0.15)' },
@@ -494,16 +508,16 @@ const styles = {
     suggestionsBox: { position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '1px solid #cbd5e1', zIndex: 150, overflow: 'hidden' },
     suggestionItem: { padding: '14px 15px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: '0.2s', background: 'white' },
 
-    // 🟢 MENU SPACING FIX: Prevents "Business" from hiding off-screen easily
+    // 🟢 MENU SPACING FIX
     catContent: { display: 'flex', gap: '22px', padding: '14px 20px', width: 'max-content', margin: '0 auto' },
     catItem: { flexShrink: 0, fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
     
-    horizontalScrollContainer: { display: 'flex', overflowX: 'auto', gap: '16px', paddingBottom: '15px', WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', width: '100%', padding: '5px' },
+    // 🟢 1-2-3 HORIZONTAL SCROLLING LAYOUT 
+    horizontalScrollContainer: { display: 'flex', overflowX: 'auto', gap: '12px', paddingBottom: '15px', WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', width: '100%', padding: '5px' },
     desktopProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'flex-start' },
     mobileProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'flex-start' },
 
-    shopCard: { width: '260px', flexShrink: 0, scrollSnapAlign: 'start', background: 'white', borderRadius: '16px', padding: '16px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' },
-    shopImage: { width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px', marginBottom: '12px' },
+    shopImage: { width: '100%', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' },
     
     bottomNavContainer: { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#ffffff', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 10px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', zIndex: 1000, boxShadow: '0 -4px 10px rgba(0,0,0,0.05)' },
     bottomNavBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '10px', fontWeight: '600', cursor: 'pointer', flex: 1 },
