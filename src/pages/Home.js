@@ -6,7 +6,6 @@ import { toast } from 'react-toastify';
 import ProductCard from '../components/ProductCard';
 import { AppContext } from '../context/AppContext'; 
 
-import TrendingSection from '../components/TrendingSection';
 import PromotionsSection from '../components/PromotionsSection'; 
 
 const getBackendUrl = () => {
@@ -23,13 +22,13 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
-// 🟢 REAL GPS MATH (Haversine Formula) - Converts Lat/Lng into Exact Kilometers
+// 🟢 REAL GPS MATH (Haversine Formula) - Checks Exact 25km Radius
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const l1 = parseFloat(lat1), ln1 = parseFloat(lon1);
     const l2 = parseFloat(lat2), ln2 = parseFloat(lon2);
     if (isNaN(l1) || isNaN(ln1) || isNaN(l2) || isNaN(ln2)) return null;
 
-    const R = 6371; // Earth's radius in km
+    const R = 6371; 
     const dLat = (l2 - l1) * (Math.PI / 180);
     const dLon = (ln2 - ln1) * (Math.PI / 180);
     const a = 
@@ -41,8 +40,21 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 const homeTranslations = {
-    en: { syncing: "Syncing Market...", searchFor: "Search across all shops, folders & items...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin" },
-    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "అన్ని దుకాణాలు, వస్తువులు & ఫోల్డర్‌ల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
+    en: { syncing: "Syncing Market...", searchFor: "Search across all shops, categories & items...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin" },
+    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "అన్ని దుకాణాలు, వర్గాలు & వస్తువుల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
+};
+
+// 🟢 CATEGORY TRANSLATION DICTIONARY (Expands based on your needs)
+const categoryTranslations = {
+    'Vegetables': 'కూరగాయలు',
+    'Fruits': 'పండ్లు',
+    'Groceries': 'కిరాణా',
+    'Electronics': 'ఎలక్ట్రానిక్స్',
+    'Clothing': 'బట్టలు',
+    'Food': 'ఆహారం',
+    'Meat': 'మాంసం',
+    'Fish': 'చేపలు',
+    'Services': 'సేవలు'
 };
 
 const Home = () => {
@@ -54,6 +66,16 @@ const Home = () => {
     const ht = homeTranslations[lang];
 
     const CATEGORIES = [t('Expo') || 'Expo', t('Trending') || 'Trending', t('Shopping') || 'Shopping', t('Services') || 'Services', t('Business') || 'Business'];
+
+    // 🟢 SMART CATEGORY TRANSLATOR
+    const tc = (word) => {
+        if (!word) return '';
+        if (lang === 'te') {
+            // Split by comma in case a shop has multiple categories "Vegetables, Fruits"
+            return word.split(',').map(w => categoryTranslations[w.trim()] || t(w.trim())).join(', ');
+        }
+        return word;
+    };
 
     const [products, setProducts] = useState([]);
     const [activeShops, setActiveShops] = useState([]); 
@@ -145,19 +167,16 @@ const Home = () => {
         setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
     };
 
-    // 🟢 DYNAMIC LOCATION TAG (GPS + Fallback Profile Address)
     const getDistanceTag = (shop) => {
         if (appLocation?.lat && appLocation?.lng && shop.lat && shop.lng) {
             const dist = calculateDistance(appLocation.lat, appLocation.lng, shop.lat, shop.lng);
-            if (dist !== null) return `📍 ${dist} km away`;
+            if (dist !== null) return `📍 ~${dist} km away`;
         }
-        
         if (localUser && localUser.address && shop.address) {
             const uCity = localUser.address.split(',')[0].toLowerCase().trim();
             const sAddr = shop.address.toLowerCase();
             if (sAddr.includes(uCity)) return `📍 Near ${localUser.address.split(',')[0]}`;
         }
-        
         if (!localUser && !appLocation?.lat) return "📍 Login for distance";
         if (localUser && !appLocation?.lat) return "📍 Turn on GPS";
         if (shop.address) return `📍 ${shop.address.split(',')[0]}`;
@@ -165,23 +184,22 @@ const Home = () => {
         return "📍 Nearby"; 
     };
 
-    // 🟢 25km RADIUS FILTER FOR "NEARBY ACTIVE SHOPS"
     const nearbyShops = activeShops.filter(shop => {
-        // Condition 1: GPS is exact
         if (appLocation?.lat && appLocation?.lng && shop.lat && shop.lng) {
             const dist = calculateDistance(appLocation.lat, appLocation.lng, shop.lat, shop.lng);
-            return dist !== null && dist <= 25.0; // Strictly within 25km
+            if (dist !== null && dist <= 25.0) return true; 
         }
-        // Condition 2: Fallback to Profile City matching
-        if (localUser && localUser.address && shop.address) {
-            const uCity = localUser.address.split(',')[0].toLowerCase().trim();
-            const sAddr = shop.address.toLowerCase();
-            return sAddr.includes(uCity);
+        const uAddr = (localUser?.address || localUser?.location || '').toLowerCase();
+        const sAddr = (shop.address || shop.location || '').toLowerCase();
+        
+        if (uAddr && sAddr) {
+            const uParts = uAddr.split(/[\s,]+/); 
+            if (uParts.some(part => part.length > 3 && sAddr.includes(part))) return true;
         }
         return false;
     });
 
-    const folderStats = adminCategories.map(adminCat => {
+    const categoryStats = adminCategories.map(adminCat => {
         const shopCount = activeShops.filter(shop => {
             const shopCats = (shop.category || '').toLowerCase().split(',').map(c => c.trim());
             return shopCats.includes(adminCat.name.toLowerCase().trim());
@@ -190,8 +208,8 @@ const Home = () => {
     });
 
     const searchSuggestions = searchQuery.trim() === '' ? [] : [
-        ...folderStats.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) && f.count > 0).map(f => ({
-            type: 'folder', name: f.name, count: f.count, section: f.section
+        ...categoryStats.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) && f.count > 0).map(f => ({
+            type: 'category', name: f.name, count: f.count, section: f.section
         })),
         ...activeShops.filter(s => s.business_name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.category || '').toLowerCase().includes(searchQuery.toLowerCase())).map(s => ({
             type: 'shop', name: s.business_name, id: s.id, img: s.shop_logo || s.shop_image, lat: s.lat, lng: s.lng
@@ -203,7 +221,7 @@ const Home = () => {
         setShowSuggestions(false);
         if (suggestion.type === 'shop') {
             navigate(`/shop/${suggestion.id}`);
-        } else if (suggestion.type === 'folder') {
+        } else if (suggestion.type === 'category') {
             const uiCategory = suggestion.section === 'Products' ? CATEGORIES[2] : CATEGORIES[3];
             setSelectedCategory(uiCategory);
             setSelectedSubCategory(suggestion.name);
@@ -226,6 +244,23 @@ const Home = () => {
                 {`
                     @keyframes scroll-left { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
                     @keyframes pulse-logo { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.8; } }
+                    
+                    @keyframes running-text {
+                        0%   { transform: translate(0, 0); }
+                        100% { transform: translate(-100%, 0); }
+                    }
+                    .scroll-container {
+                        width: 100%;
+                        overflow: hidden;
+                        white-space: nowrap;
+                        box-sizing: border-box;
+                    }
+                    .scroll-text {
+                        display: inline-block;
+                        padding-left: 100%;
+                        animation: running-text 7s linear infinite;
+                    }
+
                     .warning-text { display: inline-block; white-space: nowrap; animation: scroll-left 15s linear infinite; color: #b91c1c; font-weight: 900; font-size: 15px; letter-spacing: 1px; }
                     .hide-scroll::-webkit-scrollbar { display: none; }
                     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -257,7 +292,7 @@ const Home = () => {
                         <div style={styles.searchBar}>
                             <input 
                                 type="text" 
-                                placeholder={selectedSubCategory ? `Search in ${selectedSubCategory}...` : ht.searchFor} 
+                                placeholder={selectedSubCategory ? `Search in ${tc(selectedSubCategory)}...` : ht.searchFor} 
                                 style={styles.searchInput} 
                                 value={searchQuery} 
                                 onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
@@ -271,11 +306,11 @@ const Home = () => {
                             <div style={styles.suggestionsBox}>
                                 {searchSuggestions.map((sug, i) => (
                                     <div key={i} style={styles.suggestionItem} onClick={() => handleSuggestionClick(sug)}>
-                                        {sug.type === 'folder' ? (
+                                        {sug.type === 'category' ? (
                                             <>
                                                 <Folder size={18} color="#f59e0b" style={{flexShrink: 0}}/>
                                                 <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
-                                                    <span style={{fontWeight: '900', color: '#0f172a', fontSize: '15px'}}>{sug.name} Folder</span>
+                                                    <span style={{fontWeight: '900', color: '#0f172a', fontSize: '15px'}}>{tc(sug.name)} Category</span>
                                                     <span style={{fontSize: '11px', color: '#64748b'}}>Found in {sug.section === 'Products' ? 'Shopping' : 'Services'}</span>
                                                 </div>
                                                 <span style={{fontSize: '11px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '12px', fontWeight: 'bold'}}>{sug.count} Shops Inside</span>
@@ -328,6 +363,29 @@ const Home = () => {
             )}
 
             <div style={{ maxWidth: '1000px', margin: '15px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box' }}>
+                
+                {/* 🟢 PREMIUM ECOSYSTEM BANNERS (Only PMMS & Agent to fit perfectly) */}
+                {!loading && !searchQuery && !selectedSubCategory && selectedCategory === CATEGORIES[1] && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingBottom: '15px' }}>
+                        <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} style={{ ...styles.ecoBanner, width: '100%', background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
+                            <div style={styles.ecoIcon}>💰</div>
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                <span style={styles.ecoTitle}>Subhams PMMS</span>
+                                <span style={styles.ecoSub}>Secure Finances</span>
+                            </div>
+                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
+                        </div>
+                        <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} style={{ ...styles.ecoBanner, width: '100%', background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}>
+                            <div style={styles.ecoIcon}>🖨️</div>
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                <span style={styles.ecoTitle}>Subhams Agent</span>
+                                <span style={styles.ecoSub}>Cloud Printing</span>
+                            </div>
+                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
+                        </div>
+                    </div>
+                )}
+
                 {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
                         <div style={{ animation: 'pulse-logo 1.5s ease-in-out infinite', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -348,41 +406,12 @@ const Home = () => {
                                         {filteredProducts.map(product => <ProductCard key={product.id} product={product} t={t} />)}
                                     </div>
                                 ) : (
-                                    <p style={{color: '#64748b', fontWeight: 'bold'}}>No items found. Try clicking a shop or folder in the dropdown!</p>
+                                    <p style={{color: '#64748b', fontWeight: 'bold'}}>No items found. Try clicking a shop or category in the dropdown!</p>
                                 )}
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 SMALL PREMIUM BANNERS (ONLY ON TRENDING PAGE) */}
-                                {selectedCategory === CATEGORIES[1] && (
-                                    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '20px', scrollSnapType: 'x mandatory' }} className="hide-scroll">
-                                        <div onClick={() => window.open('https://hub.subhamsnetworks.in', '_self')} style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #2874f0, #1e3a8a)' }}>
-                                            <div style={styles.ecoIcon}>🏪</div>
-                                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                                <span style={styles.ecoTitle}>Subhams Hub</span>
-                                                <span style={styles.ecoSub}>Explore Local Market</span>
-                                            </div>
-                                        </div>
-                                        <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
-                                            <div style={styles.ecoIcon}>💰</div>
-                                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                                <span style={styles.ecoTitle}>Subhams PMMS</span>
-                                                <span style={styles.ecoSub}>Secure Finances</span>
-                                            </div>
-                                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
-                                        </div>
-                                        <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}>
-                                            <div style={styles.ecoIcon}>🖨️</div>
-                                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                                <span style={styles.ecoTitle}>Subhams Agent</span>
-                                                <span style={styles.ecoSub}>Cloud Printing</span>
-                                            </div>
-                                            <ExternalLink size={12} color="rgba(255,255,255,0.5)" style={{marginLeft: 'auto'}}/>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS (25KM RADIUS) */}
+                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{ marginBottom: '25px', padding: '0 5px' }}>
                                         <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Nearby Active Shops</h2>
@@ -398,7 +427,14 @@ const Home = () => {
                                                         <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(45deg, #2874f0, #facc15)', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
                                                             <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid white' }} />
                                                         </div>
-                                                        <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b', textAlign: 'center', marginTop: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{shop.business_name}</span>
+                                                        
+                                                        {shop.business_name.length > 10 ? (
+                                                            <div className="scroll-container" style={{ marginTop: '6px' }}>
+                                                                <span className="scroll-text" style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b' }}>{shop.business_name}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b', textAlign: 'center', marginTop: '6px', whiteSpace: 'nowrap', width: '100%' }}>{shop.business_name}</span>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -410,7 +446,7 @@ const Home = () => {
 
                                 {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
 
-                                {/* 🏪 MAIN SHOPS LIST (🟢 STRICT 3-COLUMN WRAPPING GRID) */}
+                                {/* 🏪 MAIN SHOPS LIST (3-COLUMN GRID) */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div style={{padding: '0 5px'}}>
                                         <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
@@ -439,10 +475,21 @@ const Home = () => {
                                                             </div>
                                                         )}
                                                         
-                                                        <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                                            {shop.business_name}
-                                                        </h4>
-                                                        <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{shop.category}</p>
+                                                        {shop.business_name.length > 11 ? (
+                                                            <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
+                                                                <h4 className="scroll-text" style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
+                                                                    {shop.business_name}
+                                                                </h4>
+                                                            </div>
+                                                        ) : (
+                                                            <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                                {shop.business_name}
+                                                            </h4>
+                                                        )}
+
+                                                        <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                            {tc(shop.category)}
+                                                        </p>
                                                         
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: isMobile ? '8px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                             <MapPin size={isMobile ? 10 : 14} color="#ef4444" /> {getDistanceTag(shop)}
@@ -453,7 +500,7 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 📁 FOLDERS & SHOPS VIEW (🟢 STRICT 4-COLUMN FOLDERS, 3-COLUMN SHOPS) */}
+                                {/* 📁 CATEGORIES & SHOPS VIEW (4-COLUMN CATEGORIES, 3-COLUMN SHOPS) */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div style={{padding: '0 5px'}}>
                                         {!selectedSubCategory ? (
@@ -466,7 +513,7 @@ const Home = () => {
                                                     const adminCatForTab = adminCategories.filter(c => c.section && c.section.toLowerCase() === currentTabEnglish.toLowerCase());
                                                     const allCategoryNames = [...adminCatForTab.map(c => c.name)];
 
-                                                    if (allCategoryNames.length === 0) return <div style={{padding: '20px', color: '#64748b'}}>Folders will appear once created by the Admin.</div>;
+                                                    if (allCategoryNames.length === 0) return <div style={{padding: '20px', color: '#64748b'}}>Categories will appear once created by the Admin.</div>;
 
                                                     return (
                                                         <div style={isMobile ? styles.mobileGrid4 : styles.desktopFolderGrid}>
@@ -475,10 +522,9 @@ const Home = () => {
                                                                 const imgSrc = adminCat ? adminCat.hd_image : 'https://via.placeholder.com/150/e2e8f0/64748b?text=' + catName.substring(0, 3);
 
                                                                 return (
-                                                                    // 🟢 FIXED: Removed width: 100% so it behaves on Desktop!
                                                                     <div key={index} onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: isMobile ? '100%' : '90px', cursor: 'pointer' }}>
                                                                         <img src={getOptimizedImage(imgSrc)} alt={catName} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: isMobile ? '55px' : '75px', height: isMobile ? '55px' : '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.05)'}} />
-                                                                        <span style={{ fontSize: isMobile ? '10px' : '13px', marginTop: '6px', fontWeight: '800', color: '#1e293b', textAlign: 'center', lineHeight: '1.2' }}>{catName}</span>
+                                                                        <span style={{ fontSize: isMobile ? '10px' : '13px', marginTop: '6px', fontWeight: '800', color: '#1e293b', textAlign: 'center', lineHeight: '1.2' }}>{tc(catName)}</span>
                                                                     </div>
                                                                 );
                                                             })}
@@ -493,7 +539,7 @@ const Home = () => {
                                                         <X size={14} /> Back
                                                     </button>
                                                     <h2 style={{ fontSize: '18px', margin: 0, color: '#1e293b', fontWeight: '900' }}>
-                                                        {selectedSubCategory} {ht.sellers}
+                                                        {tc(selectedSubCategory)} {ht.sellers}
                                                     </h2>
                                                 </div>
 
@@ -522,10 +568,21 @@ const Home = () => {
                                                                     </div>
                                                                 )}
 
-                                                                <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                                                    {shop.business_name}
-                                                                </h4>
-                                                                <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>{shop.category}</p>
+                                                                {shop.business_name.length > 11 ? (
+                                                                    <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
+                                                                        <h4 className="scroll-text" style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
+                                                                            {shop.business_name}
+                                                                        </h4>
+                                                                    </div>
+                                                                ) : (
+                                                                    <h4 style={{ margin: '0 0 2px 0', color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                                        {shop.business_name}
+                                                                    </h4>
+                                                                )}
+
+                                                                <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                                    {tc(shop.category)}
+                                                                </p>
                                                                 
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: isMobile ? '8px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                                     <MapPin size={isMobile ? 10 : 14} color="#ef4444" /> {getDistanceTag(shop)}
@@ -596,19 +653,17 @@ const styles = {
     catContent: { display: 'flex', gap: '22px', padding: '14px 20px', width: 'max-content', margin: '0 auto' },
     catItem: { flexShrink: 0, fontSize: '14px', cursor: 'pointer', paddingBottom: '6px', transition: 'all 0.2s' },
     
-    // 🟢 PREMIUM CLICKABLE ECOSYSTEM BANNERS (Smaller width)
-    ecoBanner: { flexShrink: 0, width: '180px', cursor: 'pointer', scrollSnapAlign: 'start', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', gap: '10px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
+    ecoBanner: { cursor: 'pointer', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', gap: '10px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
     ecoIcon: { fontSize: '20px', background: 'rgba(255,255,255,0.2)', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' },
     ecoTitle: { fontSize: '12px', fontWeight: '900', letterSpacing: '0.5px' },
     ecoSub: { fontSize: '10px', color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
 
-    // 🟢 3-COLUMN & 4-COLUMN STRICT WRAPPING GRIDS
     mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', width: '100%' },
     mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', width: '100%' },
     desktopProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'flex-start' },
-    desktopFolderGrid: { display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'flex-start' },
+    // 🟢 FIXED: Desktop Folders now render in a perfect row layout instead of 1-by-1 stacking!
+    desktopFolderGrid: { display: 'flex', flexDirection: 'row', gap: '20px', flexWrap: 'wrap', justifyContent: 'flex-start', width: '100%' },
 
-    // 🟢 COMPACT SHOP CARD FOR 3-GRID
     shopCardMobile: { background: 'white', borderRadius: '8px', padding: '6px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', position: 'relative', width: '100%', boxSizing: 'border-box' },
     shopImageMobile: { width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px', marginBottom: '6px' },
 
