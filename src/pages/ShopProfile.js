@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../context/AppContext';
 import axios from 'axios';
 import { AppContext } from '../context/AppContext';
-import { Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, Megaphone, User } from 'lucide-react';
+import { Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, Megaphone, User, UserPlus, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const getBackendUrl = () => {
@@ -40,7 +40,13 @@ const ShopProfile = () => {
     const [imageFile, setImageFile] = useState(null); 
     const [uploadError, setUploadError] = useState('');
     
-    // 🟢 ADDED: 'address' field separated from user profile
+    // 🟢 TEAM MANAGEMENT STATE (OTP Integrated)
+    const [showTeamModal, setShowTeamModal] = useState(false);
+    const [staffList, setStaffList] = useState([]);
+    const [newStaffEmail, setNewStaffEmail] = useState('');
+    const [otpMode, setOtpMode] = useState(false);
+    const [staffOtp, setStaffOtp] = useState('');
+    
     const [editForm, setEditForm] = useState({ 
         business_name: '', category: '', shop_type: 'Products', is_online: true, address: '' 
     });
@@ -61,7 +67,6 @@ const ShopProfile = () => {
                 setShopData(res.data.shop);
                 setProducts(res.data.products || []);
 
-                // 🟢 UPDATE: Load the exact shop address into the edit form
                 setEditForm({
                     business_name: res.data.shop.business_name || '',
                     category: res.data.shop.category || '',
@@ -90,6 +95,59 @@ const ShopProfile = () => {
         return () => socket.off('shop_updated');
     }, [id]);
 
+    // 🟢 TEAM MANAGEMENT FUNCTIONS
+    const fetchStaff = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${getBackendUrl()}/shops/${id}/staff`, { headers: { Authorization: `Bearer ${token}` }});
+            setStaffList(res.data.staff);
+        } catch (err) { console.error("Error fetching staff", err); }
+    };
+
+    const handleRequestStaffOtp = async (e) => {
+        e.preventDefault();
+        if (!newStaffEmail) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${getBackendUrl()}/shops/${id}/staff/request-otp`, { staff_email: newStaffEmail }, { headers: { Authorization: `Bearer ${token}` }});
+            toast.success(res.data.message);
+            setOtpMode(true);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to send OTP.");
+        }
+    };
+
+    const handleVerifyStaff = async (e) => {
+        e.preventDefault();
+        if (!staffOtp) return;
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`${getBackendUrl()}/shops/${id}/staff/verify-otp`, { staff_email: newStaffEmail, otp: staffOtp, role: 'Staff' }, { headers: { Authorization: `Bearer ${token}` }});
+            toast.success("Team member verified and added securely!");
+            setNewStaffEmail('');
+            setStaffOtp('');
+            setOtpMode(false);
+            fetchStaff();
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Invalid or expired OTP.");
+        }
+    };
+
+    const handleRemoveStaff = async (email) => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`${getBackendUrl()}/shops/${id}/staff/${email}`, { headers: { Authorization: `Bearer ${token}` }});
+            toast.success("Access removed.");
+            fetchStaff();
+        } catch (err) { toast.error("Failed to remove staff."); }
+    };
+
+    const openTeamModal = () => {
+        setShowTeamModal(true);
+        setOtpMode(false);
+        fetchStaff();
+    };
+
     const handleUpdateSubmit = async (e) => {
         e.preventDefault();
         setUploadError('');
@@ -103,19 +161,12 @@ const ShopProfile = () => {
             formData.append('category', editForm.category);
             formData.append('shop_type', editForm.shop_type);
             formData.append('is_online', editForm.is_online);
-            
-            // 🟢 UPDATE: Send the new shop address to the backend
             formData.append('address', editForm.address);
             
-            if (imageFile) {
-                formData.append('shop_logo', imageFile);
-            }
+            if (imageFile) formData.append('shop_logo', imageFile);
 
             const res = await axios.put(`${BACKEND_URL}/shops/${id}`, formData, {
-                headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data'
-                }
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
             });
             
             setShopData(res.data.shop);
@@ -123,7 +174,6 @@ const ShopProfile = () => {
             setImageFile(null);
             toast.success("✅ Store updated successfully!");
         } catch (err) {
-            console.error(err);
             setUploadError("❌ Update failed! Please check your connection.");
         }
     };
@@ -131,8 +181,8 @@ const ShopProfile = () => {
     const handleShare = async () => {
         if (navigator.share) {
             try { await navigator.share({ title: shopData.business_name, text: `Check out ${shopData.business_name} on Subhams Hub!`, url: window.location.href });
-            } catch (err) { console.log('Share canceled', err); }
-        } else { alert("Share not supported. Copy URL from browser."); }
+            } catch (err) {}
+        } else { toast.info("Share link copied!"); navigator.clipboard.writeText(window.location.href); }
     };
 
     const handleNotificationChange = (level) => { setNotifLevel(level); setNotifMenuOpen(false); };
@@ -214,14 +264,13 @@ const ShopProfile = () => {
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                             <button onClick={() => { setShowEditModal(true); setUploadError(''); }} style={styles.adminBtn}><Edit size={16}/> Edit Store Info</button>
                             <button onClick={() => navigate(`/manage-catalog/${id}`)} style={styles.primaryAdminBtn}><Package size={16}/> Manage Catalog</button>
-                            <button onClick={() => toast.success("Promotion request sent to Admin Panel!")} style={{...styles.primaryAdminBtn, background: '#f59e0b'}}><Megaphone size={16}/> Promote Shop</button>
+                            <button onClick={openTeamModal} style={{...styles.primaryAdminBtn, background: '#3b82f6'}}><UserPlus size={16}/> Manage Team</button>
                         </div>
                     </div>
                 )}
 
                 {!(isOwner || isMasterAdmin) && (
                     <div style={styles.actionButtonsRow}>
-                        {/* 🟢 REMOVED CALL BUTTON & ADJUSTED FOLLOW BUTTON WIDTH */}
                         <button style={{...isFollowing ? styles.followingBtn : styles.primaryActionBtn, flex: 1}} onClick={() => currentUser ? setIsFollowing(!isFollowing) : requireLogin('follow this shop')}>
                             {isFollowing ? <Check size={18} /> : <Users size={18} />} {isFollowing ? 'Following' : 'Follow Store'}
                         </button>
@@ -298,6 +347,69 @@ const ShopProfile = () => {
                 )}
             </div>
 
+            {/* 🟢 SECURE OTP TEAM MANAGEMENT MODAL */}
+            {showTeamModal && (
+                <div style={styles.overlay}>
+                    <div style={styles.modal}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                            <h3 style={{margin: 0, color: '#0f172a'}}>👥 Manage Shop Team</h3>
+                            <X size={20} style={{cursor: 'pointer'}} onClick={() => setShowTeamModal(false)} />
+                        </div>
+
+                        {/* 🟢 UPDATED TO REFLECT THE 1 EXTRA ACCOUNT LIMIT */}
+                        <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '8px', border: '1px solid #bfdbfe', marginBottom: '15px', fontSize: '11px', color: '#1e3a8a', fontWeight: 'bold' }}>
+                            Free Tier: Link 1 extra Google Account (e.g., Wife or Staff) to manage this shop. Upgrade to Premium for more!
+                        </div>
+
+                        {!otpMode ? (
+                            <form onSubmit={handleRequestStaffOtp} style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                                <input 
+                                    type="email" 
+                                    placeholder="Staff Google Email..." 
+                                    style={{...styles.input, marginBottom: 0, flex: 1}} 
+                                    value={newStaffEmail} 
+                                    onChange={e => setNewStaffEmail(e.target.value)} 
+                                    required 
+                                />
+                                <button type="submit" style={{ background: '#2874f0', color: 'white', border: 'none', borderRadius: '10px', padding: '0 15px', fontWeight: 'bold', cursor: 'pointer' }}>Verify</button>
+                            </form>
+                        ) : (
+                            <form onSubmit={handleVerifyStaff} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                                <p style={{ margin: 0, fontSize: '12px', fontWeight: 'bold', color: '#0f172a' }}>Enter the 6-digit code sent to {newStaffEmail}</p>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="000000" 
+                                        maxLength="6"
+                                        style={{...styles.input, marginBottom: 0, flex: 1, letterSpacing: '4px', fontWeight: 'bold', textAlign: 'center'}} 
+                                        value={staffOtp} 
+                                        onChange={e => setStaffOtp(e.target.value)} 
+                                        required 
+                                    />
+                                    <button type="submit" style={{ background: '#16a34a', color: 'white', border: 'none', borderRadius: '10px', padding: '0 15px', fontWeight: 'bold', cursor: 'pointer' }}>Add Staff</button>
+                                </div>
+                                <span onClick={() => setOtpMode(false)} style={{ fontSize: '11px', color: '#64748b', cursor: 'pointer', textAlign: 'center', marginTop: '5px', textDecoration: 'underline' }}>Cancel</span>
+                            </form>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {staffList.length === 0 ? (
+                                <p style={{ fontSize: '12px', color: '#64748b', textAlign: 'center' }}>No extra team members yet.</p>
+                            ) : (
+                                staffList.map((staff, i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>{staff.staff_email}</span>
+                                        <button onClick={() => handleRemoveStaff(staff.staff_email)} style={{ background: '#fef2f2', color: '#dc2626', border: 'none', padding: '5px 8px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showEditModal && (
                 <div style={styles.overlay}>
                     <div style={styles.modal}>
@@ -319,7 +431,6 @@ const ShopProfile = () => {
                                 <input style={styles.input} value={editForm.business_name} onChange={e => setEditForm({...editForm, business_name: e.target.value})} required />
                             </div>
 
-                            {/* 🟢 NEW FIELD: Separate Shop Address Input */}
                             <div>
                                 <label style={styles.modalLabel}>Shop Address / Location</label>
                                 <input 
