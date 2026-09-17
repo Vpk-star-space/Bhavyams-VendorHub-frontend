@@ -25,7 +25,7 @@ import ItemDetail from './pages/ItemDetail';
 import UserOrders from './pages/UserOrders';
 import VendorOrders from './pages/VendorOrders';
 
-const isMaintenanceMode = false; 
+const isMaintenanceMode = true; 
 
 function ScrollToTop() {
     const { pathname } = useLocation();
