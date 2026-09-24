@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../context/AppContext';
 import axios from 'axios';
 import { AppContext } from '../context/AppContext';
-import { Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, Megaphone, User, UserPlus, Trash2 } from 'lucide-react';
+import { Share2, BadgeCheck, MapPin, MapPinOff, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, User, UserPlus, Trash2, Loader } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const getBackendUrl = () => {
@@ -23,7 +23,6 @@ const getOptimizedImage = (url) => {
 const ShopProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { } = useContext(AppContext);
     
     const [shopData, setShopData] = useState(null);
     const [products, setProducts] = useState([]);
@@ -40,15 +39,29 @@ const ShopProfile = () => {
     const [imageFile, setImageFile] = useState(null); 
     const [uploadError, setUploadError] = useState('');
     
-    // 🟢 TEAM MANAGEMENT STATE (OTP Integrated)
+    // 🟢 TEAM MANAGEMENT STATE
     const [showTeamModal, setShowTeamModal] = useState(false);
     const [staffList, setStaffList] = useState([]);
     const [newStaffEmail, setNewStaffEmail] = useState('');
     const [otpMode, setOtpMode] = useState(false);
     const [staffOtp, setStaffOtp] = useState('');
     
+    // 🟢 DELIVERY AREAS & REQUESTS STATE
+    const [deliveryAreas, setDeliveryAreas] = useState([]);
+    const [deliveryRequests, setDeliveryRequests] = useState([]);
+    const [hasRequested, setHasRequested] = useState(false);
+    
+    // 🟢 NEW: State to toggle the requests list open/closed
+    const [showRequestsList, setShowRequestsList] = useState(false);
+
+    // 🟢 LOCATION SEARCH MODAL STATES
+    const [showLocModal, setShowLocModal] = useState(false); 
+    const [locSearch, setLocSearch] = useState('');
+    const [locResults, setLocResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+
     const [editForm, setEditForm] = useState({ 
-        business_name: '', category: '', shop_type: 'Products', is_online: true, address: '' 
+        business_name: '', category: '', shop_type: 'Products', is_online: true, address: '', delivery_areas: '' 
     });
 
     const userStr = localStorage.getItem('user');
@@ -67,12 +80,18 @@ const ShopProfile = () => {
                 setShopData(res.data.shop);
                 setProducts(res.data.products || []);
 
+                const fetchedAreas = res.data.shop.delivery_areas ? res.data.shop.delivery_areas.split(',') : ['All'];
+                setDeliveryAreas(fetchedAreas);
+                
+                setDeliveryRequests(res.data.delivery_requests || []);
+
                 setEditForm({
                     business_name: res.data.shop.business_name || '',
                     category: res.data.shop.category || '',
                     shop_type: res.data.shop.shop_type || 'Products', 
                     is_online: res.data.shop.is_online,
-                    address: res.data.shop.address || res.data.shop.location || ''
+                    address: res.data.shop.address || res.data.shop.location || '',
+                    delivery_areas: res.data.shop.delivery_areas === 'All' ? '' : (res.data.shop.delivery_areas || '')
                 });
 
                 const catRes = await axios.get(`${BACKEND_URL}/admin/categories`);
@@ -89,13 +108,31 @@ const ShopProfile = () => {
         socket.on('shop_updated', (updatedShop) => {
             if (String(updatedShop.id) === String(id)) {
                 setShopData(prev => ({ ...prev, ...updatedShop }));
+                setDeliveryAreas(updatedShop.delivery_areas ? updatedShop.delivery_areas.split(',') : ['All']);
             }
         });
 
         return () => socket.off('shop_updated');
     }, [id]);
 
-    // 🟢 TEAM MANAGEMENT FUNCTIONS
+    const userArea = currentUser?.address ? currentUser.address.split(',')[0].trim() : null;
+    const isDeliverable = (!currentUser || !userArea) ? true : deliveryAreas.some(area => 
+        userArea.toLowerCase().includes(area.toLowerCase().trim()) || area.toLowerCase().trim() === 'all'
+    );
+
+    const handleRequestDelivery = async () => {
+        if (!currentUser) return requireLogin('request delivery');
+        try {
+            const token = localStorage.getItem('token');
+            const basicUserAddress = currentUser.address || 'Unknown Location';
+            await axios.post(`${getBackendUrl()}/shops/${id}/request-delivery`, { area_name: basicUserAddress }, { headers: { Authorization: `Bearer ${token}` }});
+            toast.success(`🚀 Request sent! We notified the shop owner directly.`);
+            setHasRequested(true);
+        } catch (err) {
+            toast.error("Failed to send request.");
+        }
+    };
+
     const fetchStaff = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -148,6 +185,39 @@ const ShopProfile = () => {
         fetchStaff();
     };
 
+    const handleLocationSearch = async (query) => {
+        setLocSearch(query);
+        if (query.length < 3) return setLocResults([]);
+        
+        setIsSearching(true);
+        try {
+            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`);
+            setLocResults(res.data);
+        } catch (e) {
+            console.error("Location search failed", e);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const selectCustomLocation = (loc) => {
+        if (showLocModal === 'location') {
+            setEditForm({ ...editForm, address: loc.display_name });
+        } else if (showLocModal === 'delivery') {
+            const areaName = loc.display_name.split(',')[0].trim();
+            const currentAreas = editForm.delivery_areas ? editForm.delivery_areas.split(',').map(a => a.trim()).filter(Boolean) : [];
+            
+            if (!currentAreas.includes(areaName)) {
+                currentAreas.push(areaName);
+                setEditForm({ ...editForm, delivery_areas: currentAreas.join(', ') });
+            }
+        }
+        
+        setShowLocModal(false);
+        setLocSearch('');
+        setLocResults([]);
+    };
+
     const handleUpdateSubmit = async (e) => {
         e.preventDefault();
         setUploadError('');
@@ -163,6 +233,9 @@ const ShopProfile = () => {
             formData.append('is_online', editForm.is_online);
             formData.append('address', editForm.address);
             
+            const finalDeliveryAreas = editForm.delivery_areas || 'All';
+            formData.append('delivery_areas', finalDeliveryAreas); 
+            
             if (imageFile) formData.append('shop_logo', imageFile);
 
             const res = await axios.put(`${BACKEND_URL}/shops/${id}`, formData, {
@@ -170,6 +243,7 @@ const ShopProfile = () => {
             });
             
             setShopData(res.data.shop);
+            setDeliveryAreas(finalDeliveryAreas.split(','));
             setShowEditModal(false);
             setImageFile(null);
             toast.success("✅ Store updated successfully!");
@@ -194,6 +268,8 @@ const ShopProfile = () => {
         navigate('/welcome');
     };
 
+    const shortDisplayArea = currentUser?.address ? currentUser.address.split(',')[0].trim() : 'your area';
+
     if (loading) return <div style={styles.loading}>Loading Store Profile...</div>;
     if (!shopData) return null;
 
@@ -202,8 +278,17 @@ const ShopProfile = () => {
 
     const shopImageSrc = getOptimizedImage(shopData.shop_logo);
 
+    // 🟢 Calculate Total Number of Delivery Requests
+    const totalRequests = deliveryRequests.reduce((sum, req) => sum + Number(req.count), 0);
+
     return (
         <div style={styles.page}>
+            <style>{`
+                .touch-scale { transition: transform 0.15s; }
+                .touch-scale:active { transform: scale(0.96); }
+                .spin { animation: spin 1s linear infinite; }
+                @keyframes spin { 100% { transform: rotate(360deg); } }
+            `}</style>
             <div style={styles.navBar}>
                 <button onClick={() => navigate(-1)} style={styles.backBtn}><ArrowLeft size={20} /> Back</button>
                 <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
@@ -248,7 +333,13 @@ const ShopProfile = () => {
                 <div style={styles.bioSection}>
                     <h2 style={styles.shopName}>{shopData.business_name} <BadgeCheck size={20} color="#2563eb" /></h2>
                     <span style={styles.categoryTag}>{shopData.category}</span>
-                    <p style={styles.address}><MapPin size={14} /> {shopData.address || shopData.location || 'Local Business'}</p>
+                    
+                    <p style={styles.address}><MapPin size={14} /> {shopData.address ? shopData.address.split(',')[0].trim() : 'Local Business'}</p>
+                    
+                    <p style={{ margin: '5px 0 0 0', color: '#16a34a', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
+                        🚚 Delivers to: {shopData.delivery_areas || 'All Areas'}
+                    </p>
+
                     <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: '#475569', fontWeight: 'bold' }}>
                         <Users size={14} /> {shopData.followers_count || 0} Followers
                     </div>
@@ -266,6 +357,51 @@ const ShopProfile = () => {
                             <button onClick={() => navigate(`/manage-catalog/${id}`)} style={styles.primaryAdminBtn}><Package size={16}/> Manage Catalog</button>
                             <button onClick={openTeamModal} style={{...styles.primaryAdminBtn, background: '#3b82f6'}}><UserPlus size={16}/> Manage Team</button>
                         </div>
+
+                        {/* 🟢 DEMAND CAPTURE WIDGET - CLEAN COLLAPSIBLE UI */}
+                        {deliveryRequests.length > 0 && (
+                            <div style={{ marginTop: '15px', background: 'white', border: '1px solid #fcd34d', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+                                
+                                {/* Header / Toggle Button */}
+                                <div 
+                                    onClick={() => setShowRequestsList(!showRequestsList)}
+                                    className="touch-scale"
+                                    style={{ padding: '12px 15px', background: '#fffbeb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontWeight: '900', fontSize: '14px' }}>
+                                        <MapPin size={16} color="#d97706" /> Delivery Requests: {totalRequests}
+                                    </div>
+                                    <span style={{ fontSize: '12px', color: '#d97706', fontWeight: 'bold' }}>
+                                        {showRequestsList ? 'Hide ▴' : 'View Areas ▾'}
+                                    </span>
+                                </div>
+
+                                {/* Expanded List */}
+                                {showRequestsList && (
+                                    <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'white' }}>
+                                        <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
+                                            Customers in these areas requested delivery. Add them to your Delivery Areas above!
+                                        </p>
+                                        
+                                        {deliveryRequests.map((req, i) => {
+                                            // 🟢 Strictly extract ONLY the first word/town name
+                                            const basicArea = req.area ? req.area.split(',')[0].trim() : 'Unknown Area';
+                                            
+                                            return (
+                                                <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <MapPin size={14} color="#64748b" /> {basicArea}
+                                                    </span>
+                                                    <span style={{ background: '#ef4444', color: 'white', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>
+                                                        {req.count} {req.count == 1 ? 'Person' : 'People'}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -296,6 +432,21 @@ const ShopProfile = () => {
             </div>
 
             <div style={styles.feedSection}>
+                
+                {!(isOwner || isMasterAdmin) && currentUser && userArea && !isDeliverable && (
+                    <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', padding: '12px 15px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontSize: '13px', fontWeight: 'bold'}}>
+                            <MapPinOff size={16} /> Doesn't deliver to {shortDisplayArea}
+                        </div>
+                        <button 
+                            onClick={handleRequestDelivery} 
+                            disabled={hasRequested}
+                            style={{ background: hasRequested ? '#fcd34d' : '#d97706', color: hasRequested ? '#b45309' : 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px', cursor: hasRequested ? 'default' : 'pointer' }}>
+                            {hasRequested ? 'Requested ✓' : 'Request Delivery'}
+                        </button>
+                    </div>
+                )}
+
                 <div style={styles.feedTabs}><div style={styles.activeTab}>Store Catalog</div></div>
                 <div style={styles.localSearchBox}>
                     <Search size={16} color="#94a3b8" />
@@ -337,7 +488,9 @@ const ShopProfile = () => {
                                     </div>
                                     {!(isOwner || isMasterAdmin) && (
                                         <div style={styles.listActionBox}>
-                                            <button style={styles.addBtn} onClick={() => currentUser ? toast.success("Added to cart/booking!") : requireLogin('book this item')}>{dbShopType.includes('Services') ? 'Book' : 'Add +'}</button>
+                                            <button style={{...styles.addBtn, opacity: !isDeliverable ? 0.5 : 1}} onClick={() => currentUser ? (isDeliverable ? toast.success("Added to cart!") : toast.error(`Delivery not available to ${userArea}`)) : requireLogin('book this item')}>
+                                                {dbShopType.includes('Services') ? 'Book' : 'Add +'}
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -356,7 +509,6 @@ const ShopProfile = () => {
                             <X size={20} style={{cursor: 'pointer'}} onClick={() => setShowTeamModal(false)} />
                         </div>
 
-                        {/* 🟢 UPDATED TO REFLECT THE 1 EXTRA ACCOUNT LIMIT */}
                         <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '8px', border: '1px solid #bfdbfe', marginBottom: '15px', fontSize: '11px', color: '#1e3a8a', fontWeight: 'bold' }}>
                             Free Tier: Link 1 extra Google Account (e.g., Wife or Staff) to manage this shop. Upgrade to Premium for more!
                         </div>
@@ -410,6 +562,7 @@ const ShopProfile = () => {
                 </div>
             )}
 
+            {/* 🟢 EDIT STORE MODAL (WITH LOCATION SEARCH) */}
             {showEditModal && (
                 <div style={styles.overlay}>
                     <div style={styles.modal}>
@@ -422,7 +575,7 @@ const ShopProfile = () => {
 
                         <form onSubmit={handleUpdateSubmit} style={{display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left'}}>
                             <div style={styles.uploadBox}>
-                                <label style={styles.uploadLabel}><Upload size={16}/> Update Brand Logo / Store Photo</label>
+                                <label style={styles.uploadLabel}><Upload size={16}/> Update Brand Logo</label>
                                 <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} style={{fontSize: '12px', marginTop: '5px'}} />
                             </div>
 
@@ -431,15 +584,45 @@ const ShopProfile = () => {
                                 <input style={styles.input} value={editForm.business_name} onChange={e => setEditForm({...editForm, business_name: e.target.value})} required />
                             </div>
 
+                            {/* 🟢 SHOP ADDRESS INPUT */}
                             <div>
                                 <label style={styles.modalLabel}>Shop Address / Location</label>
-                                <input 
-                                    style={styles.input} 
-                                    value={editForm.address} 
-                                    onChange={e => setEditForm({...editForm, address: e.target.value})} 
-                                    placeholder="e.g. Konanki, AP"
-                                    required 
-                                />
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <input 
+                                        style={{...styles.input, flex: 1}} 
+                                        value={editForm.address} 
+                                        onChange={e => setEditForm({...editForm, address: e.target.value})} 
+                                        placeholder="Enter full shop address..."
+                                        required 
+                                    />
+                                    <button type="button" onClick={() => setShowLocModal('location')} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '0 15px', cursor: 'pointer', color: '#2563eb' }}>
+                                        <MapPin size={18} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* 🟢 DELIVERY AREAS INPUT */}
+                            <div>
+                                <label style={styles.modalLabel}>Delivery Areas (Where do you deliver?)</label>
+                                <div 
+                                    style={{...styles.input, background: '#ffffff', cursor: 'pointer', minHeight: '48px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px'}}
+                                    onClick={() => setShowLocModal('delivery')}
+                                >
+                                    {editForm.delivery_areas ? (
+                                        editForm.delivery_areas.split(',').map((area, idx) => (
+                                            <span key={idx} style={{ background: '#dcfce7', color: '#166534', padding: '6px 12px', borderRadius: '15px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                {area.trim()} 
+                                                <X size={14} onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const newAreas = editForm.delivery_areas.split(',').map(a=>a.trim()).filter(a => a !== area.trim());
+                                                    setEditForm({...editForm, delivery_areas: newAreas.join(', ')});
+                                                }} />
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <span style={{color: '#94a3b8', fontSize: '14px'}}>Click to add delivery areas (Leave blank for 'All')</span>
+                                    )}
+                                </div>
                             </div>
 
                             <div>
@@ -457,7 +640,6 @@ const ShopProfile = () => {
                                         <option key={cat.id} value={cat.name} />
                                     ))}
                                 </datalist>
-                                <p style={{fontSize: '11px', color: '#64748b', marginTop: '-5px', marginBottom: '10px'}}>*Select an existing category, or type a new one.</p>
                             </div>
 
                             {isMasterAdmin && (
@@ -482,6 +664,44 @@ const ShopProfile = () => {
 
                             <button type="submit" style={styles.saveBtn}><Check size={16} /> Save Changes</button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* 🟢 EXACT LOCATION MODAL POPUP FOR BOTH FIELDS */}
+            {showLocModal && (
+                <div style={styles.overlay}>
+                    <div className="touch-scale" style={styles.locModal}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                            <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>
+                                {showLocModal === 'location' ? 'Search Shop Location' : 'Search Delivery Area'}
+                            </h3>
+                            <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => { setShowLocModal(false); setLocSearch(''); setLocResults([]); }} />
+                        </div>
+
+                        <div style={{position: 'relative', marginTop: '15px'}}>
+                            <Search size={18} color="#94a3b8" style={{position: 'absolute', left: '12px', top: '14px'}} />
+                            <input 
+                                type="text" 
+                                placeholder="Type area, city, or pincode..." 
+                                style={styles.locInput} 
+                                value={locSearch} 
+                                onChange={(e) => handleLocationSearch(e.target.value)} 
+                                autoFocus
+                            />
+                            {isSearching && <Loader size={16} className="spin" color="#2563eb" style={{position: 'absolute', right: '12px', top: '14px'}} />}
+                        </div>
+
+                        {locResults.length > 0 && (
+                            <div style={styles.locResultsBox}>
+                                {locResults.map((loc, i) => (
+                                    <div key={i} className="touch-scale" style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
+                                        <MapPin size={16} color="#2563eb" style={{flexShrink: 0}} />
+                                        <span style={{fontSize: '13px', color: '#334155'}}>{loc.display_name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -534,6 +754,7 @@ const styles = {
     listImg: { width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', background: '#f8fafc' },
     listDetails: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' },
     listTitle: { margin: '0 0 4px 0', fontSize: '15px', color: '#0f172a', fontWeight: 'bold' },
+    unitText: { fontSize: '12px', color: '#64748b' },
     listDesc: { margin: '0 0 8px 0', fontSize: '12px', color: '#64748b', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
     priceRow: { display: 'flex', alignItems: 'center', gap: '8px' },
     sellPrice: { fontSize: '15px', fontWeight: '900', color: '#16a34a' },
@@ -542,13 +763,20 @@ const styles = {
     stockBadge: { fontSize: '10px', color: '#0f172a', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' },
     listActionBox: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' },
     addBtn: { background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '6px 16px', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' },
+    
     overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 },
     modal: { background: 'white', padding: '25px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', maxHeight: '90vh', overflowY: 'auto' },
     modalLabel: { fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' },
-    input: { padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', width: '100%', boxSizing: 'border-box', background: '#f8fafc', marginBottom: '10px' },
+    input: { padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', width: '100%', boxSizing: 'border-box', background: '#f8fafc', marginBottom: '10px', outline: 'none' },
     uploadBox: { background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', marginBottom: '10px' },
     uploadLabel: { fontSize: '12px', fontWeight: 'bold', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '5px' },
-    saveBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#16a34a', color: 'white', border: 'none', padding: '14px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '15px' }
+    saveBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#16a34a', color: 'white', border: 'none', padding: '14px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '15px' },
+    
+    // Modal Styles
+    locModal: { background: 'white', padding: '25px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' },
+    locInput: { padding: '14px 14px 14px 40px', borderRadius: '12px', border: '2px solid #2563eb', fontSize: '14px', width: '100%', boxSizing: 'border-box', outline: 'none' },
+    locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
+    locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' }
 };
 
 export default ShopProfile;

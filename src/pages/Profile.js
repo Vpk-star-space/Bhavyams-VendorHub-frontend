@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import axios from 'axios';
-import { User, MapPin, Phone, Save, Edit2, ArrowLeft, Globe, LogOut, Mail } from 'lucide-react'; // 🟢 Added Mail icon
+import { User, MapPin, Phone, Save, Edit2, ArrowLeft, Globe, LogOut, Mail, Search, X, Loader } from 'lucide-react'; 
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext'; 
@@ -15,12 +15,18 @@ const Profile = () => {
     
     const [profileData, setProfileData] = useState({
         username: '',
-        email: '', // 🟢 Added email state
-        address: '',
-        area: '',
-        pincode: '',
+        email: '', 
+        address: '', // Strictly for manual Street/Door No.
+        area: '',    // Auto-filled by search
+        pincode: '', // Auto-filled by search or manual
         phone: ''
     });
+
+    // 🟢 LOCATION SEARCH MODAL STATE
+    const [showLocModal, setShowLocModal] = useState(false);
+    const [locSearch, setLocSearch] = useState('');
+    const [locResults, setLocResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -43,6 +49,7 @@ const Profile = () => {
             let parsedArea = '';
             let parsedPincode = '';
 
+            // Simple parsing to keep Street, Area, and Pincode separate in the UI
             if (parsedAddress.includes('Pincode:')) {
                 const parts = parsedAddress.split(', Pincode:');
                 parsedPincode = parts[1] ? parts[1].trim() : '';
@@ -58,7 +65,7 @@ const Profile = () => {
 
             setProfileData({
                 username: data.username || '',
-                email: data.email || '', // 🟢 Pull email from database
+                email: data.email || '', 
                 address: parsedAddress,
                 area: parsedArea,
                 pincode: parsedPincode,
@@ -77,14 +84,51 @@ const Profile = () => {
         fetchFreshData();
     }, [fetchFreshData]);
 
+    // 🟢 HANDLE LOCATION SEARCH
+    const handleLocationSearch = async (query) => {
+        setLocSearch(query);
+        if (query.length < 3) return setLocResults([]);
+        
+        setIsSearching(true);
+        try {
+            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`);
+            setLocResults(res.data);
+        } catch (e) {
+            console.error("Location search failed", e);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    // 🟢 WHEN USER SELECTS A LOCATION FROM MODAL
+    const selectCustomLocation = (loc) => {
+        const fullString = loc.display_name;
+        const areaName = fullString.split(',')[0].trim();
+        
+        const pincodeMatch = fullString.match(/\b\d{6}\b/);
+        const pin = pincodeMatch ? pincodeMatch[0] : '';
+
+        // 🟢 FIX: We ONLY update Area and Pincode. We leave "address" completely alone!
+        setProfileData({ 
+            ...profileData, 
+            area: areaName, 
+            pincode: pin 
+        });
+        
+        setShowLocModal(false);
+        setLocSearch('');
+        setLocResults([]);
+    };
+
     const handleSave = async () => {
         if (!profileData.username.trim()) return toast.error("Name cannot be empty");
         
         try {
             const token = localStorage.getItem('token');
             
-            let finalAddress = profileData.address;
-            if (profileData.area) finalAddress += `, ${profileData.area}`;
+            // Combine them neatly for the database
+            let finalAddress = profileData.address ? profileData.address.trim() : '';
+            if (profileData.area) finalAddress += (finalAddress ? `, ${profileData.area}` : profileData.area);
             if (profileData.pincode) finalAddress += `, Pincode: ${profileData.pincode}`;
 
             const payload = {
@@ -121,6 +165,14 @@ const Profile = () => {
 
     return (
         <div style={{...styles.container, padding: isMobile ? '15px' : '40px 20px'}}>
+            
+            <style>{`
+                .touch-scale { transition: transform 0.15s; }
+                .touch-scale:active { transform: scale(0.96); }
+                .spin { animation: spin 1s linear infinite; }
+                @keyframes spin { 100% { transform: rotate(360deg); } }
+            `}</style>
+
             <div style={{...styles.profileCard, padding: isMobile ? '25px 20px' : '40px'}}>
                 
                 <div style={styles.topNav}>
@@ -145,7 +197,6 @@ const Profile = () => {
                     </button>
                 </div>
 
-                {/* APP LANGUAGE SETTINGS */}
                 <div style={styles.field}>
                     <div style={styles.iconBox}><Globe size={20} color="#2874f0"/></div>
                     <div style={{flex: 1}}>
@@ -164,15 +215,14 @@ const Profile = () => {
 
                 <div style={styles.divider}></div>
 
-                {/* 🟢 EMAIL FIELD (STRICTLY NON-EDITABLE) */}
                 <div style={styles.field}>
                     <div style={styles.iconBox}><Mail size={20} color="#2874f0"/></div>
                     <div style={{flex: 1}}>
                         <label style={styles.label}>Registered Google Email</label>
                         <input 
-                            disabled={true} // Strictly locked
+                            disabled={true} 
                             value={profileData.email}
-                            style={{ ...styles.input, color: '#64748b' }} // Grey text to indicate it's locked
+                            style={{ ...styles.input, color: '#64748b' }} 
                             placeholder="Loading email..."
                         />
                         {isEditing && (
@@ -183,7 +233,6 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {/* NAME FIELD */}
                 <div style={styles.field}>
                     <div style={styles.iconBox}><User size={20} color="#2874f0"/></div>
                     <div style={{flex: 1}}>
@@ -198,7 +247,6 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {/* PHONE FIELD */}
                 <div style={styles.field}>
                     <div style={styles.iconBox}><Phone size={20} color="#2874f0"/></div>
                     <div style={{flex: 1}}>
@@ -214,23 +262,26 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {/* ADDRESS FIELDS */}
+                {/* 🟢 LOCATION / ADDRESS FIELDS */}
                 <div style={styles.field}>
                     <div style={styles.iconBox}><MapPin size={20} color="#2874f0"/></div>
                     <div style={{flex: 1}}>
                         <label style={styles.label}>Location / Area</label>
+                        
                         <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                             <input 
                                 disabled={!isEditing}
-                                type="text" 
-                                placeholder="Area" 
-                                style={isEditing ? {...styles.inputActive, flex: 2} : {...styles.input, flex: 2}} 
+                                type="text"
+                                readOnly 
+                                placeholder="Click to Search Area" 
+                                style={isEditing ? {...styles.inputActive, flex: 2, cursor: 'pointer'} : {...styles.input, flex: 2}} 
                                 value={profileData.area} 
-                                onChange={e => setProfileData({...profileData, area: e.target.value})} 
+                                onClick={() => { if(isEditing) setShowLocModal(true); }}
                             />
                             <input 
                                 disabled={!isEditing}
-                                type="text" 
+                                type="text"
+                                maxLength="6"
                                 placeholder="Pincode" 
                                 style={isEditing ? {...styles.inputActive, flex: 1} : {...styles.input, flex: 1}} 
                                 value={profileData.pincode} 
@@ -244,7 +295,7 @@ const Profile = () => {
                             value={profileData.address}
                             onChange={(e) => setProfileData({...profileData, address: e.target.value})}
                             style={isEditing ? { ...styles.inputActive, height: '80px', resize: 'none' } : styles.input}
-                            placeholder="Enter full address details"
+                            placeholder="Type your Door No. & Street manually here..."
                         />
                     </div>
                 </div>
@@ -255,6 +306,43 @@ const Profile = () => {
                     </button>
                 )}
             </div>
+            
+            {/* 🟢 EXACT LOCATION MODAL POPUP */}
+            {showLocModal && (
+                <div style={styles.overlay}>
+                    <div className="touch-scale" style={styles.locModal}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                            <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>Search Location / Pincode</h3>
+                            <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLocModal(false)} />
+                        </div>
+
+                        <div style={{position: 'relative', marginTop: '15px'}}>
+                            <Search size={18} color="#94a3b8" style={{position: 'absolute', left: '12px', top: '14px'}} />
+                            <input 
+                                type="text" 
+                                placeholder="Type area, city, or pincode..." 
+                                style={styles.locInput} 
+                                value={locSearch} 
+                                onChange={(e) => handleLocationSearch(e.target.value)} 
+                                autoFocus
+                            />
+                            {isSearching && <Loader size={16} className="spin" color="#2563eb" style={{position: 'absolute', right: '12px', top: '14px'}} />}
+                        </div>
+
+                        {locResults.length > 0 && (
+                            <div style={styles.locResultsBox}>
+                                {locResults.map((loc, i) => (
+                                    <div key={i} className="touch-scale" style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
+                                        <MapPin size={16} color="#2563eb" style={{flexShrink: 0}} />
+                                        <span style={{fontSize: '13px', color: '#334155'}}>{loc.display_name}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             <div style={{ height: '80px' }}></div>
         </div>
     );
@@ -275,7 +363,13 @@ const styles = {
     inputActive: { border: '1px solid #bfdbfe', borderRadius: '8px', padding: '12px', width: '100%', fontSize: '14px', background: '#f8fafc', boxSizing: 'border-box', color: '#0f172a', fontWeight: '500', outline: 'none' },
     editBtn: { background: '#eff6ff', color: '#2563eb', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' },
     saveBtn: { background: '#2563eb', color: '#fff', border: 'none', width: '100%', padding: '16px', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', marginTop: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '0 4px 10px rgba(37, 99, 235, 0.2)' },
-    loader: { textAlign: 'center', padding: '100px', color: '#2563eb', fontWeight: 'bold' }
+    loader: { textAlign: 'center', padding: '100px', color: '#2563eb', fontWeight: 'bold' },
+    
+    overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 },
+    locModal: { background: 'white', padding: '25px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' },
+    locInput: { padding: '14px 14px 14px 40px', borderRadius: '12px', border: '2px solid #2563eb', fontSize: '14px', width: '100%', boxSizing: 'border-box', outline: 'none' },
+    locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
+    locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' }
 };
 
 export default Profile;

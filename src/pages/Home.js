@@ -510,7 +510,7 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS */}
+                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS (UNIQUE HOUSE/SHOP SHAPE) */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{ marginBottom: '25px', padding: '0 5px' }}>
                                         <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Shops In Your Area</h2>
@@ -520,14 +520,20 @@ const Home = () => {
                                                 <MapPin size={16} color="#2563eb"/> Set Location to discover nearby shops!
                                             </div>
                                         ) : nearbyShops.length > 0 ? (
-                                            <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
+                                            <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', paddingTop: '5px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
                                                 {nearbyShops.map(shop => (
-                                                    <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '65px', flexShrink: 0, cursor: 'pointer' }}>
-                                                        <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(45deg, #2874f0, #facc15)', padding: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                                                            <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid white' }} />
+                                                    <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '70px', flexShrink: 0, cursor: 'pointer' }}>
+                                                        
+                                                        {/* 🟢 UNIQUE HOUSE/SHOP SHAPE (Matches user sketch) */}
+                                                        <div style={{ filter: 'drop-shadow(0 4px 6px rgba(40, 116, 240, 0.3))', marginBottom: '8px' }}>
+                                                            <div style={{ position: 'relative', width: '64px', height: '64px', margin: '0 auto' }}>
+                                                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #2874f0, #facc15, #f59e0b)', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)' }}></div>
+                                                                <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: '3px', left: '3px', width: '58px', height: '58px', objectFit: 'cover', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)', background: 'white' }} />
+                                                            </div>
                                                         </div>
-                                                        <div className="scroll-container" style={{ marginTop: '6px' }}>
-                                                            <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: 'bold', color: '#1e293b' }}>
+                                                        
+                                                        <div className="scroll-container">
+                                                            <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b' }}>
                                                                 {shop.business_name}
                                                             </span>
                                                         </div>

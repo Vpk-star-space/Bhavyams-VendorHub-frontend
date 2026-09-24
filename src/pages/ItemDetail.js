@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Share2, Heart, ShoppingCart, Calendar, Store, Star, MessageCircle, Send, BadgeCheck, AlertTriangle, Trash2, Clock } from 'lucide-react';
+import { ArrowLeft, Share2, Heart, ShoppingCart, Calendar, Store, Star, MessageCircle, Send, BadgeCheck, AlertTriangle, Trash2, Clock, MapPinOff } from 'lucide-react';
 import { AppContext } from '../context/AppContext';
-import { useCart } from '../context/CartContext'; // 🟢 FIXED: Added Cart Context
+import { useCart } from '../context/CartContext'; 
+import { toast } from 'react-toastify';
 
 const getBackendUrl = () => {
     return process.env.NODE_ENV === 'production' 
@@ -11,7 +12,7 @@ const getBackendUrl = () => {
         : 'http://localhost:5000/api';
 };
 
-// 🌐 TRANSLATIONS (Grammar Fixed)
+// 🌐 TRANSLATIONS
 const translations = {
     en: {
         soldBy: "Sold & Managed by",
@@ -31,14 +32,10 @@ const translations = {
         bookService: "Book Service",
         addToCart: "Add Item",
         inclusiveTaxes: "Inclusive of all taxes",
-        
-        // RED Disclaimer Strings
         disclaimerTitle: "Important: Verify Before Payment",
         disclaimer1: "Direct from Vendors: Bookings are fulfilled directly by local partners.",
         disclaimer2: "Call to Verify: Confirm quality, exact pricing, and delivery details.",
         disclaimer3: "Privacy Protected: Your phone number is safely hidden.",
-        
-        // 1 Hour Rule & Total Price
         callNotice: "Note: The vendor will call you after booking. Your phone number remains safely hidden.",
         totalPrice: "Total Price"
     },
@@ -60,14 +57,10 @@ const translations = {
         bookService: "సేవను బుక్ చేయండి",
         addToCart: "వస్తువును జోడించండి",
         inclusiveTaxes: "అన్ని పన్నులతో కలిపి",
-
-        // RED Disclaimer Strings
         disclaimerTitle: "ముఖ్య గమనిక: చెల్లింపునకు ముందు నిర్ధారించుకోండి",
         disclaimer1: "నేరుగా విక్రేతల నుండి: బుకింగ్‌లు స్థానిక వ్యాపారుల ద్వారా నిర్వహించబడతాయి.",
         disclaimer2: "ధృవీకరించడానికి కాల్ చేయండి: నాణ్యత, ఖచ్చితమైన ధర మరియు డెలివరీ వివరాలను నిర్ధారించుకోండి.",
         disclaimer3: "గోప్యత రక్షించబడింది: మీ ఫోన్ నంబర్ సురక్షితంగా దాచబడుతుంది.",
-        
-        // 1 Hour Rule & Total Price
         callNotice: "గమనిక: బుకింగ్ తర్వాత విక్రేత మీకు కాల్ చేస్తారు. మీ ఫోన్ నంబర్ గోప్యంగా ఉంచబడుతుంది.",
         totalPrice: "మొత్తం ధర"
     }
@@ -77,14 +70,13 @@ const ItemDetail = () => {
     const { itemId } = useParams();
     const navigate = useNavigate();
     
-    // 🟢 GLOBAL CONTEXTS
     const { language } = useContext(AppContext);
-    const { addToCart } = useCart(); // 🟢 FIXED: Grab the addToCart function
+    const { addToCart } = useCart(); 
 
     const lang = language === 'te' ? 'te' : 'en';
     const t = translations[lang];
 
-    // Auth & Permissions
+    // 🟢 DYNAMIC USER FETCH 
     const userStr = localStorage.getItem('user');
     const currentUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
     
@@ -99,6 +91,11 @@ const ItemDetail = () => {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
+    // 🟢 DELIVERY ZONES STATE
+    const [deliveryAreas, setDeliveryAreas] = useState(['all']);
+    const [trueShopId, setTrueShopId] = useState(null);
+    const [hasRequested, setHasRequested] = useState(false);
 
     useEffect(() => {
         const fetchItemDetail = async () => {
@@ -115,14 +112,32 @@ const ItemDetail = () => {
                 } catch (e) {
                     parsedGallery = [productData.image_url]; 
                 }
-                
-                if (parsedGallery.length === 0 && productData.image_url) {
-                    parsedGallery = [productData.image_url];
-                }
+                if (parsedGallery.length === 0 && productData.image_url) parsedGallery = [productData.image_url];
 
                 setGallery(parsedGallery);
                 setActiveImage(parsedGallery[0] || 'https://via.placeholder.com/400');
 
+                // 🟢 FETCH TRUE SHOP ID AND DELIVERY SETTINGS
+                const shopIdToFetch = productData.shop_id || productData.vendor_id;
+                if (shopIdToFetch) {
+                    try {
+                        const shopRes = await axios.get(`${BACKEND_URL}/shops/${shopIdToFetch}`);
+                        setTrueShopId(shopRes.data.shop.id); 
+                        
+                        let fetchedAreas = ['all']; 
+                        if (shopRes.data.shop.delivery_areas !== undefined && shopRes.data.shop.delivery_areas !== null) {
+                            const raw = shopRes.data.shop.delivery_areas.trim();
+                            if (raw === '') {
+                                fetchedAreas = []; // Blank means No Delivery (Pickup Only)
+                            } else {
+                                fetchedAreas = raw.split(',').map(a => a.trim().toLowerCase()).filter(Boolean);
+                            }
+                        }
+                        setDeliveryAreas(fetchedAreas);
+                    } catch (e) {
+                        console.warn("Failed to fetch shop delivery areas");
+                    }
+                }
             } catch (err) {
                 console.error("Error fetching item details:", err);
             } finally {
@@ -132,6 +147,45 @@ const ItemDetail = () => {
 
         fetchItemDetail();
     }, [itemId]);
+
+    // 🟢 FLAWLESS ADDRESS CHECKER
+    const fullUserAddress = currentUser?.address ? currentUser.address.toLowerCase() : '';
+    let isDeliverable = true; 
+
+    // If logged in, strictly verify address against shop settings
+    if (currentUser && fullUserAddress) {
+        if (deliveryAreas.length === 0) {
+            isDeliverable = false; // Shop is Pickup Only (Delivery areas left blank)
+        } else if (!deliveryAreas.includes('all')) {
+            isDeliverable = deliveryAreas.some(area => fullUserAddress.includes(area));
+        }
+    }
+
+    // 🟢 FIXED: Send the full basic address to the shop owner
+    const handleRequestDelivery = async () => {
+        if (!currentUser) {
+            toast.info("Please login to request delivery!");
+            navigate('/welcome');
+            return;
+        }
+        if (!trueShopId) {
+            toast.error("Error linking to shop.");
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('token');
+            
+            // We pass the full address string so the shop owner gets complete context!
+            const basicUserAddress = currentUser.address || 'Unknown Location'; 
+            
+            await axios.post(`${getBackendUrl()}/shops/${trueShopId}/request-delivery`, { area_name: basicUserAddress }, { headers: { Authorization: `Bearer ${token}` } });
+            toast.success(`🚀 Request sent! We notified the shop owner directly.`);
+            setHasRequested(true);
+        } catch (err) {
+            toast.error("Failed to send request.");
+        }
+    };
 
     const handleShare = async () => {
         if (navigator.share) {
@@ -203,10 +257,15 @@ const ItemDetail = () => {
         if (type === 'plus' && quantity < stockCount) setQuantity(quantity + 1);
     };
 
-// 🟢 FIXED: Add To Cart Logic (Prevents React Context Crashes)
     const handleAddToCart = (orderType) => {
         if (!currentUser) {
-            alert("Please log in to add items.");
+            toast.info("Please log in to add items.");
+            navigate('/welcome');
+            return;
+        }
+
+        if (!isDeliverable) {
+            toast.error(`Delivery not available to your location.`);
             return;
         }
 
@@ -216,31 +275,30 @@ const ItemDetail = () => {
             id: item.id,
             name: item.name,
             price: sellPrice,
-            quantity: quantity, // 🟢 FORCE EXACT QUANTITY
-            qty: quantity,      // 🟢 Backup variable
+            quantity: quantity, 
+            qty: quantity,      
             image: activeImage || item.image_url,
             vendor_id: item.vendor_id,
-            shop_id: item.shop_id || item.vendor_id,
+            shop_id: trueShopId || item.shop_id || item.vendor_id,
             order_type: orderType,
             total_price: totalPrice
         };
 
-        // 1. Force save to LocalStorage immediately
         let currentCart = JSON.parse(localStorage.getItem('subhams_cart') || '[]');
-        currentCart = currentCart.filter(c => c.id !== item.id); // Remove duplicate if exists
+        currentCart = currentCart.filter(c => c.id !== item.id); 
         currentCart.push(newItem);
         localStorage.setItem('subhams_cart', JSON.stringify(currentCart));
 
-        // 2. Safely update context without crashing React
         setTimeout(() => {
             if(addToCart) addToCart(newItem);
         }, 0);
 
-        // 3. Navigate to Orders and FORCE the 'list' tab
         setTimeout(() => {
             navigate('/my-orders', { state: { forceTab: 'list' } });
         }, 300);
     };
+
+    const shortDisplayArea = currentUser?.address ? currentUser.address.split(',')[0].trim() : 'your area';
 
     return (
         <div style={styles.page}>
@@ -264,14 +322,14 @@ const ItemDetail = () => {
                 {/* IMAGE GALLERY */}
                 <div style={styles.galleryContainer}>
                     <div style={styles.mainImageWrapper}>
-                        <img src={activeImage} alt={item.name} style={styles.mainImage} />
+                        <img src={activeImage} alt={item.name} style={styles.mainImage} crossOrigin="anonymous" referrerPolicy="no-referrer" />
                     </div>
                     {gallery.length > 1 && (
                         <div style={styles.thumbnailRow}>
                             {gallery.map((imgUrl, index) => (
                                 <div key={index} onClick={() => setActiveImage(imgUrl)}
                                     style={{...styles.thumbnailWrapper, borderColor: activeImage === imgUrl ? '#2874f0' : '#e2e8f0'}}>
-                                    <img src={imgUrl} alt={`thumb-${index}`} style={styles.thumbnail} />
+                                    <img src={imgUrl} alt={`thumb-${index}`} style={styles.thumbnail} crossOrigin="anonymous" referrerPolicy="no-referrer" />
                                 </div>
                             ))}
                         </div>
@@ -280,6 +338,17 @@ const ItemDetail = () => {
 
                 {/* CORE INFO */}
                 <div style={styles.detailsContainer}>
+                    
+                    {/* 🟢 CUSTOMER OUT-OF-ZONE WARNING */}
+                    {!isDeliverable && currentUser && (
+                        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', padding: '10px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+                            <MapPinOff size={16} color="#b45309" style={{flexShrink: 0}} />
+                            <span style={{color: '#b45309', fontSize: '13px', fontWeight: 'bold'}}>
+                                This item cannot be delivered to {shortDisplayArea}.
+                            </span>
+                        </div>
+                    )}
+
                     <h1 style={styles.itemName}>{item.name}</h1>
                     
                     <div style={styles.ratingRow}>
@@ -316,7 +385,6 @@ const ItemDetail = () => {
                         </div>
                     </div>
 
-                    {/* STRICT RED DISCLAIMER BOX */}
                     <div style={styles.disclaimerBox}>
                         <h4 style={styles.disclaimerTitle}>
                             <AlertTriangle size={18} color="#dc2626" /> {t.disclaimerTitle}
@@ -330,7 +398,7 @@ const ItemDetail = () => {
 
                     <div style={styles.divider} />
 
-                    <div style={styles.vendorCard} onClick={() => navigate(`/shop/${item.shop_id || item.vendor_id}`)}>
+                    <div style={styles.vendorCard} onClick={() => navigate(`/shop/${trueShopId || item.shop_id || item.vendor_id}`)}>
                         <div style={styles.vendorIconArea}>
                             <Store size={24} color="#2874f0" />
                         </div>
@@ -398,29 +466,40 @@ const ItemDetail = () => {
                         </div>
 
                         <div style={{ display: 'flex', gap: '10px', flex: 1, justifyContent: 'flex-end' }}>
-                            {isService ? (
+                            {/* 🟢 IF OUT OF ZONE, THEY REQUEST DELIVERY HERE */}
+                            {!isDeliverable && currentUser ? (
                                 <button 
-                                    style={{...styles.bookBtn, opacity: isPlacingOrder ? 0.7 : 1}} 
-                                    onClick={() => handleAddToCart('Service')}
-                                    disabled={isPlacingOrder}
+                                    onClick={handleRequestDelivery}
+                                    disabled={hasRequested}
+                                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: hasRequested ? '#fcd34d' : '#d97706', color: hasRequested ? '#b45309' : 'white', border: 'none', padding: '0 20px', height: '44px', borderRadius: '8px', fontWeight: '700', fontSize: '14px', cursor: hasRequested ? 'default' : 'pointer', boxShadow: '0 4px 10px rgba(217,119,6,0.2)' }}
                                 >
-                                    <Calendar size={18} /> {isPlacingOrder ? "Wait..." : t.bookService}
+                                    <MapPinOff size={16} /> {hasRequested ? 'Requested ✓' : `Request to ${shortDisplayArea}`}
                                 </button>
                             ) : (
-                                <>
-                                    <div style={styles.qtyBox}>
-                                        <button onClick={() => handleQuantity('minus')} style={styles.qtyBtn}>-</button>
-                                        <span style={styles.qtyText}>{quantity}</span>
-                                        <button onClick={() => handleQuantity('plus')} style={styles.qtyBtn} disabled={quantity >= stockCount}>+</button>
-                                    </div>
+                                isService ? (
                                     <button 
-                                        style={{...styles.addToCartBtn, opacity: (stockCount === 0 || isPlacingOrder) ? 0.7 : 1}} 
-                                        onClick={() => handleAddToCart('Product')} 
-                                        disabled={stockCount === 0 || isPlacingOrder}
+                                        style={{...styles.bookBtn, opacity: isPlacingOrder ? 0.7 : 1}} 
+                                        onClick={() => handleAddToCart('Service')}
+                                        disabled={isPlacingOrder}
                                     >
-                                        <ShoppingCart size={18} /> {isPlacingOrder ? "Wait..." : t.addToCart}
+                                        <Calendar size={18} /> {isPlacingOrder ? "Wait..." : t.bookService}
                                     </button>
-                                </>
+                                ) : (
+                                    <>
+                                        <div style={styles.qtyBox}>
+                                            <button onClick={() => handleQuantity('minus')} style={styles.qtyBtn}>-</button>
+                                            <span style={styles.qtyText}>{quantity}</span>
+                                            <button onClick={() => handleQuantity('plus')} style={styles.qtyBtn} disabled={quantity >= stockCount}>+</button>
+                                        </div>
+                                        <button 
+                                            style={{...styles.addToCartBtn, opacity: (stockCount === 0 || isPlacingOrder) ? 0.7 : 1}} 
+                                            onClick={() => handleAddToCart('Product')} 
+                                            disabled={stockCount === 0 || isPlacingOrder}
+                                        >
+                                            <ShoppingCart size={18} /> {isPlacingOrder ? "Wait..." : t.addToCart}
+                                        </button>
+                                    </>
+                                )
                             )}
                         </div>
                     </div>
