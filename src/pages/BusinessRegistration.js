@@ -74,7 +74,7 @@ const translations = {
         location: "Shop Address / Location",
         locationSearchMsg: "Click to search shop location...",
         deliveryAreas: "Delivery Areas (Where do you deliver?)",
-        deliverySearchMsg: "Click to add delivery areas (Leave blank for 'All')",
+        deliverySearchMsg: "Click to add areas, states, or countries...",
         
         sec2Title: "2. Business Details",
         bizName: "Business / Shop Name",
@@ -128,7 +128,7 @@ const translations = {
         location: "షాప్ చిరునామా / ప్రాంతం",
         locationSearchMsg: "దుకాణం స్థానాన్ని శోధించడానికి క్లిక్ చేయండి...",
         deliveryAreas: "డెలివరీ ప్రాంతాలు (మీరు ఎక్కడ డెలివరీ చేస్తారు?)",
-        deliverySearchMsg: "ప్రాంతాలను జతచేయడానికి క్లిక్ చేయండి ('అన్నింటికీ' ఖాళీగా ఉంచండి)",
+        deliverySearchMsg: "ప్రాంతాలు లేదా రాష్ట్రాలను జతచేయడానికి క్లిక్ చేయండి...",
         
         sec2Title: "2. వ్యాపార వివరాలు",
         bizName: "వ్యాపారం / షాప్ పేరు",
@@ -324,10 +324,10 @@ const BusinessRegistration = () => {
     // 🟢 DYNAMICALLY FILL EITHER SHOP ADDRESS OR DELIVERY AREAS
     const selectCustomLocation = (loc) => {
         if (showLocModal === 'location') {
-            // Saves full string for Shop Address
+            // For Shop Address, save the full exact string
             setRegForm({ ...regForm, location: loc.display_name });
         } else if (showLocModal === 'delivery') {
-            // Saves short town name as a tag for Delivery Areas
+            // For Delivery Area, extract the specific place/state/country name
             const areaName = loc.display_name.split(',')[0].trim();
             const currentAreas = regForm.delivery_areas ? regForm.delivery_areas.split(',').map(a => a.trim()).filter(Boolean) : [];
             
@@ -421,7 +421,11 @@ const BusinessRegistration = () => {
             formData.append('shop_type', regForm.shop_type); 
             formData.append('work_mode', workMode); 
             formData.append('location', regForm.location);
-            formData.append('delivery_areas', regForm.delivery_areas || 'All'); 
+            
+            // If they left it blank, it defaults to 'All'
+            const finalDeliveryAreas = regForm.delivery_areas ? regForm.delivery_areas.trim() : 'All';
+            formData.append('delivery_areas', finalDeliveryAreas); 
+            
             formData.append('email', regForm.email);
             
             if (cIdFront) formData.append('idFront', cIdFront);
@@ -587,6 +591,7 @@ const BusinessRegistration = () => {
                                             <span style={{color: '#94a3b8', fontSize: '14px'}}>{t.deliverySearchMsg}</span>
                                         )}
                                     </div>
+                                    <p style={{fontSize:'11px', color:'#64748b', margin:0}}>Search & add villages, states, or countries. Leave blank to deliver everywhere.</p>
                                 </div>
 
                                 <button type="button" onClick={handleNextStep} style={{...styles.submitFormBtn, marginTop: '25px', display: 'flex', justifyContent: 'center', gap: '10px'}}>
@@ -686,9 +691,14 @@ const BusinessRegistration = () => {
                                     </div>
                                 </div>
 
-                                <button type="button" onClick={handleNextStep} style={{...styles.submitFormBtn, marginTop: '25px', display: 'flex', justifyContent: 'center', gap: '10px'}}>
-                                    {t.btnNext} <ArrowRight size={18} />
-                                </button>
+                                <div style={{display: 'flex', gap: '10px', marginTop: '25px'}}>
+                                    <button type="button" onClick={handlePrevStep} style={{...styles.submitFormBtn, flex: 1, background: '#e2e8f0', color: '#475569', boxShadow: 'none'}}>
+                                        {t.btnBack}
+                                    </button>
+                                    <button type="button" onClick={handleNextStep} style={{...styles.submitFormBtn, flex: 2, display: 'flex', justifyContent: 'center', gap: '10px'}}>
+                                        {t.btnNext} <ArrowRight size={18} />
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -721,7 +731,7 @@ const BusinessRegistration = () => {
 
                                 {workMode === 'physical' && (
                                     <div style={{ marginTop: '15px', background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #93c5fd' }}>
-                                        <h4 style={{ margin: 0, color: '#1e40af', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                                        <h4 style={{ margin: '0', color: '#1e40af', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                                             <Store size={16}/> {t.shopPhoto}
                                         </h4>
                                         <p style={styles.infoText}><Info size={14}/> {t.infoShop}</p>
@@ -751,9 +761,14 @@ const BusinessRegistration = () => {
                                     </p>
                                 </div>
 
-                                <button type="submit" disabled={submitting || nameStatus === 'taken'} style={{...styles.submitFormBtn, background: nameStatus === 'taken' ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)', marginTop: '25px'}}>
-                                    {isUpdate ? t.btnUpdate : t.btnSubmit}
-                                </button>
+                                <div style={{display: 'flex', gap: '10px', marginTop: '25px'}}>
+                                    <button type="button" onClick={handlePrevStep} style={{...styles.submitFormBtn, flex: 1, background: '#e2e8f0', color: '#475569', boxShadow: 'none'}}>
+                                        {t.btnBack}
+                                    </button>
+                                    <button type="submit" disabled={submitting || nameStatus === 'taken'} style={{...styles.submitFormBtn, flex: 2, background: nameStatus === 'taken' ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)'}}>
+                                        {isUpdate ? t.btnUpdate : t.btnSubmit}
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -776,7 +791,7 @@ const BusinessRegistration = () => {
                             <Search size={18} color="#94a3b8" style={{position: 'absolute', left: '12px', top: '14px'}} />
                             <input 
                                 type="text" 
-                                placeholder="Type area, city, or pincode..." 
+                                placeholder={showLocModal === 'location' ? "Type full address or pincode..." : "Type village, state, or country..."} 
                                 style={styles.locInput} 
                                 value={locSearch} 
                                 onChange={(e) => handleLocationSearch(e.target.value)} 

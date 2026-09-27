@@ -12,6 +12,21 @@ const getBackendUrl = () => {
         : 'http://localhost:5000/api';
 };
 
+// 🟢 SMART BASIC AREA EXTRACTOR (Ignores Door Numbers!)
+const getBasicAreaName = (fullAddress) => {
+    if (!fullAddress) return 'your area';
+    const parts = fullAddress.split(',').map(p => p.trim());
+    if (parts.length === 1) return parts[0];
+    
+    const firstPart = parts[0].toLowerCase();
+    const looksLikeDoorNo = /\d/.test(firstPart) || firstPart.includes('door') || firstPart.includes('no') || firstPart.includes('flat') || firstPart.includes('plot');
+    
+    if (looksLikeDoorNo && parts.length > 1) {
+        return parts[1]; // Skips the door number and returns the real Village/Town name
+    }
+    return parts[0];
+};
+
 // 🌐 TRANSLATIONS
 const translations = {
     en: {
@@ -76,7 +91,6 @@ const ItemDetail = () => {
     const lang = language === 'te' ? 'te' : 'en';
     const t = translations[lang];
 
-    // 🟢 DYNAMIC USER FETCH 
     const userStr = localStorage.getItem('user');
     const currentUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
     
@@ -94,6 +108,7 @@ const ItemDetail = () => {
 
     // 🟢 DELIVERY ZONES STATE
     const [deliveryAreas, setDeliveryAreas] = useState(['all']);
+    const [shopDeliveryString, setShopDeliveryString] = useState('All Areas');
     const [trueShopId, setTrueShopId] = useState(null);
     const [hasRequested, setHasRequested] = useState(false);
 
@@ -125,15 +140,21 @@ const ItemDetail = () => {
                         setTrueShopId(shopRes.data.shop.id); 
                         
                         let fetchedAreas = ['all']; 
-                        if (shopRes.data.shop.delivery_areas !== undefined && shopRes.data.shop.delivery_areas !== null) {
+                        let displayString = 'All Areas';
+
+                        if (shopRes.data.shop.delivery_areas) {
                             const raw = shopRes.data.shop.delivery_areas.trim();
-                            if (raw === '') {
-                                fetchedAreas = []; // Blank means No Delivery (Pickup Only)
-                            } else {
+                            if (raw !== '' && raw.toLowerCase() !== 'all') {
                                 fetchedAreas = raw.split(',').map(a => a.trim().toLowerCase()).filter(Boolean);
+                                displayString = raw;
+                            } else if (raw === '') {
+                                displayString = "Pickup Only (No Delivery)";
+                                fetchedAreas = [];
                             }
                         }
+                        
                         setDeliveryAreas(fetchedAreas);
+                        setShopDeliveryString(displayString);
                     } catch (e) {
                         console.warn("Failed to fetch shop delivery areas");
                     }
@@ -155,13 +176,14 @@ const ItemDetail = () => {
     // If logged in, strictly verify address against shop settings
     if (currentUser && fullUserAddress) {
         if (deliveryAreas.length === 0) {
-            isDeliverable = false; // Shop is Pickup Only (Delivery areas left blank)
+            isDeliverable = false; // Shop is Pickup Only
         } else if (!deliveryAreas.includes('all')) {
             isDeliverable = deliveryAreas.some(area => fullUserAddress.includes(area));
         }
     }
 
-    // 🟢 FIXED: Send the full basic address to the shop owner
+    const shortDisplayArea = getBasicAreaName(currentUser?.address);
+
     const handleRequestDelivery = async () => {
         if (!currentUser) {
             toast.info("Please login to request delivery!");
@@ -176,8 +198,8 @@ const ItemDetail = () => {
         try {
             const token = localStorage.getItem('token');
             
-            // We pass the full address string so the shop owner gets complete context!
-            const basicUserAddress = currentUser.address || 'Unknown Location'; 
+            // 🟢 Send the extracted, clean village name to the Shop Owner's DB!
+            const basicUserAddress = currentUser?.address ? getBasicAreaName(currentUser.address) : 'Unknown Location'; 
             
             await axios.post(`${getBackendUrl()}/shops/${trueShopId}/request-delivery`, { area_name: basicUserAddress }, { headers: { Authorization: `Bearer ${token}` } });
             toast.success(`🚀 Request sent! We notified the shop owner directly.`);
@@ -298,8 +320,6 @@ const ItemDetail = () => {
         }, 300);
     };
 
-    const shortDisplayArea = currentUser?.address ? currentUser.address.split(',')[0].trim() : 'your area';
-
     return (
         <div style={styles.page}>
             <div style={styles.appContainer}>
@@ -382,6 +402,15 @@ const ItemDetail = () => {
                             <span style={{ fontSize: '14px', fontWeight: '700', color: stockColor }}>
                                 {stockDisplay}
                             </span>
+                        </div>
+                    </div>
+
+                    {/* 🟢 PUBLIC SHOP DELIVERY ZONES WIDGET */}
+                    <div style={{ margin: '0 0 20px 0', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                        <span style={{ fontSize: '18px' }}>🚚</span>
+                        <div>
+                            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '800', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>Shop Delivers To:</span>
+                            <span style={{ fontSize: '14px', color: '#0f172a', fontWeight: '700', lineHeight: '1.4' }}>{shopDeliveryString}</span>
                         </div>
                     </div>
 

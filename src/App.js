@@ -24,7 +24,7 @@ import ManageCatalog from './pages/ManageCatalog';
 import ItemDetail from './pages/ItemDetail';
 import UserOrders from './pages/UserOrders';
 import VendorOrders from './pages/VendorOrders';
-
+import Expo from './pages/Expo';
 const isMaintenanceMode = false; 
 
 function ScrollToTop() {
@@ -308,7 +308,7 @@ function App() {
                                 <Route path="/manage-catalog/:id" element={<ProtectedRoute><ManageCatalog /></ProtectedRoute>} />
                                 <Route path="/my-orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
                                 <Route path="/vendor/orders" element={<ProtectedRoute><VendorOrders /></ProtectedRoute>} />
-                                
+                                <Route element={<Expo />} path="/expo" />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </div>

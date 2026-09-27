@@ -194,13 +194,24 @@ const Home = () => {
         navigate('/welcome');
     };
 
+    // 🟢 SMART CLICK HANDLING (Directly Route to Expo!)
     const handleCategoryClick = (cat) => {
         if (cat === (t('Business') || 'Business')) { 
             if (!localUser) return requireLogin('register a business');
             navigate('/register-business'); 
             return; 
         }
-        setSelectedCategory(cat); setSelectedSubCategory(null); setSearchQuery(''); setShowSuggestions(false);
+        
+        // If user clicks or swipes to "Expo", immediately route them to the Expo app!
+        if (cat === CATEGORIES[0]) {
+            navigate('/expo');
+            return;
+        }
+
+        setSelectedCategory(cat); 
+        setSelectedSubCategory(null); 
+        setSearchQuery(''); 
+        setShowSuggestions(false);
     };
 
     // 🟢 SIMPLE CITY DISPLAY LOGIC (No exact distance math)
@@ -490,7 +501,7 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 PREMIUM BANNERS (Icon Top, Text Bottom) */}
+                                {/* 🟢 PREMIUM BANNERS */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{ display: 'flex', gap: '10px', paddingBottom: '20px' }}>
                                         <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
@@ -510,7 +521,7 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS (UNIQUE HOUSE/SHOP SHAPE) */}
+                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{ marginBottom: '25px', padding: '0 5px' }}>
                                         <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Shops In Your Area</h2>
@@ -524,7 +535,6 @@ const Home = () => {
                                                 {nearbyShops.map(shop => (
                                                     <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '70px', flexShrink: 0, cursor: 'pointer' }}>
                                                         
-                                                        {/* 🟢 UNIQUE HOUSE/SHOP SHAPE (Matches user sketch) */}
                                                         <div style={{ filter: 'drop-shadow(0 4px 6px rgba(40, 116, 240, 0.3))', marginBottom: '8px' }}>
                                                             <div style={{ position: 'relative', width: '64px', height: '64px', margin: '0 auto' }}>
                                                                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #2874f0, #facc15, #f59e0b)', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)' }}></div>
@@ -663,7 +673,7 @@ const Home = () => {
                                                                         <Store size={isMobile ? 20 : 30} color="#cbd5e1"/>
                                                                     </div>
                                                                 )}
-
+                                                                
                                                                 <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
                                                                     <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
                                                                         {shop.business_name}
@@ -694,7 +704,7 @@ const Home = () => {
                 <button onClick={() => { navigate('/'); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); setSearchQuery(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={currentRoute === '/' && selectedCategory === CATEGORIES[1] && !searchQuery && !selectedSubCategory ? styles.bottomNavBtnActive : styles.bottomNavBtn}>
                     <HomeIcon size={24} /><span>{ht.home}</span>
                 </button>
-                <button onClick={() => { navigate('/'); setSelectedCategory(CATEGORIES[0]); setSelectedSubCategory(null); setSearchQuery(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={currentRoute === '/' && selectedCategory === CATEGORIES[0] ? styles.bottomNavBtnActive : styles.bottomNavBtn}>
+                <button onClick={() => navigate('/expo')} style={currentRoute === '/expo' ? styles.bottomNavBtnActive : styles.bottomNavBtn}>
                     <Sparkles size={24} /><span>{ht.expo}</span>
                 </button>
                 {isVendor ? (
