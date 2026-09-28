@@ -25,7 +25,10 @@ import ItemDetail from './pages/ItemDetail';
 import UserOrders from './pages/UserOrders';
 import VendorOrders from './pages/VendorOrders';
 import Expo from './pages/Expo';
-const isMaintenanceMode = false; 
+
+// 🟢 ULTRA-PREMIUM MAINTENANCE MODE TOGGLE
+// Set to 'true' to block the app and show the upgrade screen. Set to 'false' to open the app.
+const isMaintenanceMode = true; 
 
 function ScrollToTop() {
     const { pathname } = useLocation();
@@ -216,7 +219,36 @@ function App() {
         if (outcome === 'accepted') { setIsInstallable(false); setDeferredPrompt(null); }
     };
 
-    if (isMaintenanceMode) return <div style={{textAlign: 'center', marginTop: '20%', fontSize: '24px', fontWeight: 'bold'}}>Maintenance Mode Active</div>;
+    // 🟢 ULTRA-PREMIUM MAINTENANCE MODE UI
+    if (isMaintenanceMode) {
+        return (
+            <div style={maintenanceStyles.page}>
+                <style>
+                    {`
+                        @keyframes slow-spin { 100% { transform: rotate(360deg); } }
+                        @keyframes pulse-glow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.1); box-shadow: 0 0 15px #facc15; } }
+                    `}
+                </style>
+                <div style={maintenanceStyles.card}>
+                    <div style={maintenanceStyles.iconWrapper}>
+                        <div style={{ fontSize: '50px', animation: 'slow-spin 8s linear infinite' }}>⚙️</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '15px' }}>
+                        <h1 style={maintenanceStyles.title}>SUBHAMS</h1><span style={maintenanceStyles.hubBadge}>HUB</span>
+                    </div>
+                    <h2 style={maintenanceStyles.subtitle}>We're Upgrading! 🚀</h2>
+                    <p style={maintenanceStyles.text}>
+                        We are currently installing brand new features (including the new Expo Grid) and making the platform faster. 
+                        This scheduled maintenance ensures you get an ultra-premium experience.
+                    </p>
+                    <div style={maintenanceStyles.statusBox}>
+                        <span style={maintenanceStyles.pulseIndicator}></span>
+                        <span style={maintenanceStyles.statusText}>Systems will be back online shortly.</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (!isAppReady) {
         return <PremiumLoader onComplete={handleAppReady} />;
@@ -318,6 +350,20 @@ function App() {
         </GoogleOAuthProvider>
     );
 }
+
+// 🟢 STYLES FOR THE PREMIUM MAINTENANCE MODE
+const maintenanceStyles = {
+    page: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0f172a', padding: '20px', fontFamily: 'Inter, sans-serif' },
+    card: { background: 'white', padding: '40px 30px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', width: '100%', maxWidth: '450px', textAlign: 'center', boxSizing: 'border-box' },
+    iconWrapper: { background: 'linear-gradient(135deg, #e2e8f0, #f1f5f9)', width: '100px', height: '100px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 25px auto', boxShadow: 'inset 0 4px 6px rgba(0,0,0,0.05)' },
+    title: { margin: 0, fontSize: '26px', fontWeight: '900', color: '#0f172a', letterSpacing: '1px' },
+    hubBadge: { fontSize: '12px', background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', padding: '4px 8px', borderRadius: '6px', fontWeight: '900', letterSpacing: '2px' },
+    subtitle: { color: '#2563eb', fontSize: '20px', fontWeight: '800', margin: '0 0 15px 0' },
+    text: { color: '#475569', fontSize: '15px', lineHeight: '1.6', margin: '0 0 25px 0', fontWeight: '500' },
+    statusBox: { background: '#fef3c7', border: '1px solid #fde68a', padding: '12px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' },
+    pulseIndicator: { width: '10px', height: '10px', background: '#f59e0b', borderRadius: '50%', animation: 'pulse-glow 2s infinite' },
+    statusText: { color: '#b45309', fontSize: '14px', fontWeight: '700' }
+};
 
 const lockStyles = {
     page: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8fafc', padding: '20px', fontFamily: 'Inter, sans-serif' },
