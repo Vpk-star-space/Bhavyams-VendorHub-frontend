@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Share2, Heart, ShoppingCart, Calendar, Store, Star, MessageCircle, Send, BadgeCheck, AlertTriangle, Trash2, Clock, MapPinOff } from 'lucide-react';
+import { ArrowLeft, Share2, Heart, ShoppingCart, Calendar, Store, Star, MessageCircle, Send, BadgeCheck, Trash2, Clock, MapPinOff, ShieldCheck, AlertCircle } from 'lucide-react';
 import { AppContext } from '../context/AppContext';
 import { useCart } from '../context/CartContext'; 
 import { toast } from 'react-toastify';
@@ -47,10 +47,6 @@ const translations = {
         bookService: "Book Service",
         addToCart: "Add Item",
         inclusiveTaxes: "Inclusive of all taxes",
-        disclaimerTitle: "Important: Verify Before Payment",
-        disclaimer1: "Direct from Vendors: Bookings are fulfilled directly by local partners.",
-        disclaimer2: "Call to Verify: Confirm quality, exact pricing, and delivery details.",
-        disclaimer3: "Privacy Protected: Your phone number is safely hidden.",
         callNotice: "Note: The vendor will call you after booking. Your phone number remains safely hidden.",
         totalPrice: "Total Price"
     },
@@ -72,10 +68,6 @@ const translations = {
         bookService: "సేవను బుక్ చేయండి",
         addToCart: "వస్తువును జోడించండి",
         inclusiveTaxes: "అన్ని పన్నులతో కలిపి",
-        disclaimerTitle: "ముఖ్య గమనిక: చెల్లింపునకు ముందు నిర్ధారించుకోండి",
-        disclaimer1: "నేరుగా విక్రేతల నుండి: బుకింగ్‌లు స్థానిక వ్యాపారుల ద్వారా నిర్వహించబడతాయి.",
-        disclaimer2: "ధృవీకరించడానికి కాల్ చేయండి: నాణ్యత, ఖచ్చితమైన ధర మరియు డెలివరీ వివరాలను నిర్ధారించుకోండి.",
-        disclaimer3: "గోప్యత రక్షించబడింది: మీ ఫోన్ నంబర్ సురక్షితంగా దాచబడుతుంది.",
         callNotice: "గమనిక: బుకింగ్ తర్వాత విక్రేత మీకు కాల్ చేస్తారు. మీ ఫోన్ నంబర్ గోప్యంగా ఉంచబడుతుంది.",
         totalPrice: "మొత్తం ధర"
     }
@@ -94,7 +86,11 @@ const ItemDetail = () => {
     const userStr = localStorage.getItem('user');
     const currentUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
     
+    // 🟢 STRICT ADMIN LOCK (Removes all friction for you)
+    const isMasterAdmin = currentUser && currentUser.email === 'pavanvenkat63@gmail.com';
+
     const [item, setItem] = useState(null);
+    const [shopInfo, setShopInfo] = useState(null);
     const [loading, setLoading] = useState(true);
     
     const [activeImage, setActiveImage] = useState('');
@@ -132,11 +128,12 @@ const ItemDetail = () => {
                 setGallery(parsedGallery);
                 setActiveImage(parsedGallery[0] || 'https://via.placeholder.com/400');
 
-                // 🟢 FETCH TRUE SHOP ID AND DELIVERY SETTINGS
+                // 🟢 FETCH TRUE SHOP ID, TRUST LEVEL AND DELIVERY SETTINGS
                 const shopIdToFetch = productData.shop_id || productData.vendor_id;
                 if (shopIdToFetch) {
                     try {
                         const shopRes = await axios.get(`${BACKEND_URL}/shops/${shopIdToFetch}`);
+                        setShopInfo(shopRes.data.shop);
                         setTrueShopId(shopRes.data.shop.id); 
                         
                         let fetchedAreas = ['all']; 
@@ -156,7 +153,7 @@ const ItemDetail = () => {
                         setDeliveryAreas(fetchedAreas);
                         setShopDeliveryString(displayString);
                     } catch (e) {
-                        console.warn("Failed to fetch shop delivery areas");
+                        console.warn("Failed to fetch shop trust/delivery info");
                     }
                 }
             } catch (err) {
@@ -169,12 +166,27 @@ const ItemDetail = () => {
         fetchItemDetail();
     }, [itemId]);
 
-    // 🟢 FLAWLESS ADDRESS CHECKER
+    // 🟢 IDENTITY CHECKS
+    const isOfficialApp = shopInfo && (
+        String(shopInfo.user_id) === "1" || 
+        shopInfo.user_email === 'pavanvenkat63@gmail.com' || 
+        shopInfo.email === 'pavanvenkat63@gmail.com' ||
+        (currentUser && currentUser.email === 'pavanvenkat63@gmail.com' && String(currentUser.id) === String(shopInfo.user_id))
+    );
+    const isVerified = shopInfo && shopInfo.is_verified;
+
+    // 🟢 3-TIER BADGE RENDERER
+    const renderBadge = (official, verified) => {
+        if (official) return <BadgeCheck size={16} color="#ffffff" fill="#FFD700" style={{ filter: 'drop-shadow(0 1px 2px rgba(184, 134, 11, 0.4))', marginLeft: '4px' }} />;
+        if (verified) return <BadgeCheck size={16} color="#ffffff" fill="#10b981" style={{ marginLeft: '4px' }} />;
+        return <BadgeCheck size={16} color="#ffffff" fill="#3b82f6" style={{ marginLeft: '4px' }} />;
+    };
+
+    // 🟢 FLAWLESS ADDRESS CHECKER (Admin is immune to zone restrictions)
     const fullUserAddress = currentUser?.address ? currentUser.address.toLowerCase() : '';
     let isDeliverable = true; 
 
-    // If logged in, strictly verify address against shop settings
-    if (currentUser && fullUserAddress) {
+    if (currentUser && fullUserAddress && !isMasterAdmin) {
         if (deliveryAreas.length === 0) {
             isDeliverable = false; // Shop is Pickup Only
         } else if (!deliveryAreas.includes('all')) {
@@ -190,34 +202,22 @@ const ItemDetail = () => {
             navigate('/welcome');
             return;
         }
-        if (!trueShopId) {
-            toast.error("Error linking to shop.");
-            return;
-        }
+        if (!trueShopId) return toast.error("Error linking to shop.");
         
         try {
             const token = localStorage.getItem('token');
-            
-            // 🟢 Send the extracted, clean village name to the Shop Owner's DB!
             const basicUserAddress = currentUser?.address ? getBasicAreaName(currentUser.address) : 'Unknown Location'; 
-            
             await axios.post(`${getBackendUrl()}/shops/${trueShopId}/request-delivery`, { area_name: basicUserAddress }, { headers: { Authorization: `Bearer ${token}` } });
             toast.success(`🚀 Request sent! We notified the shop owner directly.`);
             setHasRequested(true);
-        } catch (err) {
-            toast.error("Failed to send request.");
-        }
+        } catch (err) { toast.error("Failed to send request."); }
     };
 
     const handleShare = async () => {
         if (navigator.share) {
             try {
-                await navigator.share({
-                    title: item?.name,
-                    text: `Check out ${item?.name} on Subhams Hub!`,
-                    url: window.location.href
-                });
-            } catch (err) { console.log('Share canceled', err); }
+                await navigator.share({ title: item?.name, text: `Check out ${item?.name} on Subhams Hub!`, url: window.location.href });
+            } catch (err) {}
         } else {
             navigator.clipboard.writeText(window.location.href);
             alert("Link copied to clipboard!");
@@ -227,14 +227,7 @@ const ItemDetail = () => {
     const handleAddComment = (e) => {
         e.preventDefault();
         if (!newComment.trim()) return;
-        
-        const commentObj = {
-            id: Date.now(),
-            user: currentUser ? currentUser.name : "Guest User", 
-            text: newComment,
-            time: "Just now"
-        };
-        
+        const commentObj = { id: Date.now(), user: currentUser ? currentUser.name : "Guest User", text: newComment, time: "Just now" };
         setComments([commentObj, ...comments]);
         setNewComment('');
     };
@@ -248,7 +241,7 @@ const ItemDetail = () => {
     if (loading) return <div style={styles.loading}>Loading item details...</div>;
     if (!item) return <div style={styles.loading}>Item not found.</div>;
 
-    const isOwner = currentUser && (String(currentUser.id) === String(item.vendor_id) || currentUser.role === 'admin');
+    const isOwner = currentUser && (String(currentUser.id) === String(item.vendor_id) || isMasterAdmin);
 
     const sellPrice = Number(item.price) || 0;
     const mrp = Number(item.mrp) || 0;
@@ -258,21 +251,11 @@ const ItemDetail = () => {
     const isService = item.unit_type === 'Service' || item.unit_type === 'Hour';
     const stockCount = Number(item.stock_count) || 0;
 
-    let stockDisplay = "";
-    let stockColor = "";
-    if (stockCount > 10) {
-        stockDisplay = t.inStock;
-        stockColor = "#16a34a"; 
-    } else if (stockCount <= 10 && stockCount > 5) {
-        stockDisplay = t.fewLeft;
-        stockColor = "#f59e0b"; 
-    } else if (stockCount <= 5 && stockCount > 0) {
-        stockDisplay = `${t.only} ${stockCount} ${t.left}`;
-        stockColor = "#ef4444"; 
-    } else {
-        stockDisplay = t.outOfStock;
-        stockColor = "#ef4444"; 
-    }
+    let stockDisplay = ""; let stockColor = "";
+    if (stockCount > 10) { stockDisplay = t.inStock; stockColor = "#16a34a"; } 
+    else if (stockCount <= 10 && stockCount > 5) { stockDisplay = t.fewLeft; stockColor = "#f59e0b"; } 
+    else if (stockCount <= 5 && stockCount > 0) { stockDisplay = `${t.only} ${stockCount} ${t.left}`; stockColor = "#ef4444"; } 
+    else { stockDisplay = t.outOfStock; stockColor = "#ef4444"; }
 
     const handleQuantity = (type) => {
         if (type === 'minus' && quantity > 1) setQuantity(quantity - 1);
@@ -281,29 +264,17 @@ const ItemDetail = () => {
 
     const handleAddToCart = (orderType) => {
         if (!currentUser) {
-            toast.info("Please log in to add items.");
-            navigate('/welcome');
-            return;
+            toast.info("Please log in to add items."); navigate('/welcome'); return;
         }
-
         if (!isDeliverable) {
-            toast.error(`Delivery not available to your location.`);
-            return;
+            toast.error(`Delivery not available to your location.`); return;
         }
 
         setIsPlacingOrder(true);
-
         const newItem = {
-            id: item.id,
-            name: item.name,
-            price: sellPrice,
-            quantity: quantity, 
-            qty: quantity,      
-            image: activeImage || item.image_url,
-            vendor_id: item.vendor_id,
-            shop_id: trueShopId || item.shop_id || item.vendor_id,
-            order_type: orderType,
-            total_price: totalPrice
+            id: item.id, name: item.name, price: sellPrice, quantity: quantity, qty: quantity,
+            image: activeImage || item.image_url, vendor_id: item.vendor_id,
+            shop_id: trueShopId || item.shop_id || item.vendor_id, order_type: orderType, total_price: totalPrice
         };
 
         let currentCart = JSON.parse(localStorage.getItem('subhams_cart') || '[]');
@@ -311,13 +282,57 @@ const ItemDetail = () => {
         currentCart.push(newItem);
         localStorage.setItem('subhams_cart', JSON.stringify(currentCart));
 
-        setTimeout(() => {
-            if(addToCart) addToCart(newItem);
-        }, 0);
+        setTimeout(() => { if(addToCart) addToCart(newItem); }, 0);
+        setTimeout(() => { navigate('/my-orders', { state: { forceTab: 'list' } }); }, 300);
+    };
 
-        setTimeout(() => {
-            navigate('/my-orders', { state: { forceTab: 'list' } });
-        }, 300);
+    // 🟢 DYNAMIC TRUST BOX RENDERER
+    const renderTrustBox = () => {
+        if (!shopInfo) return null;
+
+        if (isOfficialApp) {
+            // GOLD TIER
+            return (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: '12px 15px', borderRadius: '12px', marginBottom: '25px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <ShieldCheck size={24} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#b45309', fontWeight: '900' }}>100% Trust: Official Subhams Hub</p>
+                        <p style={{ margin: 0, fontSize: '11px', color: '#d97706', fontWeight: '700', lineHeight: '1.4' }}>
+                            You can buy securely directly from our platform. <br/> 
+                            అధికారిక సుభమ్స్ హబ్. మీరు ఇక్కడ సురక్షితంగా కొనుగోలు చేయవచ్చు.
+                        </p>
+                    </div>
+                </div>
+            );
+        } else if (isVerified) {
+            // GREEN TIER
+            return (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px 15px', borderRadius: '12px', marginBottom: '25px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <BadgeCheck size={24} color="#15803d" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#15803d', fontWeight: '900' }}>Verified Trusted Vendor</p>
+                        <p style={{ margin: 0, fontSize: '11px', color: '#16a34a', fontWeight: '700', lineHeight: '1.4' }}>
+                            Quality confirmed. Please contact them for exact order details. <br/>
+                            ధృవీకరించబడిన స్టోర్. ఆర్డర్ వివరాల కోసం వీరిని సంప్రదించండి.
+                        </p>
+                    </div>
+                </div>
+            );
+        } else {
+            // BLUE TIER (Neutral, standard shop advice)
+            return (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '12px 15px', borderRadius: '12px', marginBottom: '25px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <AlertCircle size={24} color="#1d4ed8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#1e3a8a', fontWeight: '800' }}>Shop is active, but not physically verified by Subhams Hub.</p>
+                        <p style={{ margin: 0, fontSize: '11px', color: '#2563eb', fontWeight: '600', lineHeight: '1.4' }}>
+                            Please use Cash on Delivery (COD). Do not pay in advance. Book and talk directly. <br/>
+                            భౌతికంగా ధృవీకరించబడలేదు. అడ్వాన్స్ చెల్లించకండి. COD మాత్రమే వాడండి.
+                        </p>
+                    </div>
+                </div>
+            );
+        }
     };
 
     return (
@@ -359,8 +374,8 @@ const ItemDetail = () => {
                 {/* CORE INFO */}
                 <div style={styles.detailsContainer}>
                     
-                    {/* 🟢 CUSTOMER OUT-OF-ZONE WARNING */}
-                    {!isDeliverable && currentUser && (
+                    {/* 🟢 CUSTOMER OUT-OF-ZONE WARNING (Hidden from Admin) */}
+                    {!isDeliverable && currentUser && !isMasterAdmin && (
                         <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', padding: '10px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
                             <MapPinOff size={16} color="#b45309" style={{flexShrink: 0}} />
                             <span style={{color: '#b45309', fontSize: '13px', fontWeight: 'bold'}}>
@@ -414,16 +429,8 @@ const ItemDetail = () => {
                         </div>
                     </div>
 
-                    <div style={styles.disclaimerBox}>
-                        <h4 style={styles.disclaimerTitle}>
-                            <AlertTriangle size={18} color="#dc2626" /> {t.disclaimerTitle}
-                        </h4>
-                        <ul style={styles.disclaimerList}>
-                            <li>{t.disclaimer1}</li>
-                            <li style={{ color: '#dc2626', fontWeight: 'bold' }}>{t.disclaimer2}</li>
-                            <li>{t.disclaimer3}</li>
-                        </ul>
-                    </div>
+                    {/* 🟢 DYNAMIC TRUST BOX */}
+                    {renderTrustBox()}
 
                     <div style={styles.divider} />
 
@@ -433,7 +440,10 @@ const ItemDetail = () => {
                         </div>
                         <div style={{ flex: 1 }}>
                             <span style={styles.vendorLabel}>{t.soldBy}</span>
-                            <h4 style={styles.vendorName}>{item.business_name || 'Local Vendor'} <BadgeCheck size={14} color="#2563eb" /></h4>
+                            <h4 style={styles.vendorName}>
+                                {item.business_name || 'Local Vendor'} 
+                                {renderBadge(isOfficialApp, isVerified)}
+                            </h4>
                         </div>
                         <span style={{fontSize: '12px', color: '#2874f0', fontWeight: 'bold'}}>{t.viewStore}</span>
                     </div>
@@ -495,8 +505,8 @@ const ItemDetail = () => {
                         </div>
 
                         <div style={{ display: 'flex', gap: '10px', flex: 1, justifyContent: 'flex-end' }}>
-                            {/* 🟢 IF OUT OF ZONE, THEY REQUEST DELIVERY HERE */}
-                            {!isDeliverable && currentUser ? (
+                            {/* 🟢 IF OUT OF ZONE (AND NOT ADMIN), THEY REQUEST DELIVERY HERE */}
+                            {!isDeliverable && currentUser && !isMasterAdmin ? (
                                 <button 
                                     onClick={handleRequestDelivery}
                                     disabled={hasRequested}
@@ -577,15 +587,11 @@ const styles = {
     vendorCard: { display: 'flex', alignItems: 'center', gap: '15px', padding: '5px 0', cursor: 'pointer', marginBottom: '20px' },
     vendorIconArea: { width: '48px', height: '48px', background: '#eff6ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     vendorLabel: { fontSize: '12px', color: '#64748b', marginBottom: '2px' },
-    vendorName: { margin: 0, fontSize: '15px', color: '#0f172a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' },
+    vendorName: { margin: 0, fontSize: '15px', color: '#0f172a', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '2px' },
     
     section: { marginBottom: '25px' },
     sectionTitle: { margin: '0 0 15px 0', fontSize: '18px', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' },
     description: { fontSize: '14px', color: '#334155', lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' },
-    
-    disclaimerBox: { background: '#fef2f2', border: '1px solid #fca5a5', padding: '16px', borderRadius: '12px', marginBottom: '25px' },
-    disclaimerTitle: { margin: '0 0 10px 0', fontSize: '15px', color: '#dc2626', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' },
-    disclaimerList: { margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#b91c1c', lineHeight: '1.6' },
     
     commentForm: { display: 'flex', gap: '10px', marginBottom: '20px' },
     commentInput: { flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', background: '#f8fafc', outline: 'none' },

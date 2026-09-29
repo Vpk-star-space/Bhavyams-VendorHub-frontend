@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../context/AppContext';
 import axios from 'axios';
 import { AppContext } from '../context/AppContext';
-import { Share2, BadgeCheck, MapPin, MapPinOff, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, User, UserPlus, Trash2, Loader, Play, Heart, Video, Sparkles, MessageCircle } from 'lucide-react';
+import { Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, User, UserPlus, Trash2, Loader, Play, Heart, Video, MessageCircle, Download } from 'lucide-react';
 import { toast } from 'react-toastify';
+import html2canvas from 'html2canvas';
 
 const getBackendUrl = () => {
     return process.env.NODE_ENV === 'production' 
@@ -20,7 +21,6 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
-// 🟢 Required to load Expo media correctly
 const resolveMediaUrl = (url, type = 'image') => {
     if (!url) return null;
     if (type === 'video' || url.match(/\.(mp4|webm|ogg|mov)$/i) || url.includes('video/upload')) {
@@ -33,7 +33,6 @@ const resolveMediaUrl = (url, type = 'image') => {
     return `${getBackendUrl().replace('/api', '')}/${url.replace(/\\/g, '/')}`;
 };
 
-// 🟢 FIX FOR BLACK SCREENS IN EXPO GRID
 const getVideoThumbnail = (url) => {
     if (!url) return null;
     if (url.includes('cloudinary.com')) {
@@ -42,20 +41,33 @@ const getVideoThumbnail = (url) => {
     return `${resolveMediaUrl(url, 'video')}#t=0.001`; 
 };
 
-// 🟢 3-TIER BADGE RENDERER
+// 🟢 THE NEW 3-TIER BADGE SYSTEM (Identity Locked)
 const renderBadge = (isOfficial, isVerified) => {
     if (isOfficial) {
+        // TIER 1: Master Admin (Gold)
         return (
-            <span style={styles.goldBadgeLabel}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #fde68a' }}>
                 <BadgeCheck size={16} color="#ffffff" fill="#FFD700" style={{ filter: 'drop-shadow(0 1px 2px rgba(184, 134, 11, 0.4))' }} />
                 Official
             </span>
         );
     }
     if (isVerified) {
-        return <BadgeCheck size={22} color="#ffffff" fill="#10b981" title="Verified Genuine Vendor" />;
+        // TIER 2: Trusted Vendor (Green)
+        return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #86efac' }}>
+                <BadgeCheck size={16} color="#ffffff" fill="#10b981" />
+                Verified
+            </span>
+        );
     }
-    return <BadgeCheck size={22} color="#ffffff" fill="#3b82f6" title="Approved Vendor" />;
+    // TIER 3: Standard Shop (Blue)
+    return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#eff6ff', color: '#1d4ed8', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '800', border: '1px solid #bfdbfe' }}>
+            <BadgeCheck size={16} color="#ffffff" fill="#3b82f6" />
+            Standard
+        </span>
+    );
 };
 
 const ShopProfile = () => {
@@ -96,16 +108,14 @@ const ShopProfile = () => {
     const [isSearching, setIsSearching] = useState(false);
 
     const [editForm, setEditForm] = useState({ 
-        business_name: '', category: '', shop_type: 'Products', is_online: true, address: '', delivery_areas: '' 
+        business_name: '', category: '', shop_type: 'Products', is_online: true, address: '', delivery_areas: '', founder_name: '', ceo_name: '' 
     });
 
     const userStr = localStorage.getItem('user');
     const currentUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
 
-    const isMasterAdmin = currentUser && (
-        String(currentUser.role).toLowerCase() === 'admin' || 
-        currentUser.email === 'pavanvenkat63@gmail.com'
-    );
+    // 🟢 STRICT ADMIN LOCK
+    const isMasterAdmin = currentUser && currentUser.email === 'pavanvenkat63@gmail.com';
 
     useEffect(() => {
         const fetchShopProfile = async () => {
@@ -126,13 +136,14 @@ const ShopProfile = () => {
                     shop_type: res.data.shop.shop_type || 'Products', 
                     is_online: res.data.shop.is_online,
                     address: res.data.shop.address || res.data.shop.location || '',
-                    delivery_areas: res.data.shop.delivery_areas === 'All' ? '' : (res.data.shop.delivery_areas || '')
+                    delivery_areas: res.data.shop.delivery_areas === 'All' ? '' : (res.data.shop.delivery_areas || ''),
+                    founder_name: res.data.shop.founder_name || '',
+                    ceo_name: res.data.shop.ceo_name || ''
                 });
 
                 const catRes = await axios.get(`${BACKEND_URL}/admin/categories`);
                 setAdminCategories(catRes.data || []);
 
-                // 🟢 SAFELY FETCH FOLLOW STATUS
                 if (currentUser) {
                     try {
                         const token = localStorage.getItem('token');
@@ -140,9 +151,7 @@ const ShopProfile = () => {
                         if (followRes.data.following && followRes.data.following[id]) {
                             setIsFollowing(true);
                         }
-                    } catch (followErr) {
-                        console.warn("Could not fetch follow status.");
-                    }
+                    } catch (followErr) {}
                 }
 
             } catch (err) {
@@ -167,18 +176,13 @@ const ShopProfile = () => {
         try {
             const token = localStorage.getItem('token');
             const newStatus = !shopData.is_verified;
-            
-            await axios.put(
-                `${getBackendUrl()}/shops/admin/vendor/${id}/verify-status`,
+            await axios.put(`${getBackendUrl()}/shops/admin/vendor/${id}/verify-status`,
                 { is_verified: newStatus, is_approved: shopData.is_approved },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-
             setShopData(prev => ({ ...prev, is_verified: newStatus }));
             toast.success(newStatus ? "Vendor verified with Green Badge!" : "Verification removed.");
-        } catch (err) {
-            toast.error("Failed to update verification status.");
-        }
+        } catch (err) { toast.error("Failed to update verification status."); }
     };
 
     const handleFollowToggle = async () => {
@@ -209,9 +213,7 @@ const ShopProfile = () => {
             await axios.post(`${getBackendUrl()}/shops/${id}/request-delivery`, { area_name: basicUserAddress }, { headers: { Authorization: `Bearer ${token}` }});
             toast.success(`🚀 Request sent! We notified the shop owner directly.`);
             setHasRequested(true);
-        } catch (err) {
-            toast.error("Failed to send request.");
-        }
+        } catch (err) { toast.error("Failed to send request."); }
     };
 
     const fetchStaff = async () => {
@@ -230,9 +232,7 @@ const ShopProfile = () => {
             const res = await axios.post(`${getBackendUrl()}/shops/${id}/staff/request-otp`, { staff_email: newStaffEmail }, { headers: { Authorization: `Bearer ${token}` }});
             toast.success(res.data.message);
             setOtpMode(true);
-        } catch (err) {
-            toast.error(err.response?.data?.message || "Failed to send OTP.");
-        }
+        } catch (err) { toast.error(err.response?.data?.message || "Failed to send OTP."); }
     };
 
     const handleVerifyStaff = async (e) => {
@@ -242,13 +242,8 @@ const ShopProfile = () => {
             const token = localStorage.getItem('token');
             await axios.post(`${getBackendUrl()}/shops/${id}/staff/verify-otp`, { staff_email: newStaffEmail, otp: staffOtp, role: 'Staff' }, { headers: { Authorization: `Bearer ${token}` }});
             toast.success("Team member verified and added securely!");
-            setNewStaffEmail('');
-            setStaffOtp('');
-            setOtpMode(false);
-            fetchStaff();
-        } catch (err) {
-            toast.error(err.response?.data?.message || "Invalid or expired OTP.");
-        }
+            setNewStaffEmail(''); setStaffOtp(''); setOtpMode(false); fetchStaff();
+        } catch (err) { toast.error(err.response?.data?.message || "Invalid or expired OTP."); }
     };
 
     const handleRemoveStaff = async (email) => {
@@ -260,19 +255,16 @@ const ShopProfile = () => {
         } catch (err) {}
     };
 
-    const openTeamModal = () => {
-        setShowTeamModal(true);
-        setOtpMode(false);
-        fetchStaff();
-    };
+    const openTeamModal = () => { setShowTeamModal(true); setOtpMode(false); fetchStaff(); };
 
+    // 🟢 LOCATION FIX: Forced English via accept-language
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
         if (query.length < 3) return setLocResults([]);
         
         setIsSearching(true);
         try {
-            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`);
+            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&accept-language=en&q=${query}`);
             setLocResults(res.data);
         } catch (e) {} finally { setIsSearching(false); }
     };
@@ -289,9 +281,7 @@ const ShopProfile = () => {
                 setEditForm({ ...editForm, delivery_areas: currentAreas.join(', ') });
             }
         }
-        setShowLocModal(false);
-        setLocSearch('');
-        setLocResults([]);
+        setShowLocModal(false); setLocSearch(''); setLocResults([]);
     };
 
     const handleUpdateSubmit = async (e) => {
@@ -308,6 +298,8 @@ const ShopProfile = () => {
             formData.append('shop_type', editForm.shop_type);
             formData.append('is_online', editForm.is_online);
             formData.append('address', editForm.address);
+            formData.append('founder_name', editForm.founder_name);
+            formData.append('ceo_name', editForm.ceo_name);
             
             const finalDeliveryAreas = editForm.delivery_areas || 'All';
             formData.append('delivery_areas', finalDeliveryAreas); 
@@ -323,8 +315,24 @@ const ShopProfile = () => {
             setShowEditModal(false);
             setImageFile(null);
             toast.success("✅ Store updated successfully!");
+        } catch (err) { setUploadError("❌ Update failed! Please check your connection."); }
+    };
+
+    // 🟢 WHATSAPP STATUS GENERATOR
+    const handleDownloadCard = async () => {
+        const element = document.getElementById('shop-card-export');
+        if (!element) return;
+        try {
+            toast.info("Generating shareable image...");
+            const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+            const data = canvas.toDataURL('image/jpeg');
+            const link = document.createElement('a');
+            link.href = data;
+            link.download = `${shopData.business_name}_SubhamsHub.jpg`;
+            link.click();
+            toast.success("Image saved! You can now share it on WhatsApp.");
         } catch (err) {
-            setUploadError("❌ Update failed! Please check your connection.");
+            toast.error("Failed to generate image. Try again.");
         }
     };
 
@@ -344,7 +352,29 @@ const ShopProfile = () => {
         navigate('/welcome');
     };
 
-    const shortDisplayArea = currentUser?.address ? currentUser.address.split(',')[0].trim() : 'your area';
+    const renderLeadership = () => {
+        const founder = shopData.founder_name;
+        const ceo = shopData.ceo_name;
+        if (!founder && !ceo) return null;
+        
+        let label = ""; let name = "";
+        if (founder && ceo && founder.toLowerCase() === ceo.toLowerCase()) {
+            label = "Founder & CEO"; name = founder;
+        } else if (founder && ceo) {
+            label = "Leadership"; name = `Founder: ${founder} | CEO: ${ceo}`;
+        } else if (founder) {
+            label = "Founder"; name = founder;
+        } else {
+            label = "CEO"; name = ceo;
+        }
+
+        return (
+            <div style={{ marginTop: '10px', background: '#f8fafc', border: '1px dashed #cbd5e1', padding: '8px 12px', borderRadius: '8px', display: 'inline-block' }}>
+                <span style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', fontWeight: 'bold', display: 'block' }}>{label}</span>
+                <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: 'bold' }}>{name}</span>
+            </div>
+        );
+    };
 
     if (loading) return <div style={styles.loading}>Loading Store Profile...</div>;
     if (!shopData) return null;
@@ -353,7 +383,13 @@ const ShopProfile = () => {
     const dbShopType = shopData.shop_type || 'Products'; 
 
     const shopImageSrc = getOptimizedImage(shopData.shop_logo);
-    const isOfficialApp = shopData.user_id === 1 || shopData.business_name.toLowerCase().includes('subhams hub');
+    
+   // 🟢 BULLETPROOF IDENTITY LOCK
+const isOfficialApp = 
+    String(shopData.user_id) === "1" || 
+    shopData.user_email === 'pavanvenkat63@gmail.com' || 
+    shopData.email === 'pavanvenkat63@gmail.com' ||
+    (currentUser && currentUser.email === 'pavanvenkat63@gmail.com' && String(currentUser.id) === String(shopData.user_id));
     const totalRequests = deliveryRequests.reduce((sum, req) => sum + Number(req.count), 0);
 
     return (
@@ -369,63 +405,67 @@ const ShopProfile = () => {
             
             <div style={styles.navBar}>
                 <button onClick={() => navigate(-1)} style={styles.backBtn}><ArrowLeft size={20} /> Back</button>
-                <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
-                    {!currentUser && (
-                        <button onClick={() => navigate('/welcome')} style={styles.loginBtnSmall}>
-                            <User size={14} /> Login
-                        </button>
-                    )}
-                    <button onClick={handleShare} style={styles.shareIconBtn}><Share2 size={18} /> Share</button>
+                <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                    <button onClick={handleDownloadCard} style={styles.downloadIconBtn}><Download size={16} /> Save JPG</button>
+                    <button onClick={handleShare} style={styles.shareIconBtn}><Share2 size={16} /> Share</button>
                 </div>
             </div>
 
-            <div style={{...styles.bannerBackground, background: isOfficialApp ? 'linear-gradient(135deg, #b45309 0%, #facc15 100%)' : 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)'}}>
-                <div style={styles.bannerTextContainer}>
-                    <span style={styles.bannerCategoryText}>{shopData.category || 'Local Business'}</span>
-                    <h1 style={styles.bannerTitleText}>{shopData.business_name}</h1>
-                </div>
-            </div>
-            
-            <div style={styles.profileContentWrapper}>
-                <div style={styles.avatarRow}>
-                    <div style={styles.avatarContainer}>
-                        {shopImageSrc ? (
-                            <img src={shopImageSrc} alt="Shop Logo" crossOrigin="anonymous" referrerPolicy="no-referrer" style={isOfficialApp ? styles.businessLogoGold : styles.businessLogo} />
-                        ) : (
-                            <div style={{...styles.businessLogo, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                                <Store size={40} color="#94a3b8" />
-                            </div>
-                        )}
-                        {shopData.is_online && <div style={styles.onlineBadge}></div>}
+            {/* 🟢 THE AREA THAT GETS SCREENSHOTTED FOR WHATSAPP */}
+            <div id="shop-card-export" style={{ background: '#f8fafc', paddingBottom: '20px' }}>
+                <div style={{...styles.bannerBackground, background: isOfficialApp ? 'linear-gradient(135deg, #b45309 0%, #facc15 100%)' : 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)'}}>
+                    <div style={styles.bannerTextContainer}>
+                        <span style={styles.bannerCategoryText}>{shopData.category || 'Local Business'}</span>
+                        <h1 style={styles.bannerTitleText}>{shopData.business_name}</h1>
                     </div>
-                    
-                    <div style={styles.realMetricsBox}>
-                        <Package size={20} color={isOfficialApp ? "#d97706" : "#2874f0"} />
-                        <div style={{display: 'flex', flexDirection: 'column'}}>
-                            <span style={styles.metricNumber}>{products.length}</span>
-                            <span style={styles.metricLabel}>Live Items</span>
+                </div>
+                
+                <div style={styles.profileContentWrapper}>
+                    <div style={styles.avatarRow}>
+                        <div style={styles.avatarContainer}>
+                            {shopImageSrc ? (
+                                <img src={shopImageSrc} alt="Shop Logo" crossOrigin="anonymous" referrerPolicy="no-referrer" style={isOfficialApp ? styles.businessLogoGold : styles.businessLogo} />
+                            ) : (
+                                <div style={{...styles.businessLogo, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                    <Store size={40} color="#94a3b8" />
+                                </div>
+                            )}
+                            {shopData.is_online && <div style={styles.onlineBadge}></div>}
+                        </div>
+                        
+                        <div style={styles.realMetricsBox}>
+                            <Package size={20} color={isOfficialApp ? "#d97706" : "#2874f0"} />
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                <span style={styles.metricNumber}>{products.length}</span>
+                                <span style={styles.metricLabel}>Live Items</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div style={styles.bioSection}>
-                    <h2 style={styles.shopName}>
-                        {shopData.business_name} 
-                        {renderBadge(isOfficialApp, shopData.is_verified)}
-                    </h2>
-                    <span style={{...styles.categoryTag, background: isOfficialApp ? '#fef3c7' : '#e0e7ff', color: isOfficialApp ? '#b45309' : '#1d4ed8'}}>{shopData.category}</span>
-                    
-                    <p style={styles.address}><MapPin size={14} /> {shopData.address ? shopData.address.split(',')[0].trim() : 'Local Business'}</p>
-                    
-                    <p style={{ margin: '5px 0 0 0', color: '#16a34a', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
-                        🚚 Delivers to: {shopData.delivery_areas || 'All Areas'}
-                    </p>
+                    <div style={styles.bioSection}>
+                        <h2 style={styles.shopName}>
+                            {shopData.business_name} 
+                            {renderBadge(isOfficialApp, shopData.is_verified)}
+                        </h2>
+                        <span style={{...styles.categoryTag, background: isOfficialApp ? '#fef3c7' : '#e0e7ff', color: isOfficialApp ? '#b45309' : '#1d4ed8'}}>{shopData.category}</span>
+                        
+                        <p style={styles.address}><MapPin size={14} /> {shopData.address ? shopData.address.split(',')[0].trim() : 'Local Business'}</p>
+                        
+                        <p style={{ margin: '5px 0 0 0', color: '#16a34a', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
+                            🚚 Delivers to: {shopData.delivery_areas || 'All Areas'}
+                        </p>
 
-                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: '#475569', fontWeight: 'bold' }}>
-                        <Users size={14} /> {shopData.followers_count || 0} Followers
+                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: '#475569', fontWeight: 'bold' }}>
+                            <Users size={14} /> {shopData.followers_count || 0} Followers
+                        </div>
+
+                        {/* 🟢 FOUNDER & CEO UI */}
+                        {renderLeadership()}
                     </div>
                 </div>
+            </div>
 
+            <div style={{ padding: '0 20px', maxWidth: '800px', margin: '0 auto' }}>
                 {(isOwner || isMasterAdmin) && (
                     <div style={{...styles.adminControlPanel, border: isOfficialApp ? '1px dashed #f59e0b' : '1px dashed #94a3b8', background: isOfficialApp ? '#fffbeb' : '#f8fafc'}}>
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
@@ -438,7 +478,7 @@ const ShopProfile = () => {
                             <button onClick={() => navigate(`/manage-catalog/${id}`)} style={{...styles.primaryAdminBtn, background: isOfficialApp ? '#d97706' : '#16a34a'}}><Package size={16}/> Manage Catalog</button>
                             <button onClick={openTeamModal} style={{...styles.primaryAdminBtn, background: '#3b82f6'}}><UserPlus size={16}/> Manage Team</button>
                             
-                            {/* 🟢 ADMIN OVERRIDE: VERIFY BUTTON */}
+                            {/* 🟢 ADMIN OVERRIDE: VERIFY BUTTON (HIDDEN FROM EVERYONE ELSE) */}
                             {isMasterAdmin && !isOfficialApp && (
                                 <button 
                                     onClick={handleToggleVerified} 
@@ -455,6 +495,7 @@ const ShopProfile = () => {
                             )}
                         </div>
 
+                        {/* 🟢 WARNING ONLY VISIBLE TO OWNER/ADMIN */}
                         {deliveryRequests.length > 0 && (
                             <div style={{ marginTop: '15px', background: 'white', border: '1px solid #fcd34d', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
                                 <div onClick={() => setShowRequestsList(!showRequestsList)} className="touch-scale" style={{ padding: '12px 15px', background: '#fffbeb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
@@ -465,7 +506,7 @@ const ShopProfile = () => {
                                 </div>
                                 {showRequestsList && (
                                     <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'white' }}>
-                                        <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Customers in these areas requested delivery. Add them to your Delivery Areas above!</p>
+                                        <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Customers requested delivery to these areas.</p>
                                         {deliveryRequests.map((req, i) => {
                                             const basicArea = req.area ? req.area.split(',')[0].trim() : 'Unknown Area';
                                             return (
@@ -510,17 +551,6 @@ const ShopProfile = () => {
             </div>
 
             <div style={styles.feedSection}>
-                {!(isOwner || isMasterAdmin) && currentUser && userArea && !isDeliverable && (
-                    <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', padding: '12px 15px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontSize: '13px', fontWeight: 'bold'}}>
-                            <MapPinOff size={16} /> Doesn't deliver to {shortDisplayArea}
-                        </div>
-                        <button onClick={handleRequestDelivery} disabled={hasRequested} style={{ background: hasRequested ? '#fcd34d' : '#d97706', color: hasRequested ? '#b45309' : 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px', cursor: hasRequested ? 'default' : 'pointer' }}>
-                            {hasRequested ? 'Requested ✓' : 'Request Delivery'}
-                        </button>
-                    </div>
-                )}
-
                 <div style={styles.feedTabs}>
                     <div onClick={() => setActiveProfileTab('Catalog')} style={activeProfileTab === 'Catalog' ? styles.activeTab : styles.inactiveTab}>Store Catalog</div>
                     <div onClick={() => setActiveProfileTab('Expo')} style={activeProfileTab === 'Expo' ? styles.activeTab : styles.inactiveTab}>
@@ -570,7 +600,15 @@ const ShopProfile = () => {
                                             </div>
                                             {!(isOwner || isMasterAdmin) && (
                                                 <div style={styles.listActionBox}>
-                                                    <button style={{...styles.addBtn, opacity: !isDeliverable ? 0.5 : 1}} onClick={() => currentUser ? (isDeliverable ? toast.success("Added to cart!") : toast.error(`Delivery not available to ${userArea}`)) : requireLogin('book this item')}>
+                                                    <button style={styles.addBtn} onClick={() => {
+                                                        if (!currentUser) return requireLogin('book this item');
+                                                        if (!isDeliverable) {
+                                                            handleRequestDelivery(); // Log request automatically instead of just warning
+                                                            toast.error(`Delivery not currently available to your area.`);
+                                                            return;
+                                                        }
+                                                        toast.success("Added to cart!");
+                                                    }}>
                                                         {dbShopType.includes('Services') ? 'Book' : 'Add +'}
                                                     </button>
                                                 </div>
@@ -582,7 +620,6 @@ const ShopProfile = () => {
                         )}
                     </>
                 ) : (
-                    /* 🟢 UPGRADED EXPO GRID: Beautiful Gradient Cards for Text Posts */
                     <>
                         {expoPosts.length === 0 ? (
                             <div style={styles.emptyFeed}>
@@ -598,7 +635,6 @@ const ShopProfile = () => {
                                     return (
                                         <div key={post.id} onClick={() => navigate('/expo')} style={{ aspectRatio: '1', position: 'relative', background: '#000', cursor: 'pointer', overflow: 'hidden' }}>
                                             {isTextOnly ? (
-                                                // 🟢 NEW: Vibrant Text Post Tile instead of a black screen
                                                 <div style={{ padding: '10px', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'linear-gradient(135deg, #2563eb, #8b5cf6)', boxSizing: 'border-box' }}>
                                                     <MessageCircle size={14} color="white" style={{ opacity: 0.8, marginBottom: '4px' }} />
                                                     <span style={{ color: 'white', fontSize: '11px', fontWeight: 'bold', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textShadow: '0 1px 2px rgba(0,0,0,0.3)', lineHeight: '1.3' }}>
@@ -625,7 +661,7 @@ const ShopProfile = () => {
                 )}
             </div>
 
-            {/* MODALS BELOW REMAIN THE SAME */}
+            {/* MODALS BELOW */}
             {showTeamModal && (
                 <div style={styles.overlay}>
                     <div style={styles.modal}>
@@ -684,6 +720,19 @@ const ShopProfile = () => {
                                 <label style={styles.modalLabel}>Business Name</label>
                                 <input style={styles.input} value={editForm.business_name} onChange={e => setEditForm({...editForm, business_name: e.target.value})} required />
                             </div>
+                            
+                            {/* 🟢 FOUNDER & CEO INPUTS ADDED HERE */}
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <div style={{ flex: 1 }}>
+                                    <label style={styles.modalLabel}>Founder Name</label>
+                                    <input style={styles.input} value={editForm.founder_name} onChange={e => setEditForm({...editForm, founder_name: e.target.value})} placeholder="e.g. Venkata Pavan Kumar" />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <label style={styles.modalLabel}>CEO Name</label>
+                                    <input style={styles.input} value={editForm.ceo_name} onChange={e => setEditForm({...editForm, ceo_name: e.target.value})} placeholder="Leave blank if same" />
+                                </div>
+                            </div>
+
                             <div>
                                 <label style={styles.modalLabel}>Shop Address / Location</label>
                                 <div style={{ display: 'flex', gap: '10px' }}>
@@ -761,7 +810,8 @@ const styles = {
     navBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: 'white', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' },
     backBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '15px', padding: 0 },
     loginBtnSmall: { display: 'flex', alignItems: 'center', gap: '4px', background: '#2874f0', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
-    shareIconBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '13px', padding: '6px 12px', borderRadius: '8px' },
+    downloadIconBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#dcfce7', border: '1px solid #86efac', cursor: 'pointer', color: '#166534', fontWeight: 'bold', fontSize: '12px', padding: '6px 12px', borderRadius: '8px' },
+    shareIconBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '12px', padding: '6px 12px', borderRadius: '8px' },
     bannerBackground: { height: '160px', width: '100%', display: 'flex', alignItems: 'center', boxSizing: 'border-box' },
     bannerTextContainer: { display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '800px', margin: '0 auto', padding: '0 20px', marginBottom: '20px' },
     bannerCategoryText: { fontSize: '12px', fontWeight: 'bold', color: 'white', opacity: 0.9, textTransform: 'uppercase', letterSpacing: '1px' },
@@ -789,7 +839,7 @@ const styles = {
     secondaryActionBtn: { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', background: '#e2e8f0', color: '#0f172a', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' },
     notifMenu: { position: 'absolute', top: '55px', right: 0, background: 'white', border: '1px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 10px 15px rgba(0,0,0,0.1)', zIndex: 50, width: '130px', overflow: 'hidden' },
     notifItem: { padding: '10px 15px', fontSize: '13px', fontWeight: 'bold', color: '#334155', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #f1f5f9' },
-    feedSection: { marginTop: '25px', background: 'white', borderTopLeftRadius: '20px', borderTopRightRadius: '20px', padding: '20px', minHeight: '300px', maxWidth: '800px', margin: '25px auto 0 auto', border: '1px solid #e2e8f0' },
+    feedSection: { marginTop: '20px', background: 'white', borderTopLeftRadius: '20px', borderTopRightRadius: '20px', padding: '20px', minHeight: '300px', maxWidth: '800px', margin: '0 auto', border: '1px solid #e2e8f0' },
     feedTabs: { display: 'flex', borderBottom: '2px solid #f1f5f9', marginBottom: '15px', gap: '20px' },
     activeTab: { padding: '10px 0', fontWeight: 'bold', borderBottom: '3px solid #0f172a', color: '#0f172a', fontSize: '15px', marginBottom: '-2px', cursor: 'pointer', display: 'flex', alignItems: 'center' },
     inactiveTab: { padding: '10px 0', fontWeight: 'bold', color: '#94a3b8', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center' },

@@ -76,7 +76,7 @@ const UserOrders = () => {
     const [loading, setLoading] = useState(true);
     const [isBooking, setIsBooking] = useState(false);
     
-    // 🟢 ISOLATED CART STATE: Reads exactly what was saved, avoiding context bugs
+    // 🟢 ISOLATED CART STATE: Reads exactly what was saved
     const [listItems, setListItems] = useState(() => JSON.parse(localStorage.getItem('subhams_cart') || '[]'));
 
     const defaultTab = location.state?.forceTab || (listItems.length > 0 ? 'list' : 'active');
@@ -111,28 +111,30 @@ const UserOrders = () => {
         fetchMyOrders();
     }, []);
 
-const handleConfirmBooking = async () => {
+    const handleConfirmBooking = async () => {
         const token = localStorage.getItem('token');
         if (!token) return navigate('/welcome');
 
         setIsBooking(true);
         try {
-            const ordersByVendor = {};
+            // 🟢 GROUP ITEMS BY SHOP ID
+            const ordersByShop = {};
             listItems.forEach(item => {
-                const vId = item.vendor_id || item.shop_id;
-                if (!ordersByVendor[vId]) ordersByVendor[vId] = [];
-                ordersByVendor[vId].push(item);
+                const sId = item.shop_id || item.vendor_id;
+                if (!ordersByShop[sId]) ordersByShop[sId] = [];
+                ordersByShop[sId].push(item);
             });
 
-            for (const vendorId in ordersByVendor) {
-                const vendorItems = ordersByVendor[vendorId];
-                const vendorSubtotal = vendorItems.reduce((sum, i) => sum + (Number(i.price) * (i.quantity || i.qty || 1)), 0);
+            for (const shopIdKey in ordersByShop) {
+                const shopItems = ordersByShop[shopIdKey];
+                const shopSubtotal = shopItems.reduce((sum, i) => sum + (Number(i.price) * (i.quantity || i.qty || 1)), 0);
 
                 const payload = {
-                    vendor_id: vendorId,
-                    items: vendorItems,
-                    total_amount: vendorSubtotal,
-                    order_type: vendorItems.some(i => i.order_type === 'Service') ? 'Service' : 'Product',
+                    vendor_id: shopItems[0].vendor_id, // The actual owner's user ID
+                    shop_id: shopItems[0].shop_id || shopItems[0].vendor_id, // The exact storefront ID
+                    items: shopItems,
+                    total_amount: shopSubtotal,
+                    order_type: shopItems.some(i => i.order_type === 'Service') ? 'Service' : 'Product',
                     customer_name: currentUser.username || currentUser.name || "Customer",
                     customer_phone: currentUser.phone || "",
                     customer_address: currentUser.address || currentUser.pincode || "Location pending"
@@ -145,13 +147,13 @@ const handleConfirmBooking = async () => {
 
             toast.success("Booking Confirmed!");
             
-            // 🟢 Fetch the fresh data FROM THE DB FIRST before switching tabs!
+            // 🟢 Fetch the fresh data FROM THE DB FIRST before switching tabs
             await fetchMyOrders(); 
 
-            // 🟢 Now it is safe to clear the UI and switch tabs smoothly
+            // 🟢 Clear UI and switch tabs smoothly
             localStorage.setItem('subhams_cart', '[]');
             setListItems([]);
-            setActiveTab('active'); // Deleted the buggy clearCart line entirely!
+            setActiveTab('active');
 
         } catch (err) {
             toast.error(err.response?.data?.message || "Error placing booking.");
@@ -235,7 +237,7 @@ const handleConfirmBooking = async () => {
                                         return (
                                             <div key={item.id} style={styles.orderCard}>
                                                 <div style={styles.itemRowWithImg}>
-                                                    <img src={getImageSrc(item.image)} alt={item.name} style={styles.itemImg} />
+                                                    <img src={getImageSrc(item.image)} alt={item.name} style={styles.itemImg} crossOrigin="anonymous" referrerPolicy="no-referrer" />
                                                     <div style={{flex: 1}}>
                                                         <div style={styles.itemName}>{item.name}</div>
                                                         <div style={styles.itemQty}>{t.qty} {exactQty}</div>
@@ -277,7 +279,6 @@ const handleConfirmBooking = async () => {
                                     catch (e) { items = []; }
 
                                     // 🟢 BULLETPROOF TIMEZONE FIX 
-                                    // Forces the Javascript Date to treat the database time as UTC
                                     let dbDateStr = order.created_at;
                                     if (!dbDateStr.endsWith('Z')) {
                                         dbDateStr = dbDateStr.replace(' ', 'T') + 'Z'; 
@@ -302,7 +303,8 @@ const handleConfirmBooking = async () => {
                                                 </div>
                                             </div>
 
-                                            <div style={styles.vendorRow} onClick={() => navigate(`/shop/${order.vendor_id}`)}>
+                                            {/* Routes to the shop profile dynamically */}
+                                            <div style={styles.vendorRow} onClick={() => navigate(`/shop/${order.shop_id || order.vendor_id}`)}>
                                                 <Store size={18} color="#64748b" />
                                                 <span style={styles.vendorName}>{order.vendor_name || 'Local Vendor'}</span>
                                             </div>
@@ -312,7 +314,7 @@ const handleConfirmBooking = async () => {
                                                     const exactQty = item.quantity || item.qty || 1;
                                                     return (
                                                         <div key={idx} style={styles.itemRowWithImg}>
-                                                            <img src={getImageSrc(item.image)} alt={item.name} style={styles.itemImgSmall} />
+                                                            <img src={getImageSrc(item.image)} alt={item.name} style={styles.itemImgSmall} crossOrigin="anonymous" referrerPolicy="no-referrer" />
                                                             <div style={{flex: 1}}>
                                                                 <div style={styles.itemName}>{item.name}</div>
                                                                 <div style={styles.itemQty}>{t.qty} {exactQty}</div>

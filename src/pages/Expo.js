@@ -46,20 +46,30 @@ const timeAgo = (dateString) => {
     return "Just now";
 };
 
-// 🟢 NEW: The 3-Tier Verified Badge Renderer
-const renderBadge = (isOfficial, isVerified) => {
+// 🟢 SMART 3-TIER BADGE RENDERER
+const renderBadge = (isOfficial, isVerified, hasShop = true) => {
     if (isOfficial) {
         return (
-            <span style={styles.goldBadge}>
-                <BadgeCheck size={14} color="#ffffff" fill="#FFD700" style={{ filter: 'drop-shadow(0 1px 2px rgba(184, 134, 11, 0.4))' }} />
-                Official
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', border: '1px solid #fde68a', marginLeft: '6px' }}>
+                <BadgeCheck size={12} color="#ffffff" fill="#FFD700" /> Official
             </span>
         );
     }
-    if (isVerified) {
-        return <BadgeCheck size={14} color="#ffffff" fill="#10b981" title="Verified Genuine Vendor" />;
+    if (isVerified === true || String(isVerified) === 'true') {
+        return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', border: '1px solid #86efac', marginLeft: '6px' }}>
+                <BadgeCheck size={12} color="#ffffff" fill="#10b981" /> Verified
+            </span>
+        );
     }
-    return <BadgeCheck size={14} color="#ffffff" fill="#3b82f6" title="Approved Vendor" />;
+    if (hasShop) {
+        return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '800', border: '1px solid #bfdbfe', marginLeft: '6px' }}>
+                <BadgeCheck size={12} color="#ffffff" fill="#3b82f6" /> Standard
+            </span>
+        );
+    }
+    return null; 
 };
 
 const Expo = () => {
@@ -78,7 +88,11 @@ const Expo = () => {
     const [activeTab, setActiveTab] = useState('All'); 
     
     const [followingMap, setFollowingMap] = useState({});
-    const [viewedPosts, setViewedPosts] = useState(new Set()); 
+    
+    const [viewedPosts, setViewedPosts] = useState(() => {
+        try { return new Set(JSON.parse(sessionStorage.getItem('subhams_viewed_posts')) || []); } 
+        catch (e) { return new Set(); }
+    });
 
     const [expandedComments, setExpandedComments] = useState({}); 
     const [postComments, setPostComments] = useState({}); 
@@ -105,7 +119,7 @@ const Expo = () => {
 
     useEffect(() => { 
         fetchFeed(); 
-        if (localUser) fetchFollowing(); // Load Following states on mount!
+        if (localUser) fetchFollowing(); 
     }, []);
 
     useEffect(() => {
@@ -121,9 +135,13 @@ const Expo = () => {
         return () => clearTimeout(delayDebounce);
     }, [tagSearchQuery, isTaggingMenuOpen]);
 
+    // 🟢 FIXED: Sends token to backend to get accurate 'isLikedByMe'
     const fetchFeed = async () => {
         try {
-            const res = await axios.get(`${getBackendUrl()}/expo/feed`);
+            const token = localStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const res = await axios.get(`${getBackendUrl()}/expo/feed`, { headers });
+            
             const validPosts = (res.data.posts || []).filter(p => p !== null && p !== undefined);
             setAllPosts(validPosts);
         } catch (err) { toast.error("Failed to fetch feed!"); } finally { setLoading(false); }
@@ -139,8 +157,13 @@ const Expo = () => {
 
     const handleView = async (postId) => {
         if (viewedPosts.has(postId)) return;
-        setViewedPosts(prev => new Set(prev).add(postId));
-        setAllPosts(allPosts.map(p => p.id === postId ? { ...p, views_count: (Number(p.views_count) || 0) + 1 } : p));
+        
+        const newSet = new Set(viewedPosts).add(postId);
+        setViewedPosts(newSet);
+        sessionStorage.setItem('subhams_viewed_posts', JSON.stringify([...newSet]));
+        
+        setAllPosts(prevPosts => prevPosts.map(p => p.id === postId ? { ...p, views_count: (Number(p.views_count) || 0) + 1 } : p));
+        
         try { await axios.post(`${getBackendUrl()}/expo/${postId}/view`); } catch (err) {}
     };
 
@@ -169,23 +192,42 @@ const Expo = () => {
         setActiveDropdown(null);
     };
 
+    // 🟢 FIXED: Bulletproof logic to track Likes accurately in UI immediately
     const handleLike = async (postId) => {
         if (!localUser) return navigate('/welcome');
+        
         setAllPosts(allPosts.map(post => {
-            if (post && post.id === postId) return { ...post, isLikedByMe: !post.isLikedByMe, likes_count: post.isLikedByMe ? Number(post.likes_count) - 1 : Number(post.likes_count) + 1 };
+            if (post && post.id === postId) {
+                const currentlyLiked = post.isLikedByMe === true || String(post.isLikedByMe) === 'true';
+                return { 
+                    ...post, 
+                    isLikedByMe: !currentlyLiked, 
+                    likes_count: currentlyLiked ? Math.max(0, Number(post.likes_count) - 1) : Number(post.likes_count) + 1 
+                };
+            }
             return post;
         }));
+        
         try {
             const token = localStorage.getItem('token');
             await axios.post(`${getBackendUrl()}/expo/${postId}/like`, {}, { headers: { Authorization: `Bearer ${token}` } });
-        } catch (err) {}
+        } catch (err) {
+            // Revert state silently if API fails
+            fetchFeed();
+        }
     };
 
     const fetchLikesList = async (postId) => {
         try {
-            const res = await axios.get(`${getBackendUrl()}/expo/${postId}/likes`);
-            setShowLikesModal({ isOpen: true, likes: res.data.likes });
-        } catch (err) { toast.error("Could not fetch likes."); }
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${getBackendUrl()}/expo/${postId}/likes`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+            const likesArray = res.data.likes || (Array.isArray(res.data) ? res.data : []);
+            setShowLikesModal({ isOpen: true, likes: likesArray });
+        } catch (err) { 
+            toast.error("Could not fetch likes."); 
+        }
     };
 
     const toggleComments = async (postId) => {
@@ -195,11 +237,12 @@ const Expo = () => {
         if (isOpening) {
             try {
                 const res = await axios.get(`${getBackendUrl()}/expo/${postId}/comments`);
-                setPostComments(prev => ({ ...prev, [postId]: res.data.comments }));
+                setPostComments(prev => ({ ...prev, [postId]: res.data.comments || [] }));
             } catch (err) {}
         }
     };
 
+    // 🟢 FIXED: Temporary Comment accurately tags your Gold Badge instantly
     const handlePostComment = async (e, postId) => {
         e.preventDefault();
         if (!newComment.trim() || !localUser) return;
@@ -209,7 +252,18 @@ const Expo = () => {
         setNewComment('');
         setReplyingTo(null);
         
-        const tempComment = { id: Date.now(), display_name: localUser.role === 'admin' ? 'Subhams Hub Official' : (localUser.business_name || localUser.username || 'You'), role: localUser.role, text: commentText, parent_comment_id: parentId, user_id: localUser.id };
+        const isMaster = localUser.role === 'admin' || localUser.email === 'pavanvenkat63@gmail.com';
+        
+        const tempComment = { 
+            id: Date.now(), 
+            display_name: isMaster ? 'Subhams Hub Official' : (localUser.business_name || localUser.username || 'You'), 
+            role: localUser.role, 
+            user_email: localUser.email,
+            text: commentText, 
+            parent_comment_id: parentId, 
+            user_id: localUser.id 
+        };
+        
         setPostComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), tempComment] }));
         setAllPosts(allPosts.map(p => p.id === postId ? { ...p, comments_count: Number(p.comments_count) + 1 } : p));
 
@@ -222,7 +276,7 @@ const Expo = () => {
     const handleDeleteComment = async (postId, commentId) => {
         if (!window.confirm("Delete this comment?")) return;
         setPostComments(prev => ({ ...prev, [postId]: prev[postId].filter(c => c.id !== commentId && c.parent_comment_id !== commentId) }));
-        setAllPosts(allPosts.map(p => p.id === postId ? { ...p, comments_count: Number(p.comments_count) - 1 } : p));
+        setAllPosts(allPosts.map(p => p.id === postId ? { ...p, comments_count: Math.max(0, Number(p.comments_count) - 1) } : p));
         try {
             const token = localStorage.getItem('token');
             await axios.delete(`${getBackendUrl()}/expo/comment/${commentId}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -303,14 +357,15 @@ const Expo = () => {
             setAllowComments(true);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (err) {
-            toast.error(err.response?.data?.message || "Failed to post video.");
+            toast.error(err.response?.data?.message || "Failed to post.");
         } finally { setIsUploading(false); }
     };
 
     const displayPostsData = allPosts.filter(post => {
+        const isLiked = post.isLikedByMe === true || String(post.isLikedByMe) === 'true';
         if (activeTab === 'Videos') return post.media_type === 'video';
         if (activeTab === 'Photos') return post.media_type === 'image';
-        if (activeTab === 'Activity') return post.isLikedByMe || String(post.owner_id) === String(localUser?.id);
+        if (activeTab === 'Activity') return isLiked || String(post.owner_id) === String(localUser?.id);
         return true; 
     });
 
@@ -343,24 +398,23 @@ const Expo = () => {
                 ) : (
                     displayPostsData.map(post => {
                         const isPostOwner = isAdmin || (localUser && String(post.owner_id) === String(localUser.id));
-                        const isOfficialApp = (post.shop_name && post.shop_name.toLowerCase().includes('subhams')) || post.owner_id === 1;
+                        const isOfficialApp = String(post.owner_id) === "1" || (post.shop_email && post.shop_email === 'pavanvenkat63@gmail.com') || (post.owner_email === 'pavanvenkat63@gmail.com');
                         const hasTag = post.tagged_item_name && post.tagged_item_type;
                         const isFollowing = followingMap[post.shop_id];
+                        const isLiked = post.isLikedByMe === true || String(post.isLikedByMe) === 'true'; // 🟢 FIXED HEART LOGIC
 
                         return (
-                            <div key={post.id} style={{ ...styles.postCard, border: isOfficialApp ? '2px solid #FFD700' : '1px solid #e2e8f0', boxShadow: isOfficialApp ? '0 10px 30px rgba(255, 215, 0, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)' }}>
+                            <div key={post.id} style={{ ...styles.postCard, border: isOfficialApp ? '1px solid #fde68a' : '1px solid #e2e8f0' }}>
                                 
-                                <div style={{...styles.postHeader, background: isOfficialApp ? 'linear-gradient(to right, #fffbeb, #ffffff)' : 'white'}}>
+                                <div style={{...styles.postHeader, background: isOfficialApp ? '#fffbeb' : 'white'}}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
                                         <div style={isOfficialApp ? styles.shopLogoWrapperGold : styles.shopLogoWrapper} onClick={() => navigate(`/shop/${post.shop_id}`)}>
                                             <img src={resolveMediaUrl(post.shop_logo) || getFallbackAvatar(post.shop_name)} onError={(e) => { e.target.onerror = null; e.target.src = getFallbackAvatar(post.shop_name); }} alt={post.shop_name} style={styles.shopLogo} />
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                                 <span onClick={() => navigate(`/shop/${post.shop_id}`)} style={styles.shopName}>{post.shop_name || 'Vendor'}</span>
-                                                
-                                                {/* 🟢 THE 3-TIER BADGE RENDERER */}
-                                                {renderBadge(isOfficialApp, post.is_verified)}
+                                                {renderBadge(isOfficialApp, post.is_verified, true)}
                                                 
                                                 {!isPostOwner && (
                                                     <button onClick={() => handleFollowToggle(post.shop_id)} style={{...styles.followBtn, background: isFollowing ? '#f1f5f9' : '#e0e7ff', color: isFollowing ? '#64748b' : '#4f46e5'}}>
@@ -380,7 +434,6 @@ const Expo = () => {
                                                 {isPostOwner ? (
                                                     <button onClick={() => handleDeletePost(post.id)} style={{...styles.dropdownItem, color: '#ef4444'}}><Trash2 size={14} /> Delete</button>
                                                 ) : (
-                                                    // 🟢 PREVENTS REPORTING ADMIN
                                                     !isOfficialApp && <button onClick={() => {toast.success("Reported."); setActiveDropdown(null);}} style={styles.dropdownItem}>Report Post</button>
                                                 )}
                                             </div>
@@ -388,7 +441,18 @@ const Expo = () => {
                                     </div>
                                 </div>
 
-                                {post.media_url && (
+                                {post.content && (
+                                    <div 
+                                        style={{...styles.postContent, background: isOfficialApp ? '#fffbeb' : 'white'}}
+                                        onMouseEnter={() => handleView(post.id)}
+                                        onTouchStart={() => handleView(post.id)}
+                                        onClick={() => handleView(post.id)}
+                                    >
+                                        {post.content}
+                                    </div>
+                                )}
+
+                                {post.media_url && post.media_type !== 'text' && (
                                     <div style={styles.mediaContainer} onDoubleClick={() => handleLike(post.id)}>
                                         {post.media_type === 'video' ? (
                                             <video src={resolveMediaUrl(post.media_url, 'video')} onPlay={() => handleView(post.id)} controls muted loop playsInline style={styles.mediaElement} />
@@ -399,8 +463,8 @@ const Expo = () => {
                                 )}
                                 
                                 {hasTag && (
-                                    <div style={{ padding: '10px 15px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                                        <button onClick={() => post.tagged_item_type === 'shop' ? navigate(`/shop/${post.tagged_item_id}`) : navigate(`/product/${post.tagged_item_id}`)} className="touch-scale" style={styles.visibleTagBtn}>
+                                    <div style={{ padding: '10px 15px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', borderTop: '1px solid #f1f5f9' }}>
+                                        <button onClick={() => post.tagged_item_type === 'shop' ? navigate(`/shop/${post.tagged_item_id}`) : navigate(`/item/${post.tagged_item_id}`)} className="touch-scale" style={styles.visibleTagBtn}>
                                             {post.tagged_item_type === 'shop' ? <Store size={14} color="#1e293b" /> : <ShoppingBag size={14} color="#1e293b" />}
                                             <span style={{flex: 1, textAlign: 'left', fontWeight: '800', color: '#1e293b'}}>{post.tagged_item_type === 'shop' ? 'Visit Shop: ' : 'Buy Product: '} {post.tagged_item_name}</span>
                                             <ArrowLeft size={16} color="#94a3b8" style={{ transform: 'rotate(135deg)' }} />
@@ -408,17 +472,18 @@ const Expo = () => {
                                     </div>
                                 )}
 
-                                {post.content && <div style={{...styles.postContent, background: isOfficialApp ? '#fffbeb' : 'white'}}>{post.content}</div>}
-
-                                <div style={{ padding: '5px 15px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#94a3b8', background: isOfficialApp ? '#fffbeb' : 'white' }}>
+                                <div style={{ padding: '5px 15px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#94a3b8', background: isOfficialApp ? '#fffbeb' : 'white', borderTop: '1px solid #f1f5f9' }}>
                                     <Eye size={12} /> {post.views_count || 0} views
                                 </div>
                                 <div style={{...styles.actionBar, background: isOfficialApp ? '#fffbeb' : 'white'}}>
                                     <div style={{ display: 'flex', gap: '18px', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            
+                                            {/* 🟢 HEART RENDER FIXED */}
                                             <button onClick={() => handleLike(post.id)} style={styles.actionBtn}>
-                                                <Heart size={26} color={post.isLikedByMe ? "#ef4444" : "#1e293b"} fill={post.isLikedByMe ? "#ef4444" : "transparent"} />
+                                                <Heart size={26} color={isLiked ? "#ef4444" : "#1e293b"} fill={isLiked ? "#ef4444" : "transparent"} />
                                             </button>
+                                            
                                             <span onClick={() => fetchLikesList(post.id)} style={{...styles.actionCount, cursor: 'pointer', textDecoration: 'underline'}}>{post.likes_count || 0}</span>
                                         </div>
                                         
@@ -430,49 +495,62 @@ const Expo = () => {
                                         ) : (
                                             <div style={{...styles.actionBtn, opacity: 0.5}} onClick={() => toast.info("Comments disabled.")}><MessageSquareOff size={26} color="#64748b" /></div>
                                         )}
-                                        <button style={styles.actionBtn} onClick={() => {if(navigator.share) navigator.share({title:'Offer', url:window.location.href}); else toast.success("Link copied!");}}><Share2 size={24} color="#1e293b" /></button>
+                                        <button style={styles.actionBtn} onClick={() => {if(navigator.share) navigator.share({title:'Subhams Expo', url:window.location.href}); else toast.success("Link copied!");}}><Share2 size={24} color="#1e293b" /></button>
                                     </div>
-                                    <button onClick={() => navigate(`/shop/${post.shop_id}`)} style={{...styles.visitStoreBtn, background: isOfficialApp ? 'linear-gradient(135deg, #facc15, #eab308)' : '#f1f5f9', color: isOfficialApp ? '#713f12' : '#0f172a'}}>
+                                    <button onClick={() => navigate(`/shop/${post.shop_id}`)} style={{...styles.visitStoreBtn, background: isOfficialApp ? '#facc15' : '#f1f5f9', color: isOfficialApp ? '#713f12' : '#0f172a'}}>
                                         {isOfficialApp ? 'Official Store' : 'Visit Shop'}
                                     </button>
                                 </div>
 
+                                {/* 🟢 COMMENTS SECTION WITH FIXES */}
                                 {expandedComments[post.id] && post.allow_comments !== false && (
                                     <div style={styles.commentSection}>
                                         <div style={styles.commentList} className="hide-scroll">
-                                            {(postComments[post.id] || []).filter(c => !c.parent_comment_id).map(c => (
-                                                <div key={c.id}>
-                                                    <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-                                                        <img src={resolveMediaUrl(c.display_avatar) || getFallbackAvatar(c.display_name)} onError={(e) => { e.target.onerror = null; e.target.src = getFallbackAvatar(c.display_name); }} alt="Avatar" style={{width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #e2e8f0'}} />
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                <span style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a' }}>{c.display_name}</span>
-                                                                {renderBadge(c.role === 'admin', false)}
-                                                            </div>
-                                                            <div style={{ fontSize: '13.5px', color: '#334155', marginTop: '2px', wordBreak: 'break-word' }}>{c.text}</div>
-                                                            <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '11.5px', fontWeight: '600', color: '#94a3b8' }}>
-                                                                <span style={{cursor: 'pointer'}} onClick={() => setReplyingTo({ commentId: c.id, name: c.display_name, postId: post.id })}>Reply</span>
-                                                                {(isAdmin || String(localUser?.id) === String(c.user_id) || isPostOwner) && <span style={{cursor: 'pointer', color: '#ef4444'}} onClick={() => handleDeleteComment(post.id, c.id)}>Delete</span>}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    {(postComments[post.id] || []).filter(reply => reply.parent_comment_id === c.id).map(reply => (
-                                                        <div key={reply.id} style={{ display: 'flex', gap: '10px', marginBottom: '12px', marginLeft: '35px' }}>
-                                                            <img src={resolveMediaUrl(reply.display_avatar) || getFallbackAvatar(reply.display_name)} onError={(e) => { e.target.onerror = null; e.target.src = getFallbackAvatar(reply.display_name); }} alt="Avatar" style={{width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #e2e8f0'}} />
+                                            {(postComments[post.id] || []).filter(c => !c.parent_comment_id).map(c => {
+                                                const isCommOfficial = c.role === 'admin' || c.user_email === 'pavanvenkat63@gmail.com' || c.user_id === 1;
+                                                const isCommVerified = c.is_verified;
+                                                const isCommShop = Boolean(c.shop_id || c.role === 'vendor');
+
+                                                return (
+                                                    <div key={c.id}>
+                                                        <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                                                            <img src={resolveMediaUrl(c.display_avatar) || getFallbackAvatar(c.display_name)} onError={(e) => { e.target.onerror = null; e.target.src = getFallbackAvatar(c.display_name); }} alt="Avatar" style={{width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #e2e8f0'}} />
                                                             <div style={{ flex: 1 }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                    <span style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a' }}>{reply.display_name}</span>
-                                                                    {renderBadge(reply.role === 'admin', false)}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                                                    <span style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a' }}>{c.display_name}</span>
+                                                                    {renderBadge(isCommOfficial, isCommVerified, isCommShop)}
                                                                 </div>
-                                                                <div style={{ fontSize: '13.5px', color: '#334155', marginTop: '2px', wordBreak: 'break-word' }}>{reply.text}</div>
+                                                                <div style={{ fontSize: '13.5px', color: '#334155', marginTop: '2px', wordBreak: 'break-word' }}>{c.text}</div>
                                                                 <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '11.5px', fontWeight: '600', color: '#94a3b8' }}>
-                                                                    {(isAdmin || String(localUser?.id) === String(reply.user_id) || isPostOwner) && <span style={{cursor: 'pointer', color: '#ef4444'}} onClick={() => handleDeleteComment(post.id, reply.id)}>Delete</span>}
+                                                                    <span style={{cursor: 'pointer'}} onClick={() => setReplyingTo({ commentId: c.id, name: c.display_name, postId: post.id })}>Reply</span>
+                                                                    {(isAdmin || String(localUser?.id) === String(c.user_id) || isPostOwner) && <span style={{cursor: 'pointer', color: '#ef4444'}} onClick={() => handleDeleteComment(post.id, c.id)}>Delete</span>}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            ))}
+                                                        {(postComments[post.id] || []).filter(reply => reply.parent_comment_id === c.id).map(reply => {
+                                                            const isRepOfficial = reply.role === 'admin' || reply.user_email === 'pavanvenkat63@gmail.com' || reply.user_id === 1;
+                                                            const isRepVerified = reply.is_verified;
+                                                            const isRepShop = Boolean(reply.shop_id || reply.role === 'vendor');
+
+                                                            return (
+                                                                <div key={reply.id} style={{ display: 'flex', gap: '10px', marginBottom: '12px', marginLeft: '35px' }}>
+                                                                    <img src={resolveMediaUrl(reply.display_avatar) || getFallbackAvatar(reply.display_name)} onError={(e) => { e.target.onerror = null; e.target.src = getFallbackAvatar(reply.display_name); }} alt="Avatar" style={{width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #e2e8f0'}} />
+                                                                    <div style={{ flex: 1 }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                                                            <span style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a' }}>{reply.display_name}</span>
+                                                                            {renderBadge(isRepOfficial, isRepVerified, isRepShop)}
+                                                                        </div>
+                                                                        <div style={{ fontSize: '13.5px', color: '#334155', marginTop: '2px', wordBreak: 'break-word' }}>{reply.text}</div>
+                                                                        <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '11.5px', fontWeight: '600', color: '#94a3b8' }}>
+                                                                            {(isAdmin || String(localUser?.id) === String(reply.user_id) || isPostOwner) && <span style={{cursor: 'pointer', color: '#ef4444'}} onClick={() => handleDeleteComment(post.id, reply.id)}>Delete</span>}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                );
+                                            })}
                                             {(postComments[post.id] || []).length === 0 && <div style={{textAlign: 'center', color: '#94a3b8', fontSize: '13px'}}>No comments yet.</div>}
                                         </div>
                                         
@@ -530,7 +608,7 @@ const Expo = () => {
                                 </div>
 
                                 <form onSubmit={submitPost} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                    <textarea style={styles.textArea} placeholder="Write a caption..." value={postText} onChange={e => setPostText(e.target.value)} />
+                                    <textarea style={styles.textArea} placeholder="What's happening?" value={postText} onChange={e => setPostText(e.target.value)} />
 
                                     <div style={styles.tagInputBox} onClick={() => { setIsTaggingMenuOpen(true); setTagSearchQuery(''); }}>
                                         <Tag size={16} color={selectedTag ? "#2563eb" : "#64748b"} />
@@ -545,7 +623,6 @@ const Expo = () => {
                                                 <>
                                                     <video ref={videoRef} src={mediaPreview} style={styles.previewMediaElement} controls muted />
                                                     
-                                                    {/* 🟢 THE INTUITIVE SLIDING WINDOW TRIMMER */}
                                                     {isVideoOversized && (
                                                         <div style={styles.trimmerUI}>
                                                             <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', color: '#fff', marginBottom: '10px'}}>
@@ -583,7 +660,7 @@ const Expo = () => {
                                     </div>
 
                                     <button type="submit" disabled={isUploading} style={styles.postBtn}>
-                                        {isUploading ? <Loader size={20} className="spin" /> : 'Share to Expo'}
+                                        {isUploading ? <Loader size={20} className="spin" /> : 'Post'}
                                     </button>
                                 </form>
                             </>
@@ -592,23 +669,29 @@ const Expo = () => {
                 </div>
             )}
 
-            {/* LIKES MODAL */}
             {showLikesModal.isOpen && (
                 <div style={styles.overlay} onClick={() => setShowLikesModal({ isOpen: false, likes: [] })}>
                     <div style={{...styles.modal, maxHeight: '400px'}} onClick={e => e.stopPropagation()}>
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px solid #e2e8f0'}}>
-                            <h3 style={{margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px'}}><Users size={18} color="#2563eb"/> Likes</h3>
+                            <h3 style={{margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px'}}><Users size={18} color="#2563eb"/> Likes ({showLikesModal.likes.length})</h3>
                             <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLikesModal({ isOpen: false, likes: [] })} />
                         </div>
                         <div style={{overflowY: 'auto', maxHeight: '300px'}} className="hide-scroll">
                             {showLikesModal.likes.length === 0 ? <p style={{textAlign: 'center', color: '#94a3b8', fontSize: '13px'}}>No likes yet.</p> : null}
-                            {showLikesModal.likes.map(u => (
-                                <div key={u.id} style={{display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid #f1f5f9'}}>
-                                    <img src={getFallbackAvatar(u.name)} alt="Avatar" style={{width: '32px', height: '32px', borderRadius: '50%'}} />
-                                    <span style={{fontSize: '14px', fontWeight: '700', color: '#0f172a'}}>{u.name}</span>
-                                    {renderBadge(u.role === 'admin', false)}
-                                </div>
-                            ))}
+                            {showLikesModal.likes.map(u => {
+                                const isUserOfficial = u.role === 'admin' || u.email === 'pavanvenkat63@gmail.com' || u.id === 1;
+                                const isUserVerified = u.is_verified;
+                                const isUserShop = Boolean(u.shop_id || u.role === 'vendor');
+                                const displayName = u.name || u.username || 'User';
+
+                                return (
+                                    <div key={u.id} style={{display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid #f1f5f9'}}>
+                                        <img src={getFallbackAvatar(displayName)} alt="Avatar" style={{width: '32px', height: '32px', borderRadius: '50%'}} />
+                                        <span style={{fontSize: '14px', fontWeight: '700', color: '#0f172a'}}>{displayName}</span>
+                                        {renderBadge(isUserOfficial, isUserVerified, isUserShop)}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -625,22 +708,26 @@ const styles = {
     iconBtn: { width: '40px', height: '40px', borderRadius: '50%', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer' },
     filterMenu: { display: 'flex', gap: '10px', overflowX: 'auto', padding: '10px 15px', background: 'white', borderBottom: '1px solid #e2e8f0' },
     filterBtn: { border: 'none', padding: '8px 18px', borderRadius: '20px', fontSize: '13px', fontWeight: '800', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' },
-    feedContainer: { maxWidth: '500px', margin: '0 auto', padding: '15px 0', display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '100px' },
-    postCard: { background: 'white', borderRadius: '0px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }, 
+    feedContainer: { maxWidth: '500px', margin: '0 auto', padding: '15px 0', display: 'flex', flexDirection: 'column', gap: '15px', paddingBottom: '100px' },
+    
+    postCard: { background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden' }, 
     postHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px' },
     shopLogoWrapper: { padding: '2px', background: '#e2e8f0', borderRadius: '50%', cursor: 'pointer' },
     shopLogoWrapperGold: { padding: '3px', background: 'linear-gradient(45deg, #FFD700, #FDB931)', borderRadius: '50%', cursor: 'pointer', boxShadow: '0 0 15px rgba(255, 215, 0, 0.4)' },
     shopLogo: { width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white' },
     shopName: { fontSize: '14.5px', fontWeight: '800', color: '#0f172a', cursor: 'pointer' },
-    postMeta: { fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' },
+    postMeta: { fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', marginTop: '2px' },
     followBtn: { display: 'flex', alignItems: 'center', gap: '4px', border: 'none', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '800', marginLeft: '6px', cursor: 'pointer', transition: 'all 0.2s' },
     moreBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: '5px' },
     dropdownMenu: { position: 'absolute', top: '30px', right: '0', background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 50, width: '150px', overflow: 'hidden' },
     dropdownItem: { width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 15px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', color: '#1e293b', textAlign: 'left' },
-    mediaContainer: { position: 'relative', width: '100%', maxHeight: '600px', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    
+    postContent: { padding: '0px 15px 12px 15px', fontSize: '15px', color: '#0f172a', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+    
+    mediaContainer: { position: 'relative', width: '100%', maxHeight: '600px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderTop: '1px solid #f1f5f9' },
     mediaElement: { width: '100%', maxHeight: '600px', objectFit: 'cover' }, 
+    
     visibleTagBtn: { display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '12px', background: '#e2e8f0', border: 'none', borderRadius: '12px', cursor: 'pointer' },
-    postContent: { padding: '15px 15px 5px 15px', fontSize: '14.5px', color: '#1e293b', lineHeight: '1.5', whiteSpace: 'pre-wrap' },
     actionBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px' },
     actionBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '5px 0' },
     actionCount: { fontSize: '14.5px', fontWeight: '800', color: '#1e293b' },
@@ -649,11 +736,10 @@ const styles = {
     commentInput: { flex: 1, padding: '12px 16px', borderRadius: '24px', border: '1px solid #e2e8f0', fontSize: '13.5px', outline: 'none', background: '#f8fafc' },
     commentPostBtn: { background: 'none', border: 'none', color: '#2563eb', fontWeight: '800', cursor: 'pointer', padding: '0 10px', fontSize: '14px' },
     visitStoreBtn: { display: 'flex', alignItems: 'center', gap: '6px', border: 'none', padding: '8px 16px', borderRadius: '20px', fontSize: '12.5px', fontWeight: '800', cursor: 'pointer' },
-    goldBadge: { display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#fffbeb', color: '#b45309', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', border: '1px solid #fde68a', marginLeft: '6px', filter: 'drop-shadow(0 2px 4px rgba(250, 204, 21, 0.2))' },
-    fabBtn: { position: 'fixed', bottom: '30px', right: '20px', width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, #2563eb, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', boxShadow: '0 10px 25px rgba(37, 99, 235, 0.4)', zIndex: 150 },
+    fabBtn: { position: 'fixed', bottom: '30px', right: '20px', width: '60px', height: '60px', borderRadius: '50%', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', boxShadow: '0 10px 25px rgba(15, 23, 42, 0.4)', zIndex: 150 },
     overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px', zIndex: 1000 },
     modal: { background: 'white', padding: '24px', borderRadius: '24px', maxWidth: '450px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' },
-    textArea: { width: '100%', minHeight: '80px', padding: '0', border: 'none', fontSize: '16px', outline: 'none', resize: 'none', background: 'transparent' },
+    textArea: { width: '100%', minHeight: '80px', padding: '0', border: 'none', fontSize: '18px', outline: 'none', resize: 'none', background: 'transparent', color: '#0f172a' },
     tagInputBox: { display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', background: '#f1f5f9', borderRadius: '12px', marginBottom: '10px', cursor: 'pointer', border: '1px solid #e2e8f0' },
     tagSearchContainer: { display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#f1f5f9', borderRadius: '12px', marginBottom: '15px' },
     tagSearchInput: { border: 'none', background: 'none', outline: 'none', width: '100%', fontSize: '14px' },
@@ -664,7 +750,7 @@ const styles = {
     removeMediaBtn: { position: 'absolute', top: '12px', right: '12px', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 },
     previewMediaElement: { width: '100%', maxHeight: '300px', objectFit: 'cover', display: 'block' },
     trimmerUI: { position: 'absolute', bottom: '15px', left: '15px', right: '15px', background: 'rgba(0,0,0,0.85)', padding: '15px', borderRadius: '12px', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column' },
-    postBtn: { background: '#2563eb', color: 'white', border: 'none', padding: '16px', borderRadius: '16px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: '15px', boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)' }
+    postBtn: { background: '#0f172a', color: 'white', border: 'none', padding: '16px', borderRadius: '24px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: '15px', boxShadow: '0 4px 15px rgba(15, 23, 42, 0.3)' }
 };
 
 export default Expo;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ExternalLink, Navigation } from 'lucide-react'; 
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ExternalLink, Navigation, BadgeCheck } from 'lucide-react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify'; 
 import ProductCard from '../components/ProductCard';
@@ -22,9 +22,10 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
+// 🌐 TRANSLATIONS UPDATED FOR MINI APPS & VERIFIED TOGGLE
 const homeTranslations = {
-    en: { syncing: "Syncing Market...", searchFor: "Search shops & items...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin" },
-    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "దుకాణాలు, వస్తువుల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్" }
+    en: { syncing: "Syncing Market...", searchFor: "Search shops & items...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin", miniApps: "Subhams Mini Apps", pmms: "PMMS", agent: "Agent", verifiedOnly: "Verified Only" },
+    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "దుకాణాలు, వస్తువుల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్", miniApps: "సుభమ్స్ మినీ యాప్స్", pmms: "PMMS", agent: "ఏజెంట్", verifiedOnly: "వెరిఫైడ్ మాత్రమే" }
 };
 
 const categoryTranslations = {
@@ -39,7 +40,6 @@ const categoryTranslations = {
     'Services': 'సేవలు'
 };
 
-// 🟢 SMART LOCATION ALIAS DICTIONARY (Ensures English and Telugu addresses match perfectly)
 const locationAliases = {
     'konanki': ['konanki', 'కోణంకి', 'kona'],
     'martur': ['martur', 'మార్టూరు'],
@@ -75,11 +75,13 @@ const Home = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[1]); 
+    
+    // 🟢 NEW: Verified Toggle State
+    const [showVerifiedOnly, setShowVerifiedOnly] = useState(false);
 
     const [localUserStr, setLocalUserStr] = useState(localStorage.getItem('user'));
     const localUser = localUserStr && localUserStr !== 'undefined' ? JSON.parse(localUserStr) : null;
     
-    // 🟢 CUSTOM LOCATION STATE
     const [customLocation, setCustomLocation] = useState(() => JSON.parse(localStorage.getItem('custom_hub_location')));
     const [showLocModal, setShowLocModal] = useState(false);
     const [locSearch, setLocSearch] = useState('');
@@ -144,11 +146,12 @@ const Home = () => {
         fetchLocalFeed(); 
     }, [appLocation?.lat, appLocation?.lng, customLocation]);
 
+    // 🟢 FIXED: Location search forces English results to sync with database
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
         if (query.length < 3) return setLocResults([]);
         try {
-            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`);
+            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&accept-language=en&q=${query}`);
             setLocResults(res.data);
         } catch (e) { console.log(e); }
     };
@@ -161,7 +164,6 @@ const Home = () => {
         toast.success(`Location set to ${loc.display_name.split(',')[0]}`);
     };
 
-    // 🟢 BUTTERY SMOOTH TOUCH GESTURE ENGINE (Swipe Left/Right)
     const [touchStart, setTouchStart] = useState(null);
     const [touchStartY, setTouchStartY] = useState(null);
     
@@ -194,15 +196,12 @@ const Home = () => {
         navigate('/welcome');
     };
 
-    // 🟢 SMART CLICK HANDLING (Directly Route to Expo!)
     const handleCategoryClick = (cat) => {
         if (cat === (t('Business') || 'Business')) { 
             if (!localUser) return requireLogin('register a business');
             navigate('/register-business'); 
             return; 
         }
-        
-        // If user clicks or swipes to "Expo", immediately route them to the Expo app!
         if (cat === CATEGORIES[0]) {
             navigate('/expo');
             return;
@@ -214,19 +213,19 @@ const Home = () => {
         setShowSuggestions(false);
     };
 
-    // 🟢 SIMPLE CITY DISPLAY LOGIC (No exact distance math)
     const getDistanceTag = (shop) => {
         if (shop.address) return `📍 ${shop.address.split(',')[0]}`;
         return "📍 Nearby"; 
     };
 
-    // 🟢 NEARBY SHOPS ALGORITHM (Smart Address Matching ONLY)
+    // 🟢 ADMIN LOCATION BYPASS
     const nearbyShops = activeShops.filter(shop => {
+        if (isAdmin) return true; // Master Admin bypasses local filters entirely
+        
         const searchAddrRaw = (customLocation?.address || localUser?.address || localUser?.location || '').toLowerCase();
         const shopAddrRaw = (shop.address || shop.location || '').toLowerCase();
         
         if (searchAddrRaw && shopAddrRaw) {
-            // Check Aliases First (e.g. Konanki = కోణంకి)
             let isMatch = false;
             Object.keys(locationAliases).forEach(key => {
                 const aliases = locationAliases[key];
@@ -236,7 +235,6 @@ const Home = () => {
             });
             if (isMatch) return true;
 
-            // Basic Word Match (Finds matching words longer than 3 letters)
             const uParts = searchAddrRaw.split(/[\s,]+/); 
             if (uParts.some(part => part.length >= 4 && shopAddrRaw.includes(part))) return true;
         }
@@ -282,7 +280,6 @@ const Home = () => {
 
     const currentTabEnglish = selectedCategory === (t('Services') || 'Services') ? 'Services' : (selectedCategory === (t('Shopping') || 'Shopping') ? 'Products' : selectedCategory);
 
-    // Get exact active location name for UI
     const activeLocationName = customLocation ? customLocation.address.split(',')[0] : (localUser?.address ? localUser.address.split(',')[0] : "Set Loc");
 
     return (
@@ -361,7 +358,6 @@ const Home = () => {
                     ) : null}
                 </div>
 
-                {/* 🟢 COMPACT HEADER: Location and Search Bar together! */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 15px 12px 15px', background: '#2874f0', width: '100%', boxSizing: 'border-box' }}>
                     <div className="touch-scale" style={styles.locationPill} onClick={() => setShowLocModal(true)}>
                         <MapPin size={14} color="#facc15" style={{flexShrink: 0}} />
@@ -501,30 +497,39 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 PREMIUM BANNERS */}
+                                {/* 🟢 GPAY STYLE MINI APPS ROW */}
                                 {selectedCategory === CATEGORIES[1] && (
-                                    <div style={{ display: 'flex', gap: '10px', paddingBottom: '20px' }}>
-                                        <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #16a34a, #14532d)' }}>
-                                            <div style={styles.ecoIcon}>💰</div>
-                                            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'}}>
-                                                <span style={styles.ecoTitle}>Subhams PMMS</span>
-                                                <span style={styles.ecoSub}>Secure Finances</span>
+                                    <div style={{ marginBottom: '15px', padding: '0 5px' }}>
+                                        <h2 style={{ fontSize: '12px', marginBottom: '10px', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{ht.miniApps}</h2>
+                                        <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '10px' }} className="hide-scroll">
+                                            <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#eff6ff', color: '#2563eb'}}>💰</div>
+                                                <span style={styles.miniAppText}>{ht.pmms}</span>
                                             </div>
-                                        </div>
-                                        <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={{ ...styles.ecoBanner, background: 'linear-gradient(135deg, #f59e0b, #b45309)' }}>
-                                            <div style={styles.ecoIcon}>🖨️</div>
-                                            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'}}>
-                                                <span style={styles.ecoTitle}>Subhams Agent</span>
-                                                <span style={styles.ecoSub}>Cloud Printing</span>
+                                            <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#fef3c7', color: '#d97706'}}>🖨️</div>
+                                                <span style={styles.miniAppText}>{ht.agent}</span>
+                                            </div>
+                                            <div onClick={() => navigate('/expo')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#fce7f3', color: '#db2777'}}>✨</div>
+                                                <span style={styles.miniAppText}>{t('Expo') || 'Expo'}</span>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* 🟢 LOCATION-LOCKED NEARBY SHOPS */}
+                                {/* 🟢 NEARBY SHOPS WITH VERIFIED TOGGLE */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{ marginBottom: '25px', padding: '0 5px' }}>
-                                        <h2 style={{ fontSize: '16px', marginBottom: '12px', color: '#0f172a', fontWeight: '900' }}>📍 Shops In Your Area</h2>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                            <h2 style={{ fontSize: '16px', margin: 0, color: '#0f172a', fontWeight: '900' }}>📍 Shops In Your Area</h2>
+                                            
+                                            {/* 🟢 THE VERIFIED ONLY TOGGLE */}
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '800', color: '#15803d', cursor: 'pointer', background: '#f0fdf4', padding: '4px 8px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                                                <input type="checkbox" checked={showVerifiedOnly} onChange={(e) => setShowVerifiedOnly(e.target.checked)} style={{accentColor: '#10b981', width: '12px', height: '12px'}} />
+                                                <BadgeCheck size={12} fill="#10b981" color="white" /> {ht.verifiedOnly}
+                                            </label>
+                                        </div>
                                         
                                         {!customLocation && !localUser?.address ? (
                                             <div className="touch-scale" style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe' }} onClick={() => setShowLocModal(true)}>
@@ -532,23 +537,24 @@ const Home = () => {
                                             </div>
                                         ) : nearbyShops.length > 0 ? (
                                             <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', paddingTop: '5px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
-                                                {nearbyShops.map(shop => (
-                                                    <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '70px', flexShrink: 0, cursor: 'pointer' }}>
-                                                        
-                                                        <div style={{ filter: 'drop-shadow(0 4px 6px rgba(40, 116, 240, 0.3))', marginBottom: '8px' }}>
-                                                            <div style={{ position: 'relative', width: '64px', height: '64px', margin: '0 auto' }}>
-                                                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #2874f0, #facc15, #f59e0b)', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)' }}></div>
-                                                                <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: '3px', left: '3px', width: '58px', height: '58px', objectFit: 'cover', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)', background: 'white' }} />
+                                                {nearbyShops
+                                                    .filter(shop => showVerifiedOnly ? shop.is_verified : true) // 🟢 FILTER APPLIED
+                                                    .map(shop => (
+                                                        <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '70px', flexShrink: 0, cursor: 'pointer' }}>
+                                                            <div style={{ filter: 'drop-shadow(0 4px 6px rgba(40, 116, 240, 0.3))', marginBottom: '8px' }}>
+                                                                <div style={{ position: 'relative', width: '64px', height: '64px', margin: '0 auto' }}>
+                                                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #2874f0, #facc15, #f59e0b)', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)' }}></div>
+                                                                    <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: '3px', left: '3px', width: '58px', height: '58px', objectFit: 'cover', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)', background: 'white' }} />
+                                                                </div>
+                                                            </div>
+                                                            <div className="scroll-container">
+                                                                <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                    {shop.business_name}
+                                                                    {shop.is_verified && <ShieldCheck size={10} color="#10b981" />}
+                                                                </span>
                                                             </div>
                                                         </div>
-                                                        
-                                                        <div className="scroll-container">
-                                                            <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b' }}>
-                                                                {shop.business_name}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
                                             </div>
                                         ) : (
                                             <p style={{fontSize: '12px', color: '#64748b', margin: 0, padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No shops matched in {activeLocationName} yet.</p>
@@ -558,7 +564,7 @@ const Home = () => {
 
                                 {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
 
-                                {/* 🏪 MAIN SHOPS LIST (🟢 STRICT 3-COLUMN WRAPPING GRID) */}
+                                {/* 🏪 MAIN SHOPS LIST */}
                                 {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
                                     <div style={{padding: '0 5px'}}>
                                         <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
@@ -573,6 +579,7 @@ const Home = () => {
                                                     if (selectedCategory === CATEGORIES[1]) return dbType.includes('Trending');
                                                     return false;
                                                 })
+                                                .filter(shop => showVerifiedOnly ? shop.is_verified : true) // 🟢 FILTER APPLIED
                                                 .map(shop => (
                                                     <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
                                                         <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
@@ -588,8 +595,9 @@ const Home = () => {
                                                         )}
                                                         
                                                         <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
-                                                            <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
+                                                            <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '2px' }}>
                                                                 {shop.business_name}
+                                                                {shop.is_verified && <ShieldCheck size={12} color="#10b981" />}
                                                             </h4>
                                                         </div>
 
@@ -606,7 +614,7 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 📁 CATEGORIES & SHOPS VIEW (🟢 STRICT 4-COLUMN CATEGORIES, 3-COLUMN SHOPS) */}
+                                {/* 📁 CATEGORIES & SHOPS VIEW */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div style={{padding: '0 5px'}}>
                                         {!selectedSubCategory ? (
@@ -660,6 +668,7 @@ const Home = () => {
 
                                                             return matchesTab && matchesCategory;
                                                         })
+                                                        .filter(shop => showVerifiedOnly ? shop.is_verified : true) // 🟢 FILTER APPLIED
                                                         .map(shop => (
                                                             <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
                                                                 <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
@@ -675,8 +684,9 @@ const Home = () => {
                                                                 )}
                                                                 
                                                                 <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
-                                                                    <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900' }}>
+                                                                    <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '2px' }}>
                                                                         {shop.business_name}
+                                                                        {shop.is_verified && <ShieldCheck size={12} color="#10b981" />}
                                                                     </h4>
                                                                 </div>
 
@@ -754,14 +764,13 @@ const styles = {
     overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 },
     locModal: { background: 'white', padding: '25px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' },
     locInput: { padding: '14px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '14px', width: '100%', boxSizing: 'border-box', outline: 'none' },
-    gpsBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px' },
     locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
     locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' },
 
-    ecoBanner: { cursor: 'pointer', borderRadius: '12px', padding: '15px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', flex: 1, textAlign: 'center' },
-    ecoIcon: { fontSize: '24px', background: 'rgba(255,255,255,0.2)', width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' },
-    ecoTitle: { fontSize: '13px', fontWeight: '900', letterSpacing: '0.5px' },
-    ecoSub: { fontSize: '11px', color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+    // 🟢 GPAY STYLE MINI APPS
+    miniAppItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', width: '60px', flexShrink: 0 },
+    miniAppIconBox: { width: '48px', height: '48px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', boxShadow: '0 2px 6px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' },
+    miniAppText: { fontSize: '10px', fontWeight: '800', color: '#334155', textAlign: 'center', lineHeight: '1.2' },
 
     mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px', width: '100%' },
     mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' },
