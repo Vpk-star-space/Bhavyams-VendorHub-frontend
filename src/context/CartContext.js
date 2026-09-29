@@ -9,47 +9,55 @@ export const useCart = () => useContext(CartContext);
 export const CartProvider = ({ children }) => {
     const [cart, setCart] = useState([]);
     
-    // Keep track of who is currently logged in via their token
-    const [currentToken, setCurrentToken] = useState(localStorage.getItem('token'));
+    // 🟢 1. STRICT DYNAMIC URL (Fixes the Localhost vs Render confusion)
+    const getBackendUrl = () => {
+        return process.env.NODE_ENV === 'production' 
+            ? 'https://bhavyams-vendorhub-backend.onrender.com/api' 
+            : 'http://localhost:5000/api';
+    };
 
-    // 1. FETCH FROM NEON DB
-    const fetchCartFromDB = useCallback(async (tokenToUse) => {
+    // 2. SAFE FETCH FROM NEON DB
+    const fetchCartFromDB = useCallback(async () => {
+        const tokenToUse = localStorage.getItem('token');
         if (!tokenToUse) {
-            setCart([]); // If no token, wipe the screen!
+            setCart([]); // Wipe the screen if no token exists
             return;
         }
+        
         try {
-            const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/cart', {
+            const res = await axios.get(`${getBackendUrl()}/cart`, {
                 headers: { Authorization: `Bearer ${tokenToUse}` }
             });
             setCart(res.data || []);
         } catch (err) {
-            console.error("Failed to fetch cart from Neon DB", err);
+            // 🟢 3. SELF-HEALING: If the token is from the dead database, wipe it out automatically!
+            if (err.response && err.response.status === 401) {
+                console.warn("Dead token detected. Auto-clearing session...");
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                setCart([]);
+            } else {
+                console.error("Cart fetch error:", err.message);
+            }
         }
     }, []);
 
-    // 2. 🟢 THE FIX: AUTOMATIC LOGIN/LOGOUT WATCHER
-    // This constantly checks if the account has changed without refreshing the page
+    // 4. THE EVENT LISTENER (Zero Infinite Loops)
     useEffect(() => {
-        const interval = setInterval(() => {
-            const newToken = localStorage.getItem('token');
-            // If the token changed (User logged in OR logged out)
-            if (newToken !== currentToken) {
-                setCurrentToken(newToken);
-                fetchCartFromDB(newToken); // Instantly pull the new database data!
+        fetchCartFromDB(); // Fetch once on initial load
+
+        const handleStorageChange = (e) => {
+            if (e.key === 'token') {
+                fetchCartFromDB(); // Fetch instantly only when the token actually changes
             }
-        }, 500); 
+        };
 
-        return () => clearInterval(interval);
-    }, [currentToken, fetchCartFromDB]);
-
-    // Fetch once when the app first loads
-    useEffect(() => {
-        fetchCartFromDB(currentToken);
-    }, [fetchCartFromDB, currentToken]);
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, [fetchCartFromDB]);
 
 
-    // 3. ADD TO NEON DB
+    // 5. ADD TO NEON DB
     const addToCart = async (product) => {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -58,13 +66,11 @@ export const CartProvider = ({ children }) => {
         }
 
         try {
-            // Save to Neon DB first
-            await axios.post('https://bhavyams-vendorhub-backend.onrender.com/api/cart/add', 
+            await axios.post(`${getBackendUrl()}/cart/add`, 
                 { productId: product.id, quantity: 1 }, 
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // Update the screen instantly
             setCart((prevCart) => {
                 const existingItem = prevCart.find(item => item.id === product.id);
                 if (existingItem) {
@@ -81,11 +87,11 @@ export const CartProvider = ({ children }) => {
         }
     };
 
-    // 4. REMOVE FROM NEON DB
+    // 6. REMOVE FROM NEON DB
     const removeFromCart = async (productId) => {
         const token = localStorage.getItem('token');
         try {
-            await axios.delete(`https://bhavyams-vendorhub-backend.onrender.com/api/cart/remove/${productId}`, {
+            await axios.delete(`${getBackendUrl()}/cart/remove/${productId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setCart(cart.filter(item => item.id !== productId));

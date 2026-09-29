@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../context/AppContext';
 import axios from 'axios';
 import { AppContext } from '../context/AppContext';
-import { Share2, BadgeCheck, MapPin, MapPinOff, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, User, UserPlus, Trash2, Loader, Play, Heart, Video, Sparkles } from 'lucide-react';
+import { Share2, BadgeCheck, MapPin, MapPinOff, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, User, UserPlus, Trash2, Loader, Play, Heart, Video, Sparkles, MessageCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 const getBackendUrl = () => {
@@ -132,7 +132,7 @@ const ShopProfile = () => {
                 const catRes = await axios.get(`${BACKEND_URL}/admin/categories`);
                 setAdminCategories(catRes.data || []);
 
-                // 🟢 SAFELY FETCH FOLLOW STATUS (Ignores 401 expired tokens without crashing the page)
+                // 🟢 SAFELY FETCH FOLLOW STATUS
                 if (currentUser) {
                     try {
                         const token = localStorage.getItem('token');
@@ -141,7 +141,7 @@ const ShopProfile = () => {
                             setIsFollowing(true);
                         }
                     } catch (followErr) {
-                        console.warn("Could not fetch follow status (session might be expired).");
+                        console.warn("Could not fetch follow status.");
                     }
                 }
 
@@ -161,7 +161,7 @@ const ShopProfile = () => {
         });
 
         return () => socket.off('shop_updated');
-    }, [id, currentUser]);
+    }, [id, currentUser?.id]);
 
     const handleToggleVerified = async () => {
         try {
@@ -336,8 +336,14 @@ const ShopProfile = () => {
     };
 
     const handleNotificationChange = (level) => { setNotifLevel(level); setNotifMenuOpen(false); };
+
     const filteredCatalog = products.filter(item => (item.name || '').toLowerCase().includes(shopSearch.toLowerCase()));
-    const requireLogin = (actionMsg) => { toast.info(`Please login to ${actionMsg}!`); navigate('/welcome'); };
+
+    const requireLogin = (actionMsg) => {
+        toast.info(`Please login to ${actionMsg}!`);
+        navigate('/welcome');
+    };
+
     const shortDisplayArea = currentUser?.address ? currentUser.address.split(',')[0].trim() : 'your area';
 
     if (loading) return <div style={styles.loading}>Loading Store Profile...</div>;
@@ -515,7 +521,6 @@ const ShopProfile = () => {
                     </div>
                 )}
 
-                {/* 🟢 THE TABS: CATALOG vs EXPO FEED */}
                 <div style={styles.feedTabs}>
                     <div onClick={() => setActiveProfileTab('Catalog')} style={activeProfileTab === 'Catalog' ? styles.activeTab : styles.inactiveTab}>Store Catalog</div>
                     <div onClick={() => setActiveProfileTab('Expo')} style={activeProfileTab === 'Expo' ? styles.activeTab : styles.inactiveTab}>
@@ -577,7 +582,7 @@ const ShopProfile = () => {
                         )}
                     </>
                 ) : (
-                    /* 🟢 FIXED EXPO GRID: NO BLACK SCREENS & SUPPORTS TEXT POSTS */
+                    /* 🟢 UPGRADED EXPO GRID: Beautiful Gradient Cards for Text Posts */
                     <>
                         {expoPosts.length === 0 ? (
                             <div style={styles.emptyFeed}>
@@ -591,10 +596,14 @@ const ShopProfile = () => {
                                     const isTextOnly = !post.media_url || post.media_type === 'text';
 
                                     return (
-                                        <div key={post.id} onClick={() => navigate('/expo')} style={{ aspectRatio: '1', position: 'relative', background: isTextOnly ? 'linear-gradient(135deg, #1e293b, #0f172a)' : '#000', cursor: 'pointer', overflow: 'hidden' }}>
+                                        <div key={post.id} onClick={() => navigate('/expo')} style={{ aspectRatio: '1', position: 'relative', background: '#000', cursor: 'pointer', overflow: 'hidden' }}>
                                             {isTextOnly ? (
-                                                <div style={{ padding: '12px', color: 'white', fontSize: '11px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflow: 'hidden' }}>
-                                                    <span style={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{post.content}</span>
+                                                // 🟢 NEW: Vibrant Text Post Tile instead of a black screen
+                                                <div style={{ padding: '10px', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'linear-gradient(135deg, #2563eb, #8b5cf6)', boxSizing: 'border-box' }}>
+                                                    <MessageCircle size={14} color="white" style={{ opacity: 0.8, marginBottom: '4px' }} />
+                                                    <span style={{ color: 'white', fontSize: '11px', fontWeight: 'bold', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', textShadow: '0 1px 2px rgba(0,0,0,0.3)', lineHeight: '1.3' }}>
+                                                        {post.content || "New Update"}
+                                                    </span>
                                                 </div>
                                             ) : isVideo ? (
                                                 <>

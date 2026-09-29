@@ -5,6 +5,13 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext'; 
 
+// 🟢 DYNAMIC BACKEND URL (Fixes localhost vs Render 401 errors)
+const getBackendUrl = () => {
+    return process.env.NODE_ENV === 'production' 
+        ? 'https://bhavyams-vendorhub-backend.onrender.com/api' 
+        : 'http://localhost:5000/api';
+};
+
 const Profile = () => {
     const navigate = useNavigate();
     const { language, setLanguage } = useContext(AppContext); 
@@ -16,13 +23,12 @@ const Profile = () => {
     const [profileData, setProfileData] = useState({
         username: '',
         email: '', 
-        address: '', // Strictly for manual Street/Door No.
-        area: '',    // Auto-filled by search
-        pincode: '', // Auto-filled by search or manual
+        address: '', 
+        area: '',    
+        pincode: '', 
         phone: ''
     });
 
-    // 🟢 LOCATION SEARCH MODAL STATE
     const [showLocModal, setShowLocModal] = useState(false);
     const [locSearch, setLocSearch] = useState('');
     const [locResults, setLocResults] = useState([]);
@@ -37,9 +43,13 @@ const Profile = () => {
     const fetchFreshData = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
-            if (!token) return navigate('/welcome');
+            if (!token) {
+                navigate('/welcome');
+                return;
+            }
 
-            const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/me', {
+            // 🟢 USE DYNAMIC URL
+            const res = await axios.get(`${getBackendUrl()}/auth/me`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -49,7 +59,6 @@ const Profile = () => {
             let parsedArea = '';
             let parsedPincode = '';
 
-            // Simple parsing to keep Street, Area, and Pincode separate in the UI
             if (parsedAddress.includes('Pincode:')) {
                 const parts = parsedAddress.split(', Pincode:');
                 parsedPincode = parts[1] ? parts[1].trim() : '';
@@ -74,7 +83,15 @@ const Profile = () => {
 
             localStorage.setItem('user', JSON.stringify(data));
         } catch (err) {
-            console.error("Sync Error:", err);
+            // 🟢 SELF-HEALING: If token is dead, wipe it out and force login
+            if (err.response && err.response.status === 401) {
+                console.warn("Dead token detected in Profile. Logging out...");
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                navigate('/welcome');
+            } else {
+                console.error("Profile Sync Error:", err);
+            }
         } finally {
             setLoading(false);
         }
@@ -84,7 +101,6 @@ const Profile = () => {
         fetchFreshData();
     }, [fetchFreshData]);
 
-    // 🟢 HANDLE LOCATION SEARCH
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
         if (query.length < 3) return setLocResults([]);
@@ -100,15 +116,12 @@ const Profile = () => {
         }
     };
 
-    // 🟢 WHEN USER SELECTS A LOCATION FROM MODAL
     const selectCustomLocation = (loc) => {
         const fullString = loc.display_name;
         const areaName = fullString.split(',')[0].trim();
-        
         const pincodeMatch = fullString.match(/\b\d{6}\b/);
         const pin = pincodeMatch ? pincodeMatch[0] : '';
 
-        // 🟢 FIX: We ONLY update Area and Pincode. We leave "address" completely alone!
         setProfileData({ 
             ...profileData, 
             area: areaName, 
@@ -125,8 +138,6 @@ const Profile = () => {
         
         try {
             const token = localStorage.getItem('token');
-            
-            // Combine them neatly for the database
             let finalAddress = profileData.address ? profileData.address.trim() : '';
             if (profileData.area) finalAddress += (finalAddress ? `, ${profileData.area}` : profileData.area);
             if (profileData.pincode) finalAddress += `, Pincode: ${profileData.pincode}`;
@@ -137,7 +148,8 @@ const Profile = () => {
                 address: finalAddress
             };
 
-            const res = await axios.put('https://bhavyams-vendorhub-backend.onrender.com/api/auth/update-profile', payload, {
+            // 🟢 USE DYNAMIC URL
+            const res = await axios.put(`${getBackendUrl()}/auth/update-profile`, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -165,7 +177,6 @@ const Profile = () => {
 
     return (
         <div style={{...styles.container, padding: isMobile ? '15px' : '40px 20px'}}>
-            
             <style>{`
                 .touch-scale { transition: transform 0.15s; }
                 .touch-scale:active { transform: scale(0.96); }
@@ -174,7 +185,6 @@ const Profile = () => {
             `}</style>
 
             <div style={{...styles.profileCard, padding: isMobile ? '25px 20px' : '40px'}}>
-                
                 <div style={styles.topNav}>
                     <button onClick={() => navigate(-1)} style={styles.backBtn}>
                         <ArrowLeft size={18}/> {isMobile ? "" : "Back"}
@@ -262,12 +272,10 @@ const Profile = () => {
                     </div>
                 </div>
 
-                {/* 🟢 LOCATION / ADDRESS FIELDS */}
                 <div style={styles.field}>
                     <div style={styles.iconBox}><MapPin size={20} color="#2874f0"/></div>
                     <div style={{flex: 1}}>
                         <label style={styles.label}>Location / Area</label>
-                        
                         <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                             <input 
                                 disabled={!isEditing}
@@ -288,7 +296,6 @@ const Profile = () => {
                                 onChange={e => setProfileData({...profileData, pincode: e.target.value})} 
                             />
                         </div>
-
                         <label style={styles.label}>Full Street Address</label>
                         <textarea 
                             disabled={!isEditing}
@@ -307,7 +314,6 @@ const Profile = () => {
                 )}
             </div>
             
-            {/* 🟢 EXACT LOCATION MODAL POPUP */}
             {showLocModal && (
                 <div style={styles.overlay}>
                     <div className="touch-scale" style={styles.locModal}>
@@ -315,7 +321,6 @@ const Profile = () => {
                             <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>Search Location / Pincode</h3>
                             <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLocModal(false)} />
                         </div>
-
                         <div style={{position: 'relative', marginTop: '15px'}}>
                             <Search size={18} color="#94a3b8" style={{position: 'absolute', left: '12px', top: '14px'}} />
                             <input 
@@ -328,7 +333,6 @@ const Profile = () => {
                             />
                             {isSearching && <Loader size={16} className="spin" color="#2563eb" style={{position: 'absolute', right: '12px', top: '14px'}} />}
                         </div>
-
                         {locResults.length > 0 && (
                             <div style={styles.locResultsBox}>
                                 {locResults.map((loc, i) => (
@@ -342,7 +346,6 @@ const Profile = () => {
                     </div>
                 </div>
             )}
-
             <div style={{ height: '80px' }}></div>
         </div>
     );
@@ -364,7 +367,6 @@ const styles = {
     editBtn: { background: '#eff6ff', color: '#2563eb', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' },
     saveBtn: { background: '#2563eb', color: '#fff', border: 'none', width: '100%', padding: '16px', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', marginTop: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '0 4px 10px rgba(37, 99, 235, 0.2)' },
     loader: { textAlign: 'center', padding: '100px', color: '#2563eb', fontWeight: 'bold' },
-    
     overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 },
     locModal: { background: 'white', padding: '25px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' },
     locInput: { padding: '14px 14px 14px 40px', borderRadius: '12px', border: '2px solid #2563eb', fontSize: '14px', width: '100%', boxSizing: 'border-box', outline: 'none' },

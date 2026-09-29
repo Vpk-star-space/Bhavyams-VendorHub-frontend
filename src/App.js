@@ -28,7 +28,7 @@ import Expo from './pages/Expo';
 
 // 🟢 ULTRA-PREMIUM MAINTENANCE MODE TOGGLE
 // Set to 'true' to block the app and show the upgrade screen. Set to 'false' to open the app.
-const isMaintenanceMode = true; 
+const isMaintenanceMode = false; 
 
 function ScrollToTop() {
     const { pathname } = useLocation();
@@ -83,11 +83,20 @@ function App() {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [isInstallable, setIsInstallable] = useState(false);
     const [timeLeft, setTimeLeft] = useState(''); 
+    const [currentTime, setCurrentTime] = useState(new Date()); // 🟢 For the live clock
 
     const [currentUser, setCurrentUser] = useState(() => {
         const str = localStorage.getItem('user');
         return str && str !== 'undefined' ? JSON.parse(str) : null;
     });
+
+    // 🟢 TICKING CLOCK FOR MAINTENANCE MODE
+    useEffect(() => {
+        if (isMaintenanceMode) {
+            const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+            return () => clearInterval(timer);
+        }
+    }, []);
 
     useEffect(() => {
         const syncStatus = async () => {
@@ -219,7 +228,16 @@ function App() {
         if (outcome === 'accepted') { setIsInstallable(false); setDeferredPrompt(null); }
     };
 
-    // 🟢 ULTRA-PREMIUM MAINTENANCE MODE UI
+    // 🟢 FORMATS THE CLOCK TO INDIAN STANDARD TIME
+    const formatTimeIST = (date) => {
+        return date.toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            day: '2-digit', month: '2-digit', year: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+        }).toUpperCase();
+    };
+
+    // 🟢 BILINGUAL MAINTENANCE MODE UI
     if (isMaintenanceMode) {
         return (
             <div style={maintenanceStyles.page}>
@@ -233,18 +251,45 @@ function App() {
                     <div style={maintenanceStyles.iconWrapper}>
                         <div style={{ fontSize: '50px', animation: 'slow-spin 8s linear infinite' }}>⚙️</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '15px' }}>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '5px' }}>
                         <h1 style={maintenanceStyles.title}>SUBHAMS</h1><span style={maintenanceStyles.hubBadge}>HUB</span>
                     </div>
-                    <h2 style={maintenanceStyles.subtitle}>We're Upgrading! 🚀</h2>
-                    <p style={maintenanceStyles.text}>
-                        We are currently installing brand new features (including the new Expo Grid) and making the platform faster. 
-                        This scheduled maintenance ensures you get an ultra-premium experience.
-                    </p>
+                    <h2 style={maintenanceStyles.subtitle}>System Maintenance<br/><span style={{fontSize: '14px', color: '#64748b', fontWeight: '600'}}>సిస్టమ్ నిర్వహణ</span></h2>
+
+                    {/* 🟢 DUAL CLOCK: LIVE vs TARGET */}
+                    <div style={maintenanceStyles.timeGrid}>
+                        <div style={{ textAlign: 'left', flex: 1 }}>
+                            <div style={maintenanceStyles.timeLabel}>Current Time</div>
+                            <div style={maintenanceStyles.timeSubLabel}>ప్రస్తుత సమయం</div>
+                            <div style={maintenanceStyles.timeValueCurrent}>{formatTimeIST(currentTime)}</div>
+                        </div>
+                        <div style={maintenanceStyles.timeDivider}></div>
+                        <div style={{ textAlign: 'right', flex: 1 }}>
+                            <div style={{...maintenanceStyles.timeLabel, color: '#d97706'}}>Target Live Time</div>
+                            <div style={{...maintenanceStyles.timeSubLabel, color: '#f59e0b'}}>ప్రారంభ సమయం</div>
+                            <div style={maintenanceStyles.timeValueTarget}>01-10-26 10:00 AM</div>
+                        </div>
+                    </div>
+
                     <div style={maintenanceStyles.statusBox}>
                         <span style={maintenanceStyles.pulseIndicator}></span>
-                        <span style={maintenanceStyles.statusText}>Systems will be back online shortly.</span>
+                        <span style={maintenanceStyles.statusText}>Upgrading System... <br/> <span style={{fontSize: '11px', opacity: 0.8}}>సిస్టమ్ అప్‌గ్రేడ్ అవుతోంది...</span></span>
                     </div>
+
+                    {/* 🟢 CROSS-PROMOTION LINKS */}
+                    <div style={maintenanceStyles.linksBox}>
+                        <p style={maintenanceStyles.linksTitle}>Explore our other platforms <br/> <span style={{fontSize: '10px', color: '#64748b'}}>మా ఇతర ప్లాట్‌ఫారమ్‌లను అన్వేషించండి:</span></p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <a href="https://subhams-hub-git-main-pavan-kumars-projects-cc3bb0eb.vercel.app/" target="_blank" rel="noreferrer" style={{...maintenanceStyles.appLink, background: '#2563eb'}}>
+                                🌐 Subhams Networks <span>&rarr;</span>
+                            </a>
+                            <a href="#" target="_blank" rel="noreferrer" style={{...maintenanceStyles.appLink, background: '#0f172a'}}>
+                                🛍️ Bhavyams Core <span>&rarr;</span>
+                            </a>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         );
@@ -351,18 +396,29 @@ function App() {
     );
 }
 
-// 🟢 STYLES FOR THE PREMIUM MAINTENANCE MODE
+// 🟢 STYLES FOR BILINGUAL MAINTENANCE MODE
 const maintenanceStyles = {
     page: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0f172a', padding: '20px', fontFamily: 'Inter, sans-serif' },
-    card: { background: 'white', padding: '40px 30px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', width: '100%', maxWidth: '450px', textAlign: 'center', boxSizing: 'border-box' },
-    iconWrapper: { background: 'linear-gradient(135deg, #e2e8f0, #f1f5f9)', width: '100px', height: '100px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 25px auto', boxShadow: 'inset 0 4px 6px rgba(0,0,0,0.05)' },
-    title: { margin: 0, fontSize: '26px', fontWeight: '900', color: '#0f172a', letterSpacing: '1px' },
-    hubBadge: { fontSize: '12px', background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', padding: '4px 8px', borderRadius: '6px', fontWeight: '900', letterSpacing: '2px' },
-    subtitle: { color: '#2563eb', fontSize: '20px', fontWeight: '800', margin: '0 0 15px 0' },
-    text: { color: '#475569', fontSize: '15px', lineHeight: '1.6', margin: '0 0 25px 0', fontWeight: '500' },
-    statusBox: { background: '#fef3c7', border: '1px solid #fde68a', padding: '12px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' },
-    pulseIndicator: { width: '10px', height: '10px', background: '#f59e0b', borderRadius: '50%', animation: 'pulse-glow 2s infinite' },
-    statusText: { color: '#b45309', fontSize: '14px', fontWeight: '700' }
+    card: { background: 'white', padding: '30px 20px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', width: '100%', maxWidth: '420px', textAlign: 'center', boxSizing: 'border-box' },
+    iconWrapper: { background: 'linear-gradient(135deg, #e2e8f0, #f1f5f9)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto', boxShadow: 'inset 0 4px 6px rgba(0,0,0,0.05)' },
+    title: { margin: 0, fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '1px' },
+    hubBadge: { fontSize: '11px', background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', padding: '4px 8px', borderRadius: '6px', fontWeight: '900', letterSpacing: '2px' },
+    subtitle: { color: '#2563eb', fontSize: '18px', fontWeight: '800', margin: '0 0 20px 0', lineHeight: '1.4' },
+    
+    timeGrid: { display: 'flex', justifyContent: 'space-between', background: '#f8fafc', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #e2e8f0' },
+    timeLabel: { fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' },
+    timeSubLabel: { fontSize: '9px', color: '#94a3b8', marginBottom: '4px' },
+    timeValueCurrent: { fontSize: '12px', fontWeight: '800', color: '#0f172a', whiteSpace: 'nowrap' },
+    timeValueTarget: { fontSize: '12px', fontWeight: '900', color: '#b45309', whiteSpace: 'nowrap' },
+    timeDivider: { width: '1px', background: '#cbd5e1', margin: '0 15px' },
+
+    statusBox: { background: '#fef3c7', border: '1px solid #fde68a', padding: '10px 15px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '20px' },
+    pulseIndicator: { width: '10px', height: '10px', background: '#f59e0b', borderRadius: '50%', animation: 'pulse-glow 2s infinite', flexShrink: 0 },
+    statusText: { color: '#b45309', fontSize: '13px', fontWeight: '700', textAlign: 'left', lineHeight: '1.3' },
+
+    linksBox: { marginTop: '10px', textAlign: 'left', background: '#eff6ff', padding: '15px', borderRadius: '12px', border: '1px solid #bfdbfe' },
+    linksTitle: { margin: '0 0 10px 0', fontSize: '12px', fontWeight: '800', color: '#1e3a8a' },
+    appLink: { color: 'white', padding: '10px 15px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }
 };
 
 const lockStyles = {
