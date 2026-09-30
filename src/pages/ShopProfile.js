@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../context/AppContext';
 import axios from 'axios';
-import { AppContext } from '../context/AppContext';
-import { Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, User, UserPlus, Trash2, Loader, Play, Heart, Video, MessageCircle, Download } from 'lucide-react';
+import { Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, UserPlus, Trash2, Loader, Play, Heart, Video, MessageCircle, Download } from 'lucide-react';
 import { toast } from 'react-toastify';
 import html2canvas from 'html2canvas';
 
@@ -41,10 +40,14 @@ const getVideoThumbnail = (url) => {
     return `${resolveMediaUrl(url, 'video')}#t=0.001`; 
 };
 
-// 🟢 THE NEW 3-TIER BADGE SYSTEM (Identity Locked)
-const renderBadge = (isOfficial, isVerified) => {
+const getFallbackAvatar = (name) => {
+    const safeName = name ? encodeURIComponent(name) : 'User';
+    return `https://ui-avatars.com/api/?name=${safeName}&background=random&color=fff&bold=true`;
+};
+
+// 🟢 SMART 3-TIER BADGE SYSTEM (Identity Locked)
+const renderBadge = (isOfficial, isVerified, hasShop = true) => {
     if (isOfficial) {
-        // TIER 1: Master Admin (Gold)
         return (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #fde68a' }}>
                 <BadgeCheck size={16} color="#ffffff" fill="#FFD700" style={{ filter: 'drop-shadow(0 1px 2px rgba(184, 134, 11, 0.4))' }} />
@@ -53,7 +56,6 @@ const renderBadge = (isOfficial, isVerified) => {
         );
     }
     if (isVerified) {
-        // TIER 2: Trusted Vendor (Green)
         return (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #86efac' }}>
                 <BadgeCheck size={16} color="#ffffff" fill="#10b981" />
@@ -61,13 +63,16 @@ const renderBadge = (isOfficial, isVerified) => {
             </span>
         );
     }
-    // TIER 3: Standard Shop (Blue)
-    return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#eff6ff', color: '#1d4ed8', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '800', border: '1px solid #bfdbfe' }}>
-            <BadgeCheck size={16} color="#ffffff" fill="#3b82f6" />
-            Standard
-        </span>
-    );
+    // 🟢 FIXED: Extremely strict check to prevent normal users from getting the badge
+    if (hasShop) {
+        return (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#eff6ff', color: '#1d4ed8', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '800', border: '1px solid #bfdbfe' }}>
+                <BadgeCheck size={16} color="#ffffff" fill="#3b82f6" />
+                Standard
+            </span>
+        );
+    }
+    return null;
 };
 
 const ShopProfile = () => {
@@ -106,6 +111,9 @@ const ShopProfile = () => {
     const [locSearch, setLocSearch] = useState('');
     const [locResults, setLocResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
+    
+    const [showFollowersModal, setShowFollowersModal] = useState(false);
+    const [followersList, setFollowersList] = useState([]);
 
     const [editForm, setEditForm] = useState({ 
         business_name: '', category: '', shop_type: 'Products', is_online: true, address: '', delivery_areas: '', founder_name: '', ceo_name: '' 
@@ -113,63 +121,90 @@ const ShopProfile = () => {
 
     const userStr = localStorage.getItem('user');
     const currentUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
+    const isMasterAdmin = Boolean(currentUser && currentUser.email === 'pavanvenkat63@gmail.com');
 
-    // 🟢 STRICT ADMIN LOCK
-    const isMasterAdmin = currentUser && currentUser.email === 'pavanvenkat63@gmail.com';
-
+    // 🟢 FIXED: Safe, single-pass fetching. Prevents white screens if background requests fail.
     useEffect(() => {
+        let isMounted = true;
+        
         const fetchShopProfile = async () => {
             try {
                 const BACKEND_URL = getBackendUrl();
-                const res = await axios.get(`${BACKEND_URL}/shops/${id}`);
-                setShopData(res.data.shop);
-                setProducts(res.data.products || []);
-                setExpoPosts(res.data.expo_posts || []); 
+                const token = localStorage.getItem('token');
+                
+                // 1. Fetch main shop data FIRST so the screen renders immediately
+                const shopRes = await axios.get(`${BACKEND_URL}/shops/${id}`);
+                if (!isMounted) return;
+                
+                const shopInfo = shopRes.data.shop;
+                setShopData(shopInfo);
+                setProducts(shopRes.data.products || []);
+                setExpoPosts(shopRes.data.expo_posts || []); 
 
-                const fetchedAreas = res.data.shop.delivery_areas ? res.data.shop.delivery_areas.split(',') : ['All'];
+                const fetchedAreas = shopInfo.delivery_areas ? shopInfo.delivery_areas.split(',') : ['All'];
                 setDeliveryAreas(fetchedAreas);
-                setDeliveryRequests(res.data.delivery_requests || []);
+                setDeliveryRequests(shopRes.data.delivery_requests || []);
 
                 setEditForm({
-                    business_name: res.data.shop.business_name || '',
-                    category: res.data.shop.category || '',
-                    shop_type: res.data.shop.shop_type || 'Products', 
-                    is_online: res.data.shop.is_online,
-                    address: res.data.shop.address || res.data.shop.location || '',
-                    delivery_areas: res.data.shop.delivery_areas === 'All' ? '' : (res.data.shop.delivery_areas || ''),
-                    founder_name: res.data.shop.founder_name || '',
-                    ceo_name: res.data.shop.ceo_name || ''
+                    business_name: shopInfo.business_name || '',
+                    category: shopInfo.category || '',
+                    shop_type: shopInfo.shop_type || 'Products', 
+                    is_online: shopInfo.is_online,
+                    address: shopInfo.address || shopInfo.location || '',
+                    delivery_areas: shopInfo.delivery_areas === 'All' ? '' : (shopInfo.delivery_areas || ''),
+                    founder_name: shopInfo.founder_name || '',
+                    ceo_name: shopInfo.ceo_name || ''
                 });
 
-                const catRes = await axios.get(`${BACKEND_URL}/admin/categories`);
-                setAdminCategories(catRes.data || []);
+                // 2. Fetch categories silently in the background
+                axios.get(`${BACKEND_URL}/admin/categories`).then(catRes => {
+                    if (isMounted) setAdminCategories(catRes.data || []);
+                }).catch(() => {});
 
-                if (currentUser) {
-                    try {
-                        const token = localStorage.getItem('token');
-                        const followRes = await axios.get(`${BACKEND_URL}/expo/following`, { headers: { Authorization: `Bearer ${token}` } });
-                        if (followRes.data.following && followRes.data.following[id]) {
+                // 3. Fetch follow status silently in the background
+                if (currentUser && token) {
+                    axios.get(`${BACKEND_URL}/expo/following`, { headers: { Authorization: `Bearer ${token}` } }).then(followRes => {
+                        let currentlyFollowing = false;
+                        if (isMounted && followRes.data.following && followRes.data.following[id]) {
                             setIsFollowing(true);
+                            currentlyFollowing = true;
                         }
-                    } catch (followErr) {}
-                }
 
+                        const isThisOfficial = String(shopInfo.user_id) === "1" || shopInfo.user_email === 'pavanvenkat63@gmail.com' || shopInfo.email === 'pavanvenkat63@gmail.com';
+                        const isOwner = String(currentUser.id) === String(shopInfo.user_id);
+                        
+                        // 🟢 FIXED: Owner and Master Admin will NOT auto-follow their own shop
+                        if (isThisOfficial && !currentlyFollowing && !isOwner && !isMasterAdmin) {
+                            axios.post(`${BACKEND_URL}/expo/follow/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } }).catch(()=>{});
+                            if (isMounted) {
+                                setIsFollowing(true);
+                                setShopData(prev => ({ ...prev, followers_count: (Number(prev.followers_count) || 0) + 1 }));
+                            }
+                        }
+                    }).catch(() => {});
+                }
             } catch (err) {
                 console.error("Frontend fetch error:", err);
+                if (isMounted) toast.error("Failed to load shop.");
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
+
         fetchShopProfile();
 
-        socket.on('shop_updated', (updatedShop) => {
+        const handleShopUpdate = (updatedShop) => {
             if (String(updatedShop.id) === String(id)) {
                 setShopData(prev => ({ ...prev, ...updatedShop }));
                 setDeliveryAreas(updatedShop.delivery_areas ? updatedShop.delivery_areas.split(',') : ['All']);
             }
-        });
+        };
 
-        return () => socket.off('shop_updated');
+        socket.on('shop_updated', handleShopUpdate);
+        return () => {
+            isMounted = false;
+            socket.off('shop_updated', handleShopUpdate);
+        };
     }, [id, currentUser?.id]);
 
     const handleToggleVerified = async () => {
@@ -186,17 +221,49 @@ const ShopProfile = () => {
     };
 
     const handleFollowToggle = async () => {
-        if (!currentUser) return requireLogin('follow this shop');
+        if (!currentUser) {
+            toast.info("Please login to follow this shop!");
+            return navigate('/welcome');
+        }
+        
+        const isOfficialApp = String(shopData.user_id) === "1" || shopData.user_email === 'pavanvenkat63@gmail.com' || shopData.email === 'pavanvenkat63@gmail.com';
+        if (isOfficialApp && isFollowing) {
+            toast.info("The Subhams Hub Official Store is a mandatory ecosystem channel and cannot be unfollowed.");
+            return;
+        }
+
         const prevFollow = isFollowing;
         setIsFollowing(!prevFollow);
-        toast.success(!prevFollow ? "Following!" : "Unfollowed");
+        
+        setShopData(prev => ({
+            ...prev,
+            followers_count: prevFollow ? Math.max(0, (Number(prev.followers_count) || 0) - 1) : (Number(prev.followers_count) || 0) + 1
+        }));
         
         try {
             const token = localStorage.getItem('token');
             await axios.post(`${getBackendUrl()}/expo/follow/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            toast.success(!prevFollow ? "Following!" : "Unfollowed");
         } catch (err) {
             setIsFollowing(prevFollow); 
+            setShopData(prev => ({
+                ...prev,
+                followers_count: prevFollow ? (Number(prev.followers_count) || 0) + 1 : Math.max(0, (Number(prev.followers_count) || 0) - 1)
+            }));
             toast.error("Failed to update follow status.");
+        }
+    };
+
+    const fetchFollowersList = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`${getBackendUrl()}/shops/${id}/followers`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setFollowersList(res.data.followers || []);
+            setShowFollowersModal(true);
+        } catch (err) {
+            toast.error("Failed to load followers list.");
         }
     };
 
@@ -206,7 +273,10 @@ const ShopProfile = () => {
     );
 
     const handleRequestDelivery = async () => {
-        if (!currentUser) return requireLogin('request delivery');
+        if (!currentUser) {
+            toast.info("Please login to request delivery!");
+            return navigate('/welcome');
+        }
         try {
             const token = localStorage.getItem('token');
             const basicUserAddress = currentUser.address || 'Unknown Location';
@@ -257,7 +327,6 @@ const ShopProfile = () => {
 
     const openTeamModal = () => { setShowTeamModal(true); setOtpMode(false); fetchStaff(); };
 
-    // 🟢 LOCATION FIX: Forced English via accept-language
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
         if (query.length < 3) return setLocResults([]);
@@ -318,7 +387,6 @@ const ShopProfile = () => {
         } catch (err) { setUploadError("❌ Update failed! Please check your connection."); }
     };
 
-    // 🟢 WHATSAPP STATUS GENERATOR
     const handleDownloadCard = async () => {
         const element = document.getElementById('shop-card-export');
         if (!element) return;
@@ -347,11 +415,6 @@ const ShopProfile = () => {
 
     const filteredCatalog = products.filter(item => (item.name || '').toLowerCase().includes(shopSearch.toLowerCase()));
 
-    const requireLogin = (actionMsg) => {
-        toast.info(`Please login to ${actionMsg}!`);
-        navigate('/welcome');
-    };
-
     const renderLeadership = () => {
         const founder = shopData.founder_name;
         const ceo = shopData.ceo_name;
@@ -376,20 +439,35 @@ const ShopProfile = () => {
         );
     };
 
-    if (loading) return <div style={styles.loading}>Loading Store Profile...</div>;
-    if (!shopData) return null;
+    // 🟢 FIXED: Proper Loading State and Error Fallback (Prevents White Screen)
+    if (loading) return (
+        <div style={{...styles.page, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
+            <Loader className="spin" size={40} color="#2874f0" style={{marginBottom: '10px'}} />
+            <h3 style={{color: '#64748b'}}>Loading Store Profile...</h3>
+        </div>
+    );
+    if (!shopData) return (
+        <div style={{...styles.page, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px'}}>
+            <Store size={60} color="#cbd5e1" style={{marginBottom: '10px'}} />
+            <h2 style={{color: '#0f172a'}}>Store Not Found</h2>
+            <p style={{color: '#64748b'}}>This shop may have been removed or the link is invalid.</p>
+            <button onClick={() => navigate('/')} style={styles.primaryActionBtn}>Return Home</button>
+        </div>
+    );
 
-    const isOwner = currentUser && shopData && (String(currentUser.id) === String(shopData.user_id));
-    const dbShopType = shopData.shop_type || 'Products'; 
-
-    const shopImageSrc = getOptimizedImage(shopData.shop_logo);
+    // 🟢 ACCURATE OWNER AND OFFICIAL STATUS CHECKS
+    const isOwner = Boolean(currentUser?.id && shopData?.user_id && String(currentUser.id) === String(shopData.user_id));
+    const isOfficialApp = Boolean(
+        String(shopData?.user_id) === "1" || 
+        shopData?.user_email === 'pavanvenkat63@gmail.com' || 
+        shopData?.email === 'pavanvenkat63@gmail.com'
+    );
     
-   // 🟢 BULLETPROOF IDENTITY LOCK
-const isOfficialApp = 
-    String(shopData.user_id) === "1" || 
-    shopData.user_email === 'pavanvenkat63@gmail.com' || 
-    shopData.email === 'pavanvenkat63@gmail.com' ||
-    (currentUser && currentUser.email === 'pavanvenkat63@gmail.com' && String(currentUser.id) === String(shopData.user_id));
+    // 🟢 FIXED: Only hide follow button if they actually own it OR if they are admin viewing the official store.
+    const hideFollowButton = isOwner || (isMasterAdmin && isOfficialApp);
+
+    const dbShopType = shopData.shop_type || 'Products'; 
+    const shopImageSrc = getOptimizedImage(shopData.shop_logo);
     const totalRequests = deliveryRequests.reduce((sum, req) => sum + Number(req.count), 0);
 
     return (
@@ -411,7 +489,6 @@ const isOfficialApp =
                 </div>
             </div>
 
-            {/* 🟢 THE AREA THAT GETS SCREENSHOTTED FOR WHATSAPP */}
             <div id="shop-card-export" style={{ background: '#f8fafc', paddingBottom: '20px' }}>
                 <div style={{...styles.bannerBackground, background: isOfficialApp ? 'linear-gradient(135deg, #b45309 0%, #facc15 100%)' : 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)'}}>
                     <div style={styles.bannerTextContainer}>
@@ -434,10 +511,24 @@ const isOfficialApp =
                         </div>
                         
                         <div style={styles.realMetricsBox}>
-                            <Package size={20} color={isOfficialApp ? "#d97706" : "#2874f0"} />
-                            <div style={{display: 'flex', flexDirection: 'column'}}>
-                                <span style={styles.metricNumber}>{products.length}</span>
-                                <span style={styles.metricLabel}>Live Items</span>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                                <Package size={20} color={isOfficialApp ? "#d97706" : "#2874f0"} />
+                                <div style={{display: 'flex', flexDirection: 'column'}}>
+                                    <span style={styles.metricNumber}>{products.length}</span>
+                                    <span style={styles.metricLabel}>Live Items</span>
+                                </div>
+                            </div>
+                            <div style={{width: '1px', height: '35px', background: '#e2e8f0', margin: '0 8px'}}></div>
+                            
+                            <div 
+                                style={{display: 'flex', alignItems: 'center', gap: '10px', cursor: (isOwner || isMasterAdmin) ? 'pointer' : 'default'}}
+                                onClick={() => { if (isOwner || isMasterAdmin) fetchFollowersList(); }}
+                            >
+                                <Users size={20} color={isOfficialApp ? "#d97706" : "#2874f0"} />
+                                <div style={{display: 'flex', flexDirection: 'column'}}>
+                                    <span style={styles.metricNumber}>{shopData.followers_count || 0}</span>
+                                    <span style={styles.metricLabel}>Followers</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -455,11 +546,6 @@ const isOfficialApp =
                             🚚 Delivers to: {shopData.delivery_areas || 'All Areas'}
                         </p>
 
-                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', color: '#475569', fontWeight: 'bold' }}>
-                            <Users size={14} /> {shopData.followers_count || 0} Followers
-                        </div>
-
-                        {/* 🟢 FOUNDER & CEO UI */}
                         {renderLeadership()}
                     </div>
                 </div>
@@ -470,7 +556,7 @@ const isOfficialApp =
                     <div style={{...styles.adminControlPanel, border: isOfficialApp ? '1px dashed #f59e0b' : '1px dashed #94a3b8', background: isOfficialApp ? '#fffbeb' : '#f8fafc'}}>
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
                             <span style={{fontSize: '12px', fontWeight: 'bold', color: isMasterAdmin ? '#b45309' : '#475569'}}>
-                                {isMasterAdmin ? '👑 Master Admin Mode' : '🛠️ Store Owner Tools'}
+                                {isMasterAdmin ? '👑 Master Admin Mode' : '🛠 Store Owner Tools'}
                             </span>
                         </div>
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -478,7 +564,6 @@ const isOfficialApp =
                             <button onClick={() => navigate(`/manage-catalog/${id}`)} style={{...styles.primaryAdminBtn, background: isOfficialApp ? '#d97706' : '#16a34a'}}><Package size={16}/> Manage Catalog</button>
                             <button onClick={openTeamModal} style={{...styles.primaryAdminBtn, background: '#3b82f6'}}><UserPlus size={16}/> Manage Team</button>
                             
-                            {/* 🟢 ADMIN OVERRIDE: VERIFY BUTTON (HIDDEN FROM EVERYONE ELSE) */}
                             {isMasterAdmin && !isOfficialApp && (
                                 <button 
                                     onClick={handleToggleVerified} 
@@ -495,7 +580,6 @@ const isOfficialApp =
                             )}
                         </div>
 
-                        {/* 🟢 WARNING ONLY VISIBLE TO OWNER/ADMIN */}
                         {deliveryRequests.length > 0 && (
                             <div style={{ marginTop: '15px', background: 'white', border: '1px solid #fcd34d', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
                                 <div onClick={() => setShowRequestsList(!showRequestsList)} className="touch-scale" style={{ padding: '12px 15px', background: '#fffbeb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
@@ -523,7 +607,8 @@ const isOfficialApp =
                     </div>
                 )}
 
-                {!(isOwner || isMasterAdmin) && (
+                {/* 🟢 FIXED: HIDE FOLLOW BUTTON USING STRICT LOGIC */}
+                {!hideFollowButton && (
                     <div style={styles.actionButtonsRow}>
                         <button style={{...isFollowing ? styles.followingBtn : styles.primaryActionBtn, flex: 1, background: isFollowing ? '#f1f5f9' : (isOfficialApp ? 'linear-gradient(135deg, #facc15, #d97706)' : '#2874f0')}} onClick={handleFollowToggle}>
                             {isFollowing ? <Check size={18} color="#0f172a" /> : <Users size={18} color="white" />} 
@@ -598,12 +683,15 @@ const isOfficialApp =
                                                     </div>
                                                 </div>
                                             </div>
-                                            {!(isOwner || isMasterAdmin) && (
+                                            {!isOwner && (
                                                 <div style={styles.listActionBox}>
                                                     <button style={styles.addBtn} onClick={() => {
-                                                        if (!currentUser) return requireLogin('book this item');
+                                                        if (!currentUser) {
+                                                            toast.info("Please login to add to cart!");
+                                                            return navigate('/welcome');
+                                                        }
                                                         if (!isDeliverable) {
-                                                            handleRequestDelivery(); // Log request automatically instead of just warning
+                                                            handleRequestDelivery();
                                                             toast.error(`Delivery not currently available to your area.`);
                                                             return;
                                                         }
@@ -661,7 +749,7 @@ const isOfficialApp =
                 )}
             </div>
 
-            {/* MODALS BELOW */}
+            {/* MODALS */}
             {showTeamModal && (
                 <div style={styles.overlay}>
                     <div style={styles.modal}>
@@ -670,7 +758,7 @@ const isOfficialApp =
                             <X size={20} style={{cursor: 'pointer'}} onClick={() => setShowTeamModal(false)} />
                         </div>
                         <div style={{ background: '#eff6ff', padding: '10px', borderRadius: '8px', border: '1px solid #bfdbfe', marginBottom: '15px', fontSize: '11px', color: '#1e3a8a', fontWeight: 'bold' }}>
-                            Free Tier: Link 1 extra Google Account (e.g., Wife or Staff) to manage this shop.
+                            Free Tier: Link 1 extra Google Account to manage this shop.
                         </div>
                         {!otpMode ? (
                             <form onSubmit={handleRequestStaffOtp} style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
@@ -721,7 +809,6 @@ const isOfficialApp =
                                 <input style={styles.input} value={editForm.business_name} onChange={e => setEditForm({...editForm, business_name: e.target.value})} required />
                             </div>
                             
-                            {/* 🟢 FOUNDER & CEO INPUTS ADDED HERE */}
                             <div style={{ display: 'flex', gap: '10px' }}>
                                 <div style={{ flex: 1 }}>
                                     <label style={styles.modalLabel}>Founder Name</label>
@@ -759,7 +846,7 @@ const isOfficialApp =
                                 <div style={{ background: '#fffbeb', padding: '10px', borderRadius: '8px', border: '1px dashed #f59e0b', marginBottom: '10px' }}>
                                     <label style={{...styles.modalLabel, color: '#b45309'}}>👑 Admin Override: Assign Store Tab</label>
                                     <select style={styles.input} value={editForm.shop_type} onChange={e => setEditForm({...editForm, shop_type: e.target.value})}>
-                                        <option value="Products">🛍️ Shopping & Retail</option><option value="Services">🧑‍🔧 Services & Bookings</option><option value="Business">📈 Business & Enterprise</option><option value="Promotions">📢 Promotions & Offers</option>
+                                        <option value="Products">🛍 Shopping & Retail</option><option value="Services">🧑‍🔧 Services & Bookings</option><option value="Business">📈 Business & Enterprise</option><option value="Promotions">📢 Promotions & Offers</option>
                                     </select>
                                 </div>
                             )}
@@ -800,6 +887,38 @@ const isOfficialApp =
                     </div>
                 </div>
             )}
+
+            {/* 🟢 FOLLOWERS MODAL (STRICT PRIVACY: USERNAME ONLY, NO EMAILS) */}
+            {showFollowersModal && (
+                <div style={styles.overlay} onClick={() => setShowFollowersModal(false)}>
+                    <div style={{...styles.modal, maxHeight: '400px'}} onClick={e => e.stopPropagation()}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px solid #e2e8f0'}}>
+                            <h3 style={{margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                <Users size={18} color="#2563eb"/> Followers ({followersList.length})
+                            </h3>
+                            <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowFollowersModal(false)} />
+                        </div>
+                        <div style={{overflowY: 'auto', maxHeight: '300px'}} className="hide-scroll">
+                            {followersList.length === 0 ? <p style={{textAlign: 'center', color: '#94a3b8', fontSize: '13px'}}>No followers yet.</p> : null}
+                            {followersList.map(u => {
+                                const isUserOfficial = u.role === 'admin' || u.id === 1;
+                                const isUserVerified = u.is_verified;
+                                // 🟢 FIXED: Extremely strict check against actual 'null' strings
+                                const isUserShop = u.shop_id && String(u.shop_id) !== 'null' && String(u.shop_id) !== 'undefined';
+                                const displayName = u.business_name || u.username || 'User';
+
+                                return (
+                                    <div key={u.id} style={{display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid #f1f5f9'}}>
+                                        <img src={getFallbackAvatar(displayName)} alt="Avatar" style={{width: '32px', height: '32px', borderRadius: '50%'}} />
+                                        <span style={{fontSize: '14px', fontWeight: '700', color: '#0f172a'}}>{displayName}</span>
+                                        {renderBadge(isUserOfficial, isUserVerified, isUserShop)}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -809,7 +928,6 @@ const styles = {
     loading: { textAlign: 'center', padding: '50px', fontWeight: 'bold', color: '#64748b' },
     navBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: 'white', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' },
     backBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '15px', padding: 0 },
-    loginBtnSmall: { display: 'flex', alignItems: 'center', gap: '4px', background: '#2874f0', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
     downloadIconBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#dcfce7', border: '1px solid #86efac', cursor: 'pointer', color: '#166534', fontWeight: 'bold', fontSize: '12px', padding: '6px 12px', borderRadius: '8px' },
     shareIconBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', border: '1px solid #cbd5e1', cursor: 'pointer', color: '#0f172a', fontWeight: 'bold', fontSize: '12px', padding: '6px 12px', borderRadius: '8px' },
     bannerBackground: { height: '160px', width: '100%', display: 'flex', alignItems: 'center', boxSizing: 'border-box' },
@@ -822,13 +940,12 @@ const styles = {
     businessLogo: { width: '90px', height: '90px', borderRadius: '16px', objectFit: 'cover', border: '4px solid white', backgroundColor: 'white', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
     businessLogoGold: { width: '90px', height: '90px', borderRadius: '16px', objectFit: 'cover', border: '4px solid #facc15', backgroundColor: 'white', boxShadow: '0 4px 15px rgba(250, 204, 21, 0.4)' },
     onlineBadge: { position: 'absolute', bottom: '-4px', right: '-4px', width: '18px', height: '18px', background: '#22c55e', border: '3px solid white', borderRadius: '50%' },
-    realMetricsBox: { background: 'white', padding: '10px 15px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', marginBottom: '10px' },
+    realMetricsBox: { background: 'white', padding: '10px 15px', borderRadius: '12px', display: 'flex', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', marginBottom: '10px' },
     metricNumber: { fontSize: '16px', fontWeight: '900', color: '#0f172a', lineHeight: '1' },
     metricLabel: { fontSize: '11px', color: '#64748b', fontWeight: 'bold' },
     bioSection: { marginTop: '15px' },
     shopName: { margin: '0 0 5px 0', fontSize: '22px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '6px', color: '#0f172a' },
     categoryTag: { display: 'inline-block', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' },
-    goldBadgeLabel: { display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #fde68a' },
     address: { margin: 0, color: '#475569', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '500' },
     adminControlPanel: { marginTop: '20px', padding: '15px', borderRadius: '12px' },
     adminBtn: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px', background: 'white', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' },

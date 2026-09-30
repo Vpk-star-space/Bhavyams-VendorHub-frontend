@@ -3,7 +3,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
-import { Search, MapPin, X, Loader } from 'lucide-react'; // 🟢 Added Icons
+import { Search, MapPin, X, Loader } from 'lucide-react'; 
 
 const getBackendUrl = () => {
     return process.env.NODE_ENV === 'production' 
@@ -31,6 +31,9 @@ const Welcome = () => {
     const [locSearch, setLocSearch] = useState('');
     const [locResults, setLocResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
+    
+    // 🟢 ADDED DEBOUNCE TIMER STATE TO PREVENT API DRAIN
+    const [searchTimeout, setSearchTimeout] = useState(null);
 
     const handleLanguageSelect = (lang) => {
         setLanguage(lang);
@@ -67,20 +70,32 @@ const Welcome = () => {
         }
     };
 
-    // 🟢 SMART LOCATION SEARCH
-    const handleLocationSearch = async (query) => {
+    // 🟢 FIXED: SMART DEBOUNCED LOCATION SEARCH
+    const handleLocationSearch = (query) => {
         setLocSearch(query);
-        if (query.length < 3) return setLocResults([]);
+        if (query.length < 3) {
+            setLocResults([]);
+            return;
+        }
         
         setIsSearching(true);
-        try {
-            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`);
-            setLocResults(res.data);
-        } catch (e) {
-            console.error("Location search failed", e);
-        } finally {
-            setIsSearching(false);
-        }
+
+        // Clear the previous timer if user is still typing
+        if (searchTimeout) clearTimeout(searchTimeout);
+
+        // Wait 500ms after they finish typing to make 1 clean API call
+        const timeoutId = setTimeout(async () => {
+            try {
+                const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`);
+                setLocResults(res.data);
+            } catch (e) {
+                console.error("Location search failed", e);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 500);
+
+        setSearchTimeout(timeoutId);
     };
 
     // 🟢 WHEN USER SELECTS A LOCATION FROM MODAL
@@ -138,7 +153,7 @@ const Welcome = () => {
         }
 
         if (!area || !address) {
-            alert(language === 'en' ? "⚠️ Please set your delivery area." : "⚠️ దయచేసి మీ ప్రాంతాన్ని సెట్ చేయండి.");
+            alert(language === 'en' ? "⚠️️ Please set your delivery area." : "⚠️ దయచేసి మీ ప్రాంతాన్ని సెట్ చేయండి.");
             return;
         }
 

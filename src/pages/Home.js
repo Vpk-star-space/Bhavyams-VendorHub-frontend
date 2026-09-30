@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ExternalLink, Navigation, BadgeCheck } from 'lucide-react'; 
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, Grid } from 'lucide-react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify'; 
 import ProductCard from '../components/ProductCard';
@@ -22,10 +22,59 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
-// 🌐 TRANSLATIONS UPDATED FOR MINI APPS & VERIFIED TOGGLE
+// 🌐 TRANSLATIONS UPDATED
 const homeTranslations = {
-    en: { syncing: "Syncing Market...", searchFor: "Search shops & items...", searchResults: "Search Results for", topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Local Area", home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", expo: "Expo", profile: "Profile", admin: "Admin", miniApps: "Subhams Mini Apps", pmms: "PMMS", agent: "Agent", verifiedOnly: "Verified Only" },
-    te: { syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "దుకాణాలు, వస్తువుల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", browse: "బ్రౌజ్ చేయండి", sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "స్థానిక ప్రాంతం", home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్", miniApps: "సుభమ్స్ మినీ యాప్స్", pmms: "PMMS", agent: "ఏజెంట్", verifiedOnly: "వెరిఫైడ్ మాత్రమే" }
+    en: { 
+        syncing: "Syncing Market...", 
+        searchFor: "Search shops & items...", 
+        searchResults: "Search Results for", 
+        topTrending: "🔥 Top Trending Shops", 
+        subhamsExpo: "🌟 Subhams Expo", 
+        browse: "Browse", 
+        sellers: "Sellers", 
+        open: "Open", 
+        closed: "Closed", 
+        localArea: "Shops In Your Area", 
+        home: "Home", 
+        dashboard: "Dashboard", 
+        shopOrders: "Shop", 
+        orders: "Orders", 
+        expo: "Expo", 
+        profile: "Profile", 
+        admin: "Admin", 
+        explore: "Explore Subhams Hub",
+         officialShop: "Subhams Store", 
+        usefulApps: "Subhams Ecosystem", 
+       
+        pmms: "Subhams PMMS", 
+        agent: "Subhams Agent", 
+        network: "Subhams Network" 
+    },
+    te: { 
+        syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", 
+        searchFor: "దుకాణాలు, వస్తువుల కోసం వెతకండి...", 
+        searchResults: "దీని కోసం శోధన ఫలితాలు", 
+        topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", 
+        subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", 
+        browse: "బ్రౌజ్ చేయండి", 
+        sellers: "విక్రేతలు", 
+        open: "తెరిచి ఉంది", 
+        closed: "మూసివేయబడింది", 
+        localArea: "మీ ప్రాంతంలోని షాపులు", 
+        home: "హోమ్", 
+        dashboard: "డాష్‌బోర్డ్", 
+        shopOrders: "షాప్", 
+        orders: "ఆర్డర్‌లు", 
+        expo: "ఎక్స్‌పో", 
+        profile: "ప్రొఫైల్", 
+        admin: "అడ్మిన్", 
+        explore: "సుభమ్స్ హబ్ అన్వేషించండి", 
+        usefulApps: "సుభమ్స్ హబ్ ఎకోసిస్టమ్", 
+        officialShop: "సుభమ్స్ స్టోర్",
+        pmms: "సుభమ్స్ PMMS", 
+        agent: "సుభమ్స్ ఏజెంట్", 
+        network: "సుభమ్స్ నెట్‌వర్క్" 
+    }
 };
 
 const categoryTranslations = {
@@ -57,6 +106,15 @@ const Home = () => {
 
     const CATEGORIES = [t('Expo') || 'Expo', t('Trending') || 'Trending', t('Shopping') || 'Shopping', t('Services') || 'Services', t('Business') || 'Business'];
 
+    const getCatIcon = (cat) => {
+        if (cat === (t('Expo') || 'Expo')) return { icon: '✨', bg: '#fce7f3', color: '#db2777' };
+        if (cat === (t('Trending') || 'Trending')) return { icon: '🔥', bg: '#fef2f2', color: '#dc2626' };
+        if (cat === (t('Shopping') || 'Shopping')) return { icon: '🛍️', bg: '#eff6ff', color: '#2563eb' };
+        if (cat === (t('Services') || 'Services')) return { icon: '🧑‍🔧', bg: '#f0fdf4', color: '#16a34a' };
+        if (cat === (t('Business') || 'Business')) return { icon: '📈', bg: '#fef3c7', color: '#d97706' };
+        return { icon: '🏪', bg: '#f1f5f9', color: '#64748b' };
+    };
+
     const tc = (word) => {
         if (!word) return '';
         if (lang === 'te') {
@@ -75,9 +133,6 @@ const Home = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[1]); 
-    
-    // 🟢 NEW: Verified Toggle State
-    const [showVerifiedOnly, setShowVerifiedOnly] = useState(false);
 
     const [localUserStr, setLocalUserStr] = useState(localStorage.getItem('user'));
     const localUser = localUserStr && localUserStr !== 'undefined' ? JSON.parse(localUserStr) : null;
@@ -87,14 +142,14 @@ const Home = () => {
     const [locSearch, setLocSearch] = useState('');
     const [locResults, setLocResults] = useState([]);
 
+    // 🟢 FIXED: REMOVED CPU-DRAINING setInterval
     useEffect(() => {
         const checkUser = () => {
             const currentStr = localStorage.getItem('user');
             if (currentStr !== localUserStr) setLocalUserStr(currentStr); 
         };
         window.addEventListener('storage', checkUser);
-        const interval = setInterval(checkUser, 1000); 
-        return () => { window.removeEventListener('storage', checkUser); clearInterval(interval); };
+        return () => window.removeEventListener('storage', checkUser);
     }, [localUserStr]);
 
     const isVendor = localUser && (localUser.role === 'vendor' || activeShops.some(shop => String(shop.user_id) === String(localUser.id)));
@@ -102,6 +157,7 @@ const Home = () => {
 
     const [cartCount, setCartCount] = useState(0);
 
+    // 🟢 FIXED: REMOVED CPU-DRAINING setInterval
     useEffect(() => {
         const updateCartCount = () => {
             const localCart = JSON.parse(localStorage.getItem('subhams_cart') || '[]');
@@ -110,8 +166,7 @@ const Home = () => {
         };
         updateCartCount(); 
         window.addEventListener('storage', updateCartCount);
-        const interval = setInterval(updateCartCount, 1000); 
-        return () => { window.removeEventListener('storage', updateCartCount); clearInterval(interval); };
+        return () => window.removeEventListener('storage', updateCartCount);
     }, []);
 
     useEffect(() => {
@@ -120,19 +175,23 @@ const Home = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // Extract primitive values to prevent infinite looping
+    const activeLat = customLocation?.lat || appLocation?.lat || 0;
+    const activeLng = customLocation?.lng || appLocation?.lng || 0;
+
+    // 🟢 FIXED: LOCKED DATA FETCHING (Only runs once, no more DB draining!)
     useEffect(() => {
+        let isMounted = true;
         const fetchLocalFeed = async () => {
-            if (activeShops.length === 0) setLoading(true);
-            const activeLat = customLocation?.lat || appLocation?.lat || 0;
-            const activeLng = customLocation?.lng || appLocation?.lng || 0;
-            const BACKEND_URL = getBackendUrl();
-            
             try {
+                const BACKEND_URL = getBackendUrl();
                 const results = await Promise.allSettled([
                     axios.get(`${BACKEND_URL}/products/feed?lat=${activeLat}&lng=${activeLng}`),
                     axios.get(`${BACKEND_URL}/shops/active/all`),
                     axios.get(`${BACKEND_URL}/admin/categories`)
                 ]);
+
+                if (!isMounted) return;
 
                 if (results[0].status === 'fulfilled') setProducts(results[0].value.data.products || []);
                 if (results[1].status === 'fulfilled') setActiveShops(results[1].value.data.shops || []);
@@ -140,13 +199,17 @@ const Home = () => {
             } catch (err) {
                 console.error("Feed Error:", err);
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
-        fetchLocalFeed(); 
-    }, [appLocation?.lat, appLocation?.lng, customLocation]);
 
-    // 🟢 FIXED: Location search forces English results to sync with database
+        fetchLocalFeed(); 
+
+        return () => {
+            isMounted = false;
+        };
+    }, [activeLat, activeLng]); 
+
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
         if (query.length < 3) return setLocResults([]);
@@ -161,6 +224,7 @@ const Home = () => {
         localStorage.setItem('custom_hub_location', JSON.stringify(customLoc));
         setCustomLocation(customLoc);
         setShowLocModal(false);
+        setLoading(true); // Show loader explicitly when location changes manually
         toast.success(`Location set to ${loc.display_name.split(',')[0]}`);
     };
 
@@ -202,7 +266,7 @@ const Home = () => {
             navigate('/register-business'); 
             return; 
         }
-        if (cat === CATEGORIES[0]) {
+        if (cat === (t('Expo') || 'Expo')) {
             navigate('/expo');
             return;
         }
@@ -218,9 +282,8 @@ const Home = () => {
         return "📍 Nearby"; 
     };
 
-    // 🟢 ADMIN LOCATION BYPASS
     const nearbyShops = activeShops.filter(shop => {
-        if (isAdmin) return true; // Master Admin bypasses local filters entirely
+        if (isAdmin) return true; 
         
         const searchAddrRaw = (customLocation?.address || localUser?.address || localUser?.location || '').toLowerCase();
         const shopAddrRaw = (shop.address || shop.location || '').toLowerCase();
@@ -240,6 +303,13 @@ const Home = () => {
         }
         return false;
     });
+
+    const officialHubShop = activeShops.find(s => 
+        String(s.user_id) === "1" || 
+        s.user_email === 'pavanvenkat63@gmail.com' || 
+        s.email === 'pavanvenkat63@gmail.com' ||
+        (s.business_name && s.business_name.toLowerCase().includes('subhams'))
+    );
 
     const categoryStats = adminCategories.map(adminCat => {
         const shopCount = activeShops.filter(shop => {
@@ -279,7 +349,6 @@ const Home = () => {
     });
 
     const currentTabEnglish = selectedCategory === (t('Services') || 'Services') ? 'Services' : (selectedCategory === (t('Shopping') || 'Shopping') ? 'Products' : selectedCategory);
-
     const activeLocationName = customLocation ? customLocation.address.split(',')[0] : (localUser?.address ? localUser.address.split(',')[0] : "Set Loc");
 
     return (
@@ -299,9 +368,7 @@ const Home = () => {
                         -webkit-text-fill-color: transparent;
                         animation: logo-shine 3s linear infinite;
                     }
-
                     @keyframes pulse-logo { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(0.95); opacity: 0.8; } }
-                    
                     @keyframes running-text {
                         0%   { transform: translateX(0%); }
                         100% { transform: translateX(-100%); }
@@ -318,7 +385,6 @@ const Home = () => {
                         padding-left: 100%;
                         animation: running-text 8s linear infinite;
                     }
-
                     .touch-scale {
                         transition: transform 0.15s cubic-bezier(0.25, 0.8, 0.25, 1);
                     }
@@ -331,7 +397,6 @@ const Home = () => {
                     .touch-scale:active {
                         transform: scale(0.96);
                     }
-
                     .hide-scroll::-webkit-scrollbar { display: none; }
                     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
                     .swipe-content { transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
@@ -470,7 +535,7 @@ const Home = () => {
                 onTouchStart={onTouchStart} 
                 onTouchEnd={onTouchEnd} 
                 className="swipe-content"
-                style={{ maxWidth: '1000px', margin: '15px auto', padding: '0 10px', width: '100%', boxSizing: 'border-box', minHeight: '70vh' }}
+                style={{ maxWidth: '1000px', margin: '0 auto', padding: '10px 0', width: '100%', boxSizing: 'border-box', minHeight: '70vh' }}
             >
                 {loading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
@@ -485,7 +550,7 @@ const Home = () => {
                 ) : (
                     <>
                         {searchQuery && !showSuggestions ? (
-                            <div style={{padding: '0 5px'}}>
+                            <div style={{padding: '10px 15px'}}>
                                 <h2 style={{ fontSize: '20px', marginBottom: '15px', color: '#1e293b' }}>{ht.searchResults} "{searchQuery}"</h2>
                                 {filteredProducts.length > 0 ? (
                                     <div style={styles.desktopProductGrid}>
@@ -497,89 +562,115 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 GPAY STYLE MINI APPS ROW */}
+                                {/* 🟢 1. SHOPS IN YOUR AREA */}
                                 {selectedCategory === CATEGORIES[1] && (
-                                    <div style={{ marginBottom: '15px', padding: '0 5px' }}>
-                                        <h2 style={{ fontSize: '12px', marginBottom: '10px', color: '#64748b', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{ht.miniApps}</h2>
-                                        <div style={{ display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '10px' }} className="hide-scroll">
-                                            <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
-                                                <div style={{...styles.miniAppIconBox, background: '#eff6ff', color: '#2563eb'}}>💰</div>
-                                                <span style={styles.miniAppText}>{ht.pmms}</span>
-                                            </div>
-                                            <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
-                                                <div style={{...styles.miniAppIconBox, background: '#fef3c7', color: '#d97706'}}>🖨️</div>
-                                                <span style={styles.miniAppText}>{ht.agent}</span>
-                                            </div>
-                                            <div onClick={() => navigate('/expo')} className="touch-scale" style={styles.miniAppItem}>
-                                                <div style={{...styles.miniAppIconBox, background: '#fce7f3', color: '#db2777'}}>✨</div>
-                                                <span style={styles.miniAppText}>{t('Expo') || 'Expo'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 🟢 NEARBY SHOPS WITH VERIFIED TOGGLE */}
-                                {selectedCategory === CATEGORIES[1] && (
-                                    <div style={{ marginBottom: '25px', padding: '0 5px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                            <h2 style={{ fontSize: '16px', margin: 0, color: '#0f172a', fontWeight: '900' }}>📍 Shops In Your Area</h2>
-                                            
-                                            {/* 🟢 THE VERIFIED ONLY TOGGLE */}
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '800', color: '#15803d', cursor: 'pointer', background: '#f0fdf4', padding: '4px 8px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
-                                                <input type="checkbox" checked={showVerifiedOnly} onChange={(e) => setShowVerifiedOnly(e.target.checked)} style={{accentColor: '#10b981', width: '12px', height: '12px'}} />
-                                                <BadgeCheck size={12} fill="#10b981" color="white" /> {ht.verifiedOnly}
-                                            </label>
+                                    <div style={styles.sectionBlock}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '0 5px' }}>
+                                            <h2 style={{ fontSize: '16px', margin: 0, color: '#0f172a', fontWeight: '900' }}>📍 {ht.localArea}</h2>
                                         </div>
                                         
                                         {!customLocation && !localUser?.address ? (
-                                            <div className="touch-scale" style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe' }} onClick={() => setShowLocModal(true)}>
+                                            <div className="touch-scale" style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe', margin: '0 5px' }} onClick={() => setShowLocModal(true)}>
                                                 <MapPin size={16} color="#2563eb"/> Set Location to discover nearby shops!
                                             </div>
                                         ) : nearbyShops.length > 0 ? (
-                                            <div style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', paddingTop: '5px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
-                                                {nearbyShops
-                                                    .filter(shop => showVerifiedOnly ? shop.is_verified : true) // 🟢 FILTER APPLIED
-                                                    .map(shop => (
-                                                        <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '70px', flexShrink: 0, cursor: 'pointer' }}>
-                                                            <div style={{ filter: 'drop-shadow(0 4px 6px rgba(40, 116, 240, 0.3))', marginBottom: '8px' }}>
-                                                                <div style={{ position: 'relative', width: '64px', height: '64px', margin: '0 auto' }}>
-                                                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #2874f0, #facc15, #f59e0b)', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)' }}></div>
-                                                                    <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: '3px', left: '3px', width: '58px', height: '58px', objectFit: 'cover', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)', background: 'white' }} />
-                                                                </div>
-                                                            </div>
-                                                            <div className="scroll-container">
-                                                                <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                                    {shop.business_name}
-                                                                    {shop.is_verified && <ShieldCheck size={10} color="#10b981" />}
-                                                                </span>
+                                            <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '15px', overflowX: 'auto', paddingBottom: '5px', paddingLeft: '5px', paddingRight: '5px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
+                                                {nearbyShops.map(shop => (
+                                                    <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '70px', flexShrink: 0, cursor: 'pointer' }}>
+                                                        <div style={{ filter: 'drop-shadow(0 4px 6px rgba(40, 116, 240, 0.3))', marginBottom: '8px' }}>
+                                                            <div style={{ position: 'relative', width: '64px', height: '64px', margin: '0 auto' }}>
+                                                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #2874f0, #facc15, #f59e0b)', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)' }}></div>
+                                                                <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: '3px', left: '3px', width: '58px', height: '58px', objectFit: 'cover', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)', background: 'white' }} />
                                                             </div>
                                                         </div>
-                                                    ))}
+                                                        <div className="scroll-container">
+                                                            <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                {shop.business_name}
+                                                                {shop.is_verified && <ShieldCheck size={10} color="#10b981" />}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         ) : (
-                                            <p style={{fontSize: '12px', color: '#64748b', margin: 0, padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No shops matched in {activeLocationName} yet.</p>
+                                            <p style={{fontSize: '12px', color: '#64748b', margin: '0 5px', padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No shops matched in {activeLocationName} yet.</p>
                                         )}
                                     </div>
                                 )}
 
-                                {selectedCategory === CATEGORIES[0] && <PromotionsSection />}
+                                {/* 🟢 2. EXPLORE SUBHAMS HUB (ALL CATEGORIES EXCEPT TRENDING IN UPI STYLE) */}
+                                {selectedCategory === CATEGORIES[1] && (
+                                    <div style={styles.sectionBlock}>
+                                        <h2 style={styles.sectionTitle}>{ht.explore}</h2>
+                                        <div style={styles.upiRow} className="hide-scroll">
+                                            {/* Subhams Official Store Quick Tile MOVED HERE */}
+                                            <div 
+                                                onClick={() => {
+                                                    if (officialHubShop) navigate(`/shop/${officialHubShop.id}`);
+                                                    else navigate('/shop/1');
+                                                }} 
+                                                className="touch-scale" 
+                                                style={styles.miniAppItem}
+                                            >
+                                                <div style={{...styles.miniAppIconBox, background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', color: '#d97706', border: '1.5px solid #fde68a'}}>
+                                                    🏬
+                                                </div>
+                                                <span style={styles.miniAppText}>{ht.officialShop}</span>
+                                            </div>
 
-                                {/* 🏪 MAIN SHOPS LIST */}
-                                {(selectedCategory === CATEGORIES[0] || selectedCategory === CATEGORIES[1]) && (
-                                    <div style={{padding: '0 5px'}}>
+                                            {CATEGORIES.filter(c => c !== CATEGORIES[1]).map(cat => {
+                                                const { icon, bg, color } = getCatIcon(cat);
+                                                return (
+                                                    <div key={cat} onClick={() => handleCategoryClick(cat)} className="touch-scale" style={styles.miniAppItem}>
+                                                        <div style={{...styles.miniAppIconBox, background: bg, color: color, border: '1px solid #e2e8f0'}}>
+                                                            {icon}
+                                                        </div>
+                                                        <span style={styles.miniAppText}>{cat}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 🟢 3. SUBHAMS HUB ECOSYSTEM (OTHER USEFUL APPS) */}
+                                {selectedCategory === CATEGORIES[1] && (
+                                    <div style={styles.sectionBlock}>
+                                        <h2 style={{...styles.sectionTitle, display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                            <Grid size={16} color="#2563eb" /> {ht.usefulApps}
+                                        </h2>
+                                        <div style={styles.upiRow} className="hide-scroll">
+                                            {/* Subhams PMMS */}
+                                            <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#eff6ff', color: '#2563eb'}}>💰</div>
+                                                <span style={styles.miniAppText}>{ht.pmms}</span>
+                                            </div>
+
+                                            {/* Subhams Agent */}
+                                            <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#fef3c7', color: '#d97706'}}>🖨️</div>
+                                                <span style={styles.miniAppText}>{ht.agent}</span>
+                                            </div>
+
+                                            {/* Subhams Network */}
+                                            <div onClick={() => window.open('https://subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#fce7f3', color: '#db2777'}}>🌐</div>
+                                                <span style={styles.miniAppText}>{ht.network}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 🟢 4. TRENDING SHOPS GRID */}
+                                {selectedCategory === CATEGORIES[1] && (
+                                    <div style={{padding: '0 10px'}}>
                                         <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
-                                            {selectedCategory === CATEGORIES[1] ? ht.topTrending : ht.subhamsExpo}
+                                            {ht.topTrending}
                                         </h2>
                                         
                                         <div style={isMobile ? styles.mobileGrid3 : styles.desktopProductGrid}>
                                             {activeShops
-                                                .filter(shop => {
-                                                    const dbType = shop.shop_type || 'Products'; 
-                                                    if (selectedCategory === CATEGORIES[0]) return dbType.includes('Expo') || dbType.includes('Promotions');
-                                                    if (selectedCategory === CATEGORIES[1]) return dbType.includes('Trending');
-                                                    return false;
-                                                })
-                                                .filter(shop => showVerifiedOnly ? shop.is_verified : true) // 🟢 FILTER APPLIED
+                                                .filter(shop => (shop.shop_type || 'Products').includes('Trending'))
                                                 .map(shop => (
                                                     <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
                                                         <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
@@ -614,9 +705,59 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 📁 CATEGORIES & SHOPS VIEW */}
+                                {/* EXPO TAB */}
+                                {selectedCategory === CATEGORIES[0] && (
+                                    <>
+                                        <PromotionsSection />
+                                        <div style={{padding: '0 10px'}}>
+                                            <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
+                                                {ht.subhamsExpo}
+                                            </h2>
+                                            
+                                            <div style={isMobile ? styles.mobileGrid3 : styles.desktopProductGrid}>
+                                                {activeShops
+                                                    .filter(shop => {
+                                                        const dbType = shop.shop_type || 'Products'; 
+                                                        return dbType.includes('Expo') || dbType.includes('Promotions');
+                                                    })
+                                                    .map(shop => (
+                                                        <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
+                                                            <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
+                                                                {shop.is_online ? ht.open : ht.closed}
+                                                            </span>
+
+                                                            {shop.shop_logo ? (
+                                                                <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={isMobile ? styles.shopImageMobile : styles.shopImageDesktop} />
+                                                            ) : (
+                                                                <div style={{...(isMobile ? styles.shopImageMobile : styles.shopImageDesktop), background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                                                    <Store size={isMobile ? 20 : 30} color="#cbd5e1"/>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
+                                                                <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                    {shop.business_name}
+                                                                    {shop.is_verified && <ShieldCheck size={12} color="#10b981" />}
+                                                                </h4>
+                                                            </div>
+
+                                                            <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                                {tc(shop.category)}
+                                                            </p>
+                                                            
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: isMobile ? '8px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                <MapPin size={isMobile ? 10 : 14} color="#ef4444" /> {getDistanceTag(shop)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* SHOPPING & SERVICES TABS (Admin Folders) */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
-                                    <div style={{padding: '0 5px'}}>
+                                    <div style={{padding: '0 10px'}}>
                                         {!selectedSubCategory ? (
                                             <>
                                                 <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
@@ -668,7 +809,6 @@ const Home = () => {
 
                                                             return matchesTab && matchesCategory;
                                                         })
-                                                        .filter(shop => showVerifiedOnly ? shop.is_verified : true) // 🟢 FILTER APPLIED
                                                         .map(shop => (
                                                             <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
                                                                 <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
@@ -767,10 +907,13 @@ const styles = {
     locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
     locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' },
 
-    // 🟢 GPAY STYLE MINI APPS
-    miniAppItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', width: '60px', flexShrink: 0 },
-    miniAppIconBox: { width: '48px', height: '48px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', boxShadow: '0 2px 6px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' },
-    miniAppText: { fontSize: '10px', fontWeight: '800', color: '#334155', textAlign: 'center', lineHeight: '1.2' },
+    sectionBlock: { padding: '15px 10px', background: 'white', margin: '0 5px 15px 5px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+    sectionTitle: { fontSize: '15px', marginBottom: '15px', color: '#0f172a', fontWeight: '900', paddingLeft: '5px' },
+    upiRow: { display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '5px', paddingLeft: '5px' },
+
+    miniAppItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', width: '70px', flexShrink: 0 },
+    miniAppIconBox: { width: '54px', height: '54px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' },
+    miniAppText: { fontSize: '10.5px', fontWeight: '800', color: '#334155', textAlign: 'center', lineHeight: '1.2' },
 
     mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px', width: '100%' },
     mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' },
