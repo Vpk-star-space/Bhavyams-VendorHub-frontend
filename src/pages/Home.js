@@ -43,9 +43,8 @@ const homeTranslations = {
         profile: "Profile", 
         admin: "Admin", 
         explore: "Explore Subhams Hub",
-         officialShop: "Subhams Store", 
+        officialShop: "Subhams Store", 
         usefulApps: "Subhams Ecosystem", 
-       
         pmms: "Subhams PMMS", 
         agent: "Subhams Agent", 
         network: "Subhams Network" 
@@ -73,7 +72,7 @@ const homeTranslations = {
         officialShop: "సుభమ్స్ స్టోర్",
         pmms: "సుభమ్స్ PMMS", 
         agent: "సుభమ్స్ ఏజెంట్", 
-        network: "సుభమ్స్ నెట్‌వర్క్" 
+        network: "సుభమ్స్ నెట్‌‌వర్క్" 
     }
 };
 
@@ -142,7 +141,6 @@ const Home = () => {
     const [locSearch, setLocSearch] = useState('');
     const [locResults, setLocResults] = useState([]);
 
-    // 🟢 FIXED: REMOVED CPU-DRAINING setInterval
     useEffect(() => {
         const checkUser = () => {
             const currentStr = localStorage.getItem('user');
@@ -157,7 +155,6 @@ const Home = () => {
 
     const [cartCount, setCartCount] = useState(0);
 
-    // 🟢 FIXED: REMOVED CPU-DRAINING setInterval
     useEffect(() => {
         const updateCartCount = () => {
             const localCart = JSON.parse(localStorage.getItem('subhams_cart') || '[]');
@@ -175,11 +172,9 @@ const Home = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Extract primitive values to prevent infinite looping
     const activeLat = customLocation?.lat || appLocation?.lat || 0;
     const activeLng = customLocation?.lng || appLocation?.lng || 0;
 
-    // 🟢 FIXED: LOCKED DATA FETCHING (Only runs once, no more DB draining!)
     useEffect(() => {
         let isMounted = true;
         const fetchLocalFeed = async () => {
@@ -224,7 +219,7 @@ const Home = () => {
         localStorage.setItem('custom_hub_location', JSON.stringify(customLoc));
         setCustomLocation(customLoc);
         setShowLocModal(false);
-        setLoading(true); // Show loader explicitly when location changes manually
+        setLoading(true); 
         toast.success(`Location set to ${loc.display_name.split(',')[0]}`);
     };
 
@@ -598,12 +593,12 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 🟢 2. EXPLORE SUBHAMS HUB (ALL CATEGORIES EXCEPT TRENDING IN UPI STYLE) */}
+                                {/* 🟢 2. EXPLORE SUBHAMS HUB (4-COLUMN GRID, NO SCROLLING / NO SWIPE BUGS) */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={styles.sectionBlock}>
                                         <h2 style={styles.sectionTitle}>{ht.explore}</h2>
-                                        <div style={styles.upiRow} className="hide-scroll">
-                                            {/* Subhams Official Store Quick Tile MOVED HERE */}
+                                        <div style={styles.upiGrid}>
+                                            {/* Subhams Official Store Quick Tile */}
                                             <div 
                                                 onClick={() => {
                                                     if (officialHubShop) navigate(`/shop/${officialHubShop.id}`);
@@ -633,26 +628,23 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 🟢 3. SUBHAMS HUB ECOSYSTEM (OTHER USEFUL APPS) */}
+                                {/* 🟢 3. SUBHAMS HUB ECOSYSTEM (4-COLUMN GRID) */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={styles.sectionBlock}>
                                         <h2 style={{...styles.sectionTitle, display: 'flex', alignItems: 'center', gap: '6px'}}>
                                             <Grid size={16} color="#2563eb" /> {ht.usefulApps}
                                         </h2>
-                                        <div style={styles.upiRow} className="hide-scroll">
-                                            {/* Subhams PMMS */}
+                                        <div style={styles.upiGrid}>
                                             <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
                                                 <div style={{...styles.miniAppIconBox, background: '#eff6ff', color: '#2563eb'}}>💰</div>
                                                 <span style={styles.miniAppText}>{ht.pmms}</span>
                                             </div>
 
-                                            {/* Subhams Agent */}
                                             <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
                                                 <div style={{...styles.miniAppIconBox, background: '#fef3c7', color: '#d97706'}}>🖨️</div>
                                                 <span style={styles.miniAppText}>{ht.agent}</span>
                                             </div>
 
-                                            {/* Subhams Network */}
                                             <div onClick={() => window.open('https://subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
                                                 <div style={{...styles.miniAppIconBox, background: '#fce7f3', color: '#db2777'}}>🌐</div>
                                                 <span style={styles.miniAppText}>{ht.network}</span>
@@ -909,11 +901,13 @@ const styles = {
 
     sectionBlock: { padding: '15px 10px', background: 'white', margin: '0 5px 15px 5px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
     sectionTitle: { fontSize: '15px', marginBottom: '15px', color: '#0f172a', fontWeight: '900', paddingLeft: '5px' },
-    upiRow: { display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '5px', paddingLeft: '5px' },
+    
+    // 🟢 NEW 4-COLUMN GRID LAYOUT (Eliminates horizontal scrolling / swipe bugs)
+    upiGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: '15px', columnGap: '5px', padding: '5px', justifyItems: 'center' },
 
-    miniAppItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', width: '70px', flexShrink: 0 },
+    miniAppItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', width: '100%' },
     miniAppIconBox: { width: '54px', height: '54px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' },
-    miniAppText: { fontSize: '10.5px', fontWeight: '800', color: '#334155', textAlign: 'center', lineHeight: '1.2' },
+    miniAppText: { fontSize: '10px', fontWeight: '800', color: '#334155', textAlign: 'center', lineHeight: '1.2' },
 
     mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px', width: '100%' },
     mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', width: '100%' },
