@@ -9,7 +9,7 @@ self.addEventListener('fetch', (event) => {
     // Required for PWA
 });
 
-// 🟢 1. RECEIVE THE URGENT PUSH AND STICK IT TO THE SCREEN
+// 🟢 RECEIVE THE URGENT PUSH AND FORCE THE HEADS-UP BANNER
 self.addEventListener('push', function(event) {
     if (event.data) {
         const data = event.data.json();
@@ -18,8 +18,14 @@ self.addEventListener('push', function(event) {
             body: data.body,
             icon: '/logo192.png',
             badge: '/logo192.png',
-            vibrate: [300, 100, 300, 100, 300], // Strong vibration helps trigger Android's top-popup
-            requireInteraction: true, // 🟢 THIS IS THE SECRET: It STAYS on screen until the user swipes it away or clicks it!
+            // Aggressive continuous vibration pattern (simulates a ringing phone)
+            vibrate: [500, 250, 500, 250, 500, 250, 500, 250, 500], 
+            requireInteraction: true, 
+            renotify: true, // Forces Android to drop the banner again even if one is already there
+            tag: 'urgent-alert', // Required for renotify to work
+            actions: [
+                { action: 'open', title: '🟢 View Order / Message' }
+            ],
             data: { url: data.url || '/' }
         };
 
