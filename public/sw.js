@@ -5,11 +5,8 @@ self.addEventListener('install', (event) => {
     console.log("Subhams Hub Service Worker Installed!");
 });
 
-self.addEventListener('fetch', (event) => {
-    // Required for PWA
-});
+self.addEventListener('fetch', (event) => {});
 
-// 🟢 RECEIVE THE URGENT PUSH AND FORCE THE HEADS-UP BANNER
 self.addEventListener('push', function(event) {
     if (event.data) {
         const data = event.data.json();
@@ -18,13 +15,14 @@ self.addEventListener('push', function(event) {
             body: data.body,
             icon: '/logo192.png',
             badge: '/logo192.png',
-            // Aggressive continuous vibration pattern (simulates a ringing phone)
-            vibrate: [500, 250, 500, 250, 500, 250, 500, 250, 500], 
+            vibrate: [500, 250, 500, 250, 500], 
             requireInteraction: true, 
-            renotify: true, // Forces Android to drop the banner again even if one is already there
-            tag: 'urgent-alert', // Required for renotify to work
+            renotify: true, 
+            // 🟢 CHANGED: We use a new tag so Android treats this as a brand new "Call" category
+            tag: 'incoming-booking-call', 
             actions: [
-                { action: 'open', title: '🟢 View Order / Message' }
+                // 🟢 The Missed Call / Booking Action
+                { action: 'open', title: '📞 View Urgent Booking' } 
             ],
             data: { url: data.url || '/' }
         };
@@ -35,7 +33,6 @@ self.addEventListener('push', function(event) {
     }
 });
 
-// 🟢 2. HANDLE THE USER TAPPING THE NOTIFICATION
 self.addEventListener('notificationclick', function(event) {
     event.notification.close(); 
     
