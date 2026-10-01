@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, Grid } from 'lucide-react'; 
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, Grid, BellRing } from 'lucide-react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify'; 
 import ProductCard from '../components/ProductCard';
 import { AppContext } from '../context/AppContext'; 
-
 import PromotionsSection from '../components/PromotionsSection'; 
+import { subscribeUserToPush } from '../utils/pushHelper'; // 🟢 IMPORT ADDED
 
 const getBackendUrl = () => {
     return process.env.NODE_ENV === 'production' 
@@ -140,6 +140,9 @@ const Home = () => {
     const [showLocModal, setShowLocModal] = useState(false);
     const [locSearch, setLocSearch] = useState('');
     const [locResults, setLocResults] = useState([]);
+
+    // 🟢 CHECK PERMISSION STATUS
+    const [pushPermission, setPushPermission] = useState(Notification.permission);
 
     useEffect(() => {
         const checkUser = () => {
@@ -408,21 +411,42 @@ const Home = () => {
                     </div>
                     
                     <div style={{display: 'flex', gap: '8px'}}>
-                        {/* 🟢 NEW TEST BUTTON HERE */}
-                        <button 
-                            onClick={async () => {
-                                try {
-                                    const token = localStorage.getItem('token');
-                                    await axios.post(`${getBackendUrl()}/notifications/test`, {}, { headers: { Authorization: `Bearer ${token}` }});
-                                    toast.success("Push sent! Minimize your app NOW to see the popup.");
-                                } catch (e) {
-                                    toast.error("Failed to send push.");
-                                }
-                            }} 
-                            style={{...styles.adminBtn, background: '#10b981', color: 'white'}}
-                        >
-                            🔔 Test Popup
-                        </button>
+                        {/* 🟢 FIXED: VISIBLE TO ADMIN ONLY, HANDLES PERMISSIONS AND TESTS PUSH */}
+                        {isAdmin && (
+                            <>
+                                {pushPermission !== 'granted' ? (
+                                    <button 
+                                        onClick={async () => {
+                                            await subscribeUserToPush();
+                                            setPushPermission(Notification.permission);
+                                        }} 
+                                        style={{...styles.adminBtn, background: '#f59e0b', color: 'white'}}
+                                    >
+                                        <BellRing size={14} /> Enable Popups
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={async () => {
+                                            try {
+                                                const token = localStorage.getItem('token');
+                                                const res = await axios.post(`${getBackendUrl()}/notifications/test`, {}, { headers: { Authorization: `Bearer ${token}` }});
+                                                
+                                                if (res.data.delivered > 0) {
+                                                    toast.success("✅ Push sent! Minimize your app NOW.");
+                                                } else {
+                                                    toast.error("❌ No device registered. Did you click Allow?");
+                                                }
+                                            } catch (e) {
+                                                toast.error("Failed to connect to Push Server.");
+                                            }
+                                        }} 
+                                        style={{...styles.adminBtn, background: '#10b981', color: 'white'}}
+                                    >
+                                        🔔 Test Popup
+                                    </button>
+                                )}
+                            </>
+                        )}
 
                         {isAdmin ? (
                             <button onClick={() => navigate('/admin')} style={styles.adminBtn}>
@@ -435,7 +459,7 @@ const Home = () => {
                         ) : null}
                     </div>
                 </div>
-               
+                
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 15px 12px 15px', background: '#2874f0', width: '100%', boxSizing: 'border-box' }}>
                     <div className="touch-scale" style={styles.locationPill} onClick={() => setShowLocModal(true)}>
