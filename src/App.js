@@ -27,6 +27,7 @@ import VendorOrders from './pages/VendorOrders';
 import Expo from './pages/Expo';
 import Chat from './pages/Chat';
 import GlobalAlert from './components/GlobalAlert';
+import IncomingCallScreen from './pages/IncomingCallScreen';
 // 🟢 ULTRA-PREMIUM MAINTENANCE MODE TOGGLE
 // Set to 'true' to block the app and show the upgrade screen. Set to 'false' to open the app.
 const isMaintenanceMode = false; 
@@ -388,6 +389,7 @@ function App() {
                                 <Route path="/vendor/orders" element={<ProtectedRoute><VendorOrders /></ProtectedRoute>} />
                                 <Route element={<Expo />} path="/expo" />
                                <Route path="/chat/:conversationId" element={<Chat />} />
+                               <Route path="/incoming-call" element={<IncomingCallScreen />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </div>
