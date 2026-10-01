@@ -9,19 +9,25 @@ self.addEventListener('fetch', (event) => {
     // We leave this empty so it doesn't mess with your fast Render API calls!
 });
 
-// 🟢 NEW: Listen for Background Notifications
+// 🟢 NEW: High-Priority "Call Style" Background Notifications
 self.addEventListener('push', function(event) {
     if (event.data) {
         const data = event.data.json();
         
         const options = {
             body: data.body,
-            icon: '/logo192.png', // Uses your app's icon
+            icon: '/logo192.png', 
             badge: '/logo192.png',
-            vibrate: [200, 100, 200, 100, 200, 100, 200], // Strong WhatsApp-style vibration
-            requireInteraction: true, // 🟢 Forces popup to stay on screen until clicked/dismissed
-            data: { url: data.url || '/' },
-            actions: data.actions || [] // Ready for "Answer / Decline" buttons later
+            // Massive ringing vibration pattern
+            vibrate: [500, 250, 500, 250, 500, 250, 500, 250, 500, 250, 500], 
+            requireInteraction: true, // Forces it to stay on screen
+            renotify: true, // If multiple messages come, it rings again
+            tag: data.tag || 'subhams-alert', // Groups notifications
+            actions: [
+                { action: 'answer', title: '🟢 Open / Answer' },
+                { action: 'decline', title: '🔴 Decline' }
+            ],
+            data: { url: data.url || '/' }
         };
 
         event.waitUntil(
@@ -30,14 +36,17 @@ self.addEventListener('push', function(event) {
     }
 });
 
-// 🟢 NEW: Handle Notification Clicks
+// 🟢 NEW: Handle Button Clicks (Answer vs Decline)
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
     
+    // If they clicked decline, do nothing
+    if (event.action === 'decline') return;
+
+    // If they clicked Answer or the main body, open the app
     if (event.notification.data && event.notification.data.url) {
         event.waitUntil(
-            clients.matchAll({ type: 'window' }).then(windowClients => {
-                // If app is open in background, bring it to front
+            clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
                 for (var i = 0; i < windowClients.length; i++) {
                     var client = windowClients[i];
                     if (client.url.includes(self.registration.scope) && 'focus' in client) {
@@ -45,7 +54,6 @@ self.addEventListener('notificationclick', function(event) {
                         return client.focus();
                     }
                 }
-                // If app is fully closed, open it
                 if (clients.openWindow) {
                     return clients.openWindow(event.notification.data.url);
                 }

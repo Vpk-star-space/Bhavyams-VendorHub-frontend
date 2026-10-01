@@ -26,6 +26,7 @@ import UserOrders from './pages/UserOrders';
 import VendorOrders from './pages/VendorOrders';
 import Expo from './pages/Expo';
 import Chat from './pages/Chat';
+import GlobalAlert from './components/GlobalAlert';
 // 🟢 ULTRA-PREMIUM MAINTENANCE MODE TOGGLE
 // Set to 'true' to block the app and show the upgrade screen. Set to 'false' to open the app.
 const isMaintenanceMode = false; 
@@ -366,7 +367,7 @@ function App() {
                                     </button>
                                 </div>
                             )}
-
+<GlobalAlert /> {/* 🟢 Added Here */}
                             <Routes>
                                 {/* 🟢 FULLY UNLOCKED FOR PUBLIC & AI */}
                                 <Route path="/" element={<Home />} />
