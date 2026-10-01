@@ -7,6 +7,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('fetch', (event) => {});
 
+// 🟢 UNIVERSAL HANDLER FOR ALL NOTIFICATIONS
 self.addEventListener('push', function(event) {
     if (event.data) {
         const data = event.data.json();
@@ -15,14 +16,12 @@ self.addEventListener('push', function(event) {
             body: data.body,
             icon: '/logo192.png',
             badge: '/logo192.png',
-            vibrate: [500, 250, 500, 250, 500], 
-            requireInteraction: true, 
+            vibrate: [400, 200, 400, 200, 400], // Strong vibration for mobile attention
+            requireInteraction: true, // Stays on screen until touched
             renotify: true, 
-            // 🟢 CHANGED: We use a new tag so Android treats this as a brand new "Call" category
-            tag: 'incoming-booking-call', 
+            tag: 'subhams-hub-alert', 
             actions: [
-                // 🟢 The Missed Call / Booking Action
-                { action: 'open', title: '📞 View Urgent Booking' } 
+                { action: 'open', title: '🟢 View Now' }
             ],
             data: { url: data.url || '/' }
         };
