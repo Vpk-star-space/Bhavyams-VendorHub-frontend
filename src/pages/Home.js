@@ -399,7 +399,7 @@ const Home = () => {
             </style>
 
             <div style={styles.headerStack}>
-                <div style={styles.headerTopRow}>
+          <div style={styles.headerTopRow}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
                         <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                             <span className="animated-logo" style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '-0.5px' }}>SUBHAMS</span>
@@ -407,16 +407,35 @@ const Home = () => {
                         </h1>
                     </div>
                     
-                    {isAdmin ? (
-                        <button onClick={() => navigate('/admin')} style={styles.adminBtn}>
-                            <ShieldCheck size={18} /> {isMobile ? "" : ht.admin}
+                    <div style={{display: 'flex', gap: '8px'}}>
+                        {/* 🟢 NEW TEST BUTTON HERE */}
+                        <button 
+                            onClick={async () => {
+                                try {
+                                    const token = localStorage.getItem('token');
+                                    await axios.post(`${getBackendUrl()}/notifications/test`, {}, { headers: { Authorization: `Bearer ${token}` }});
+                                    toast.success("Push sent! Minimize your app NOW to see the popup.");
+                                } catch (e) {
+                                    toast.error("Failed to send push.");
+                                }
+                            }} 
+                            style={{...styles.adminBtn, background: '#10b981', color: 'white'}}
+                        >
+                            🔔 Test Popup
                         </button>
-                    ) : !localUser ? (
-                        <button onClick={() => navigate('/welcome')} style={styles.loginHeaderBtn}>
-                            <User size={16} /> Login
-                        </button>
-                    ) : null}
+
+                        {isAdmin ? (
+                            <button onClick={() => navigate('/admin')} style={styles.adminBtn}>
+                                <ShieldCheck size={18} /> {isMobile ? "" : ht.admin}
+                            </button>
+                        ) : !localUser ? (
+                            <button onClick={() => navigate('/welcome')} style={styles.loginHeaderBtn}>
+                                <User size={16} /> Login
+                            </button>
+                        ) : null}
+                    </div>
                 </div>
+               
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 15px 12px 15px', background: '#2874f0', width: '100%', boxSizing: 'border-box' }}>
                     <div className="touch-scale" style={styles.locationPill} onClick={() => setShowLocModal(true)}>

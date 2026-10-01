@@ -130,8 +130,8 @@ const UserOrders = () => {
                 const shopSubtotal = shopItems.reduce((sum, i) => sum + (Number(i.price) * (i.quantity || i.qty || 1)), 0);
 
                 const payload = {
-                    vendor_id: shopItems[0].vendor_id, // The actual owner's user ID
-                    shop_id: shopItems[0].shop_id || shopItems[0].vendor_id, // The exact storefront ID
+                    vendor_id: shopItems[0].vendor_id, 
+                    shop_id: shopItems[0].shop_id || shopItems[0].vendor_id, 
                     items: shopItems,
                     total_amount: shopSubtotal,
                     order_type: shopItems.some(i => i.order_type === 'Service') ? 'Service' : 'Product',
@@ -167,6 +167,32 @@ const UserOrders = () => {
         setListItems(newCart);
         localStorage.setItem('subhams_cart', JSON.stringify(newCart));
         if (newCart.length === 0) setActiveTab('active');
+    };
+
+    // 🟢 INITIATE SECURE CHAT FROM ORDERS
+    const handleInitiateChat = async (shopId) => {
+        if (!currentUser) {
+            toast.info("Please login to message this shop!");
+            return navigate('/welcome');
+        }
+
+        // 🟢 Check if the Violation Engine has blocked their chat features
+        if (currentUser.can_message === false) {
+            toast.error("⚠️ Your messaging privileges have been suspended by Admin.");
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${getBackendUrl()}/chats/initiate/${shopId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            // Navigate directly to the secure chat room
+            navigate(`/chat/${res.data.conversation_id}`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to start chat.");
+        }
     };
 
     const filteredOrders = orders.filter(order => {
@@ -333,7 +359,8 @@ const UserOrders = () => {
                                                 
                                                 {activeTab === 'active' && (
                                                     <div style={styles.actionGroup}>
-                                                        <button style={styles.msgBtn} onClick={() => alert("Secure messaging system opening...")}>
+                                                        {/* 🟢 FIXED: INITIATE SECURE CHAT */}
+                                                        <button style={styles.msgBtn} onClick={() => handleInitiateChat(order.shop_id || order.vendor_id)}>
                                                             <MessageCircle size={14} /> {t.messageVendor}
                                                         </button>
 

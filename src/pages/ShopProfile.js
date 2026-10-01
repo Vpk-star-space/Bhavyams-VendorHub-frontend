@@ -439,6 +439,29 @@ const ShopProfile = () => {
         );
     };
 
+    // 🟢 INITIATE SECURE CHAT (Only for Official Store)
+    const handleInitiateChat = async () => {
+        if (!currentUser) {
+            toast.info("Please login to message this shop!");
+            return navigate('/welcome');
+        }
+
+        if (currentUser.can_message === false) {
+            toast.error("⚠️ Your messaging privileges have been suspended by Admin.");
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${getBackendUrl()}/chats/initiate/${id}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            navigate(`/chat/${res.data.conversation_id}`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to start chat.");
+        }
+    };
+
     // 🟢 FIXED: Proper Loading State and Error Fallback (Prevents White Screen)
     if (loading) return (
         <div style={{...styles.page, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
@@ -463,7 +486,6 @@ const ShopProfile = () => {
         shopData?.email === 'pavanvenkat63@gmail.com'
     );
     
-    // 🟢 FIXED: Only hide follow button if they actually own it OR if they are admin viewing the official store.
     const hideFollowButton = isOwner || (isMasterAdmin && isOfficialApp);
 
     const dbShopType = shopData.shop_type || 'Products'; 
@@ -607,17 +629,28 @@ const ShopProfile = () => {
                     </div>
                 )}
 
-                {/* 🟢 FIXED: HIDE FOLLOW BUTTON USING STRICT LOGIC */}
-                {!hideFollowButton && (
-                    <div style={styles.actionButtonsRow}>
-                        <button style={{...isFollowing ? styles.followingBtn : styles.primaryActionBtn, flex: 1, background: isFollowing ? '#f1f5f9' : (isOfficialApp ? 'linear-gradient(135deg, #facc15, #d97706)' : '#2874f0')}} onClick={handleFollowToggle}>
-                            {isFollowing ? <Check size={18} color="#0f172a" /> : <Users size={18} color="white" />} 
-                            <span style={{color: isFollowing ? '#0f172a' : 'white'}}>{isFollowing ? 'Following' : 'Follow Store'}</span>
-                        </button>
+                {/* 🟢 FIXED: ACTION BUTTONS (Message Button ONLY for Official Store) */}
+                {!isOwner && (
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '20px', width: '100%' }}>
                         
-                        {isFollowing && (
+                        {!hideFollowButton && (
+                            <button style={{...isFollowing ? styles.followingBtn : styles.primaryActionBtn, flex: 1, background: isFollowing ? '#f1f5f9' : (isOfficialApp ? 'linear-gradient(135deg, #facc15, #d97706)' : '#2874f0')}} onClick={handleFollowToggle}>
+                                {isFollowing ? <Check size={18} color="#0f172a" /> : <Users size={18} color="white" />} 
+                                <span style={{color: isFollowing ? '#0f172a' : 'white'}}>{isFollowing ? 'Following' : 'Follow Store'}</span>
+                            </button>
+                        )}
+                        
+                        {/* 🟢 SHOW MESSAGE BUTTON ONLY IF IT IS THE OFFICIAL SUBHAMS HUB STORE */}
+                        {isOfficialApp && (
+                            <button onClick={handleInitiateChat} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', background: '#16a34a', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', flex: 1, boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
+                                <MessageCircle size={18} color="white" />
+                                Contact Subhams Hub
+                            </button>
+                        )}
+
+                        {!hideFollowButton && isFollowing && (
                             <div style={{ position: 'relative' }}>
-                                <button style={styles.secondaryActionBtn} onClick={() => setNotifMenuOpen(!notifMenuOpen)}>
+                                <button style={{...styles.secondaryActionBtn, padding: '12px 15px'}} onClick={() => setNotifMenuOpen(!notifMenuOpen)}>
                                     {notifLevel === 'All' && <BellRing size={18} color={isOfficialApp ? "#d97706" : "#2563eb"} />}
                                     {notifLevel === 'Silent' && <Bell size={18} color="#f59e0b" />}
                                     {notifLevel === 'Off' && <BellOff size={18} color="#94a3b8" />}

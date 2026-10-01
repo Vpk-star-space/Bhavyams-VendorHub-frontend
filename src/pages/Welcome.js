@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import { Search, MapPin, X, Loader } from 'lucide-react'; 
-
+import { subscribeUserToPush } from '../utils/pushHelper';
 const getBackendUrl = () => {
     return process.env.NODE_ENV === 'production' 
         ? 'https://bhavyams-vendorhub-backend.onrender.com/api' 
@@ -59,6 +59,7 @@ const Welcome = () => {
 
             // Check if phone is valid and not the default filler
             if (user.phone && user.phone.length === 10 && user.phone !== "0000000000") {
+                subscribeUserToPush(); // 👈 ADD THIS HERE
                 navigate('/'); 
             } else {
                 setName(user.username || '');
@@ -183,6 +184,7 @@ const Welcome = () => {
             userObj.address = finalAddress;
             userObj.language = language;
             localStorage.setItem('user', JSON.stringify(userObj));
+            await subscribeUserToPush();
             
             window.location.href = '/'; 
 

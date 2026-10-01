@@ -25,7 +25,7 @@ import ItemDetail from './pages/ItemDetail';
 import UserOrders from './pages/UserOrders';
 import VendorOrders from './pages/VendorOrders';
 import Expo from './pages/Expo';
-
+import Chat from './pages/Chat';
 // 🟢 ULTRA-PREMIUM MAINTENANCE MODE TOGGLE
 // Set to 'true' to block the app and show the upgrade screen. Set to 'false' to open the app.
 const isMaintenanceMode = false; 
@@ -386,6 +386,7 @@ function App() {
                                 <Route path="/my-orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
                                 <Route path="/vendor/orders" element={<ProtectedRoute><VendorOrders /></ProtectedRoute>} />
                                 <Route element={<Expo />} path="/expo" />
+                               <Route path="/chat/:conversationId" element={<Chat />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </div>

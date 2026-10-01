@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client'; 
 import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus, MessageSquare, Lock, Edit, UserX, Unlock, Clock, Ban, Search, Users, Store, User } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 // 🟢 CLOUDINARY OPTIMIZER: Stops browser tracker blocks!
 const getOptimizedImage = (url) => {
@@ -32,7 +33,7 @@ const AdminDashboard = () => {
     const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
     const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://bhavyams-vendorhub-backend.onrender.com';
 
-    // 🟢 FIX: Local socket variable prevents React 18 from crashing WebSockets
+    // 🟢 Live Sync WebSockets
     useEffect(() => {
         const localSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
         localSocket.on('connect', () => console.log('🟢 Admin Live Sync Connected'));
@@ -102,7 +103,7 @@ const AdminDashboard = () => {
 
             await axios.put(`${BACKEND_URL}/shops/${shop.id}`, formData, { headers: { 'Authorization': `Bearer ${token}` } });
             fetchVendors(); 
-        } catch (err) { alert("Failed to toggle section."); }
+        } catch (err) { toast.error("Failed to toggle section."); }
     };
 
     const handleAdminEdit = async (vendor) => {
@@ -119,9 +120,9 @@ const AdminDashboard = () => {
             formData.append('shop_type', vendor.shop_type); 
 
             await axios.put(`${BACKEND_URL}/shops/${vendor.id}`, formData, { headers: { 'Authorization': `Bearer ${token}` } });
-            alert(`✅ ${newBusinessName} updated!`);
+            toast.success(`✅ ${newBusinessName} updated!`);
             fetchVendors(); 
-        } catch (err) { alert("Failed to edit."); }
+        } catch (err) { toast.error("Failed to edit."); }
     };
 
     const handleAction = async (id, businessName, actionType) => {
@@ -141,7 +142,7 @@ const AdminDashboard = () => {
             else if (actionType === 'delete') await axios.delete(`${BACKEND_URL}/admin/delete-vendor/${id}`, { headers: { Authorization: `Bearer ${token}` } });
             else if (actionType === 'request_changes') await axios.put(`${BACKEND_URL}/admin/request-changes/${id}`, { reason }, { headers: { Authorization: `Bearer ${token}` } });
             fetchVendors();
-        } catch (err) { alert(`Failed to execute ${actionType}.`); }
+        } catch (err) { toast.error(`Failed to execute ${actionType}.`); }
     };
 
     const fileToBase64 = (file) => new Promise((resolve, reject) => {
@@ -153,15 +154,15 @@ const AdminDashboard = () => {
 
     const handleCreateCategory = async (e) => {
         e.preventDefault();
-        if (!newCatName || !newCatImage) return alert("Please provide a name and upload an HD photo.");
+        if (!newCatName || !newCatImage) return toast.error("Please provide a name and upload an HD photo.");
         try {
             const token = localStorage.getItem('token');
             const base64Image = await fileToBase64(newCatImage);
             await axios.post(`${BACKEND_URL}/admin/categories`, { name: newCatName, section: newCatSection, hd_image: base64Image }, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } });
-            alert(`✅ Added ${newCatName}!`);
+            toast.success(`✅ Added ${newCatName}!`);
             setNewCatName(''); setNewCatImage(null);
             fetchCategories(); 
-        } catch (err) { alert("Failed to upload category."); }
+        } catch (err) { toast.error("Failed to upload category."); }
     };
 
     const handleDeleteCategory = async (id, name) => {
@@ -170,15 +171,51 @@ const AdminDashboard = () => {
             const token = localStorage.getItem('token');
             await axios.delete(`${BACKEND_URL}/admin/categories/${id}`, { headers: { Authorization: `Bearer ${token}` }});
             fetchCategories();
-        } catch (err) { alert("Failed to delete category."); }
+        } catch (err) { toast.error("Failed to delete category."); }
     };
 
+    // 🟢 VIOLATION ENGINE: GRANULAR FEATURE TOGGLE
+    const toggleUserFeature = async (user, featureKey) => {
+        const currentValue = user[featureKey] !== false; // Defaults to true if null
+        const newValue = !currentValue;
+        const featureName = featureKey.replace('can_', '').toUpperCase();
+        
+        let reason = `Admin ${newValue ? 'enabled' : 'disabled'} ${featureName}`;
+        if (!newValue) {
+            reason = window.prompt(`Why are you DISABLING ${featureName} for ${user.username}?`);
+            if (!reason) return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const features = {
+                can_message: user.can_message !== false,
+                can_call: user.can_call !== false,
+                can_book: user.can_book !== false,
+                [featureKey]: newValue
+            };
+            
+            await axios.put(`${BACKEND_URL}/admin/user-security/${user.id}`, { 
+                action: 'toggle_features', 
+                reason: reason, 
+                features 
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            
+            toast.success(`✅ ${featureName} is now ${newValue ? 'ON' : 'OFF'} for ${user.username}`);
+            fetchAllUsers();
+        } catch (err) { toast.error("Failed to toggle feature."); }
+    };
+
+    // 🟢 SECURITY ENGINE CORE
     const handleUserSecurity = async (userId, username, action) => {
         let reason = '';
         let minutes = 0;
 
         if (action === 'warn') {
             reason = window.prompt(`⚠️ SEND WARNING TO ${username}:\nType the message that will scroll on their home screen:`);
+            if (!reason) return;
+        } else if (action === 'add_strike') {
+            reason = window.prompt(`⚠️ ISSUE STRIKE TO ${username}:\nThey will be permanently banned at 3 strikes.\nReason for strike:`);
             if (!reason) return;
         } else if (action === 'temp_block') {
             reason = window.prompt(`⏳ TEMP BLOCK ${username}:\nReason for block:`);
@@ -195,7 +232,7 @@ const AdminDashboard = () => {
             if (!reason) return;
             if (!window.confirm(`Are you absolutely sure you want to PERMANENTLY BAN ${username}? They will never be able to access the app again.`)) return;
         } else if (action === 'unblock') {
-            if (!window.confirm(`Remove all restrictions from ${username} and make them Active?`)) return;
+            if (!window.confirm(`Remove all restrictions, strikes, and bans from ${username}?`)) return;
         } else if (action === 'delete') {
             if (!window.confirm(`🚨 CRITICAL WARNING 🚨\nAre you sure you want to PERMANENTLY WIPE ${username} and ALL their data (shop, cart, products) from the database?`)) return;
         }
@@ -204,13 +241,13 @@ const AdminDashboard = () => {
             const token = localStorage.getItem('token');
             if (action === 'delete') {
                 await axios.delete(`${BACKEND_URL}/admin/delete-user/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
-                alert(`🗑️ User ${username} completely deleted.`);
+                toast.success(`🗑️️ User ${username} completely deleted.`);
             } else {
-                await axios.put(`${BACKEND_URL}/admin/user-security/${userId}`, { action, reason, minutes }, { headers: { Authorization: `Bearer ${token}` } });
-                alert(`✅ Applied ${action} to ${username}.`);
+                const res = await axios.put(`${BACKEND_URL}/admin/user-security/${userId}`, { action, reason, minutes }, { headers: { Authorization: `Bearer ${token}` } });
+                toast.success(`✅ ${res.data.message}`);
             }
             fetchAllUsers(); fetchVendors(); 
-        } catch (err) { alert("Failed to update security status."); }
+        } catch (err) { toast.error("Failed to update security status."); }
     };
 
     const formatIST = (dateString) => {
@@ -300,19 +337,24 @@ const AdminDashboard = () => {
                     <button style={activeTab === 'pending' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('pending')}>⏳ Pending</button>
                     <button style={activeTab === 'active' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('active')}>✅ Active Shops</button>
                     <button style={activeTab === 'categories' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('categories')}>📂 Folders</button>
-                    <button style={activeTab === 'security' ? {...styles.activeTab, background: '#ef4444'} : styles.inactiveTab} onClick={() => setActiveTab('security')}>🛡️ Security</button>
+                    <button style={activeTab === 'security' ? {...styles.activeTab, background: '#ef4444'} : styles.inactiveTab} onClick={() => setActiveTab('security')}>🛡️️ Security</button>
                 </div>
 
                 {activeTab === 'security' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{...styles.card, background: '#fef2f2', border: '1px solid #ef4444'}}>
                             <h2 style={{marginTop: 0, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px'}}><AlertTriangle /> Global Security Center</h2>
-                            <p style={{color: '#991b1b', fontSize: '13px', margin: 0}}>Manage all accounts. <b>Temp Blocks</b> auto-expire via IST. <b>Perma Ban</b> locks them forever. <b>Wipe</b> deletes their data.</p>
+                            <p style={{color: '#991b1b', fontSize: '13px', margin: 0}}>Manage all accounts. Toggle features individually or issue Strikes. 3 Strikes = Auto Ban.</p>
                         </div>
 
-                        {filteredUsers.length === 0 ? <div style={styles.emptyBox}>No users found.</div> : filteredUsers.map(u => (
+                        {filteredUsers.length === 0 ? <div style={styles.emptyBox}>No users found.</div> : filteredUsers.map(u => {
+                            const chatOn = u.can_message !== false;
+                            const callOn = u.can_call !== false;
+                            const bookOn = u.can_book !== false;
+                            
+                            return (
                             <div key={u.id} style={{...styles.card, display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px', padding: '15px', borderLeft: u.account_status !== 'active' ? '5px solid #dc2626' : '1px solid #e2e8f0'}}>
-                                <div>
+                                <div style={{width: '100%'}}>
                                     <h4 style={{ margin: '0 0 5px 0', fontSize: '16px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         {u.username} <span style={{fontSize: '10px', background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase'}}>{u.role}</span>
                                     </h4>
@@ -327,14 +369,31 @@ const AdminDashboard = () => {
                                         )}
                                     </div>
                                     {u.ban_reason && <p style={{margin: '8px 0 0 0', fontSize: '12px', color: '#b91c1c', fontWeight: 'bold'}}>⚠️ Msg: {u.ban_reason}</p>}
+
+                                    {/* 🟢 GRANULAR FEATURE TOGGLES & STRIKE BADGE */}
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                                        <div onClick={() => toggleUserFeature(u, 'can_message')} style={{ cursor: 'pointer', padding: '4px 8px', background: chatOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: chatOn ? '#166534' : '#991b1b', border: `1px solid ${chatOn ? '#bbf7d0' : '#fecaca'}` }}>
+                                            💬 Chat: {chatOn ? 'ON' : 'OFF'}
+                                        </div>
+                                        <div onClick={() => toggleUserFeature(u, 'can_call')} style={{ cursor: 'pointer', padding: '4px 8px', background: callOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: callOn ? '#166534' : '#991b1b', border: `1px solid ${callOn ? '#bbf7d0' : '#fecaca'}` }}>
+                                            📞 Call: {callOn ? 'ON' : 'OFF'}
+                                        </div>
+                                        <div onClick={() => toggleUserFeature(u, 'can_book')} style={{ cursor: 'pointer', padding: '4px 8px', background: bookOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: bookOn ? '#166534' : '#991b1b', border: `1px solid ${bookOn ? '#bbf7d0' : '#fecaca'}` }}>
+                                            📅 Book: {bookOn ? 'ON' : 'OFF'}
+                                        </div>
+                                        <div style={{ padding: '4px 8px', background: u.strikes >= 2 ? '#fef08a' : '#f1f5f9', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: u.strikes >= 2 ? '#a16207' : '#475569', border: '1px solid #cbd5e1' }}>
+                                            ⚠️ Strikes: {u.strikes || 0}/3
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto'}}>
+                                <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', alignContent: 'flex-start'}}>
                                     {u.account_status !== 'active' ? (
-                                        <button onClick={() => handleUserSecurity(u.id, u.username, 'unblock')} style={{...styles.approveBtn, flex: isMobile ? 1 : 'auto', background: '#16a34a'}}><Unlock size={14}/> Unblock</button>
+                                        <button onClick={() => handleUserSecurity(u.id, u.username, 'unblock')} style={{...styles.approveBtn, flex: isMobile ? 1 : 'auto', background: '#16a34a'}}><Unlock size={14}/> Unblock All</button>
                                     ) : (
                                         <>
                                             <button onClick={() => handleUserSecurity(u.id, u.username, 'warn')} style={{...styles.suspendBtn, flex: isMobile ? 1 : 'auto'}}><AlertTriangle size={14}/> Warn</button>
+                                            <button onClick={() => handleUserSecurity(u.id, u.username, 'add_strike')} style={{...styles.suspendBtn, background: '#d97706', flex: isMobile ? 1 : 'auto'}}><AlertTriangle size={14}/> Strike</button>
                                             <button onClick={() => handleUserSecurity(u.id, u.username, 'temp_block')} style={{...styles.suspendBtn, background: '#ea580c', flex: isMobile ? 1 : 'auto'}}><Clock size={14}/> Block Time</button>
                                         </>
                                     )}
@@ -344,7 +403,7 @@ const AdminDashboard = () => {
                                     <button onClick={() => handleUserSecurity(u.id, u.username, 'delete')} style={{...styles.deleteBtn, flex: isMobile ? 1 : 'auto', background: '#0f172a'}}><UserX size={14}/> Wipe DB</button>
                                 </div>
                             </div>
-                        ))}
+                        )})}
                     </div>
                 ) : activeTab === 'categories' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -519,7 +578,7 @@ const styles = {
     tabContainer: { display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '5px' },
     activeTab: { flex: 1, minWidth: '100px', padding: '12px', background: '#2874f0', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', fontSize: '12px' },
     inactiveTab: { flex: 1, minWidth: '100px', padding: '12px', background: '#e2e8f0', color: '#475569', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '12px' },
-    card: { background: 'white', borderRadius: '16px', border: '1px solid #e2e8f0' },
+    card: { background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' },
     emptyBox: { textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b', fontWeight: 'bold' },
     vendorBoxDesktop: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column' },
     vendorBoxMobile: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '15px', display: 'flex', flexDirection: 'column' },
@@ -530,7 +589,9 @@ const styles = {
     approveBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#16a34a', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
     requestBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#8b5cf6', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
     suspendBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f59e0b', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
-    deleteBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#dc2626', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }
+    deleteBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#dc2626', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
+    catLabel: { fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '4px', display: 'block' },
+    catInput: { padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', width: '100%', boxSizing: 'border-box', background: '#f8fafc', outline: 'none' }
 };
 
 export default AdminDashboard;
