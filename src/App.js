@@ -30,7 +30,7 @@ import GlobalAlert from './components/GlobalAlert';
 import IncomingCallScreen from './pages/IncomingCallScreen';
 // 🟢 ULTRA-PREMIUM MAINTENANCE MODE TOGGLE
 // Set to 'true' to block the app and show the upgrade screen. Set to 'false' to open the app.
-const isMaintenanceMode = false; 
+const isMaintenanceMode = true; 
 
 function ScrollToTop() {
     const { pathname } = useLocation();
@@ -270,7 +270,7 @@ function App() {
                         <div style={{ textAlign: 'right', flex: 1 }}>
                             <div style={{...maintenanceStyles.timeLabel, color: '#d97706'}}>Target Live Time</div>
                             <div style={{...maintenanceStyles.timeSubLabel, color: '#f59e0b'}}>ప్రారంభ సమయం</div>
-                            <div style={maintenanceStyles.timeValueTarget}>01-10-26 10:00 AM</div>
+                            <div style={maintenanceStyles.timeValueTarget}>Update Available Soon</div>
                         </div>
                     </div>
 
