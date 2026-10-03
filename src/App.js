@@ -282,14 +282,36 @@ function App() {
                     {/* 🟢 CROSS-PROMOTION LINKS */}
                     <div style={maintenanceStyles.linksBox}>
                         <p style={maintenanceStyles.linksTitle}>Explore our other platforms <br/> <span style={{fontSize: '10px', color: '#64748b'}}>మా ఇతర ప్లాట్‌ఫారమ్‌లను అన్వేషించండి:</span></p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <a href="https://subhams-hub-git-main-pavan-kumars-projects-cc3bb0eb.vercel.app/" target="_blank" rel="noreferrer" style={{...maintenanceStyles.appLink, background: '#2563eb'}}>
-                                🌐 Subhams Networks <span>&rarr;</span>
-                            </a>
-                            <a href="#" target="_blank" rel="noreferrer" style={{...maintenanceStyles.appLink, background: '#0f172a'}}>
-                                🛍️ Bhavyams Core <span>&rarr;</span>
-                            </a>
-                        </div>
+                        <
+<div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <a
+        href="https://agent.subhamsnetworks.in"
+        target="_blank"
+        rel="noreferrer"
+        style={{ ...maintenanceStyles.appLink, background: '#2563eb' }}
+    >
+        🔐 Subhams Secure Agent <span>&rarr;</span>
+    </a>
+
+    <a
+        href="https://pmms.subhamsnetworks.in"
+        target="_blank"
+        rel="noreferrer"
+        style={{ ...maintenanceStyles.appLink, background: '#0f766e' }}
+    >
+        💰 Subhams Smart Finance <span>&rarr;</span>
+    </a>
+
+    <a
+        href="https://subhamsnetworks.in"
+        target="_blank"
+        rel="noreferrer"
+        style={{ ...maintenanceStyles.appLink, background: '#16a34a' }}
+    >
+        🌐 Subhams Networks <span>&rarr;</span>
+    </a>
+</div>
+
                     </div>
 
                 </div>
