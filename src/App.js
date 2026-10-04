@@ -283,34 +283,52 @@ function App() {
                     <div style={maintenanceStyles.linksBox}>
                         <p style={maintenanceStyles.linksTitle}>Explore our other platforms <br/> <span style={{fontSize: '10px', color: '#64748b'}}>మా ఇతర ప్లాట్‌ఫారమ్‌లను అన్వేషించండి:</span></p>
                         
+
 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    {/* Saffron */}
     <a
         href="https://agent.subhamsnetworks.in"
         target="_blank"
         rel="noreferrer"
-        style={{ ...maintenanceStyles.appLink, background: '#2563eb' }}
+        style={{
+            ...maintenanceStyles.appLink,
+            background: '#FF9933',
+            color: '#172033'
+        }}
     >
         🔐 Subhams Secure Agent <span>&rarr;</span>
     </a>
 
+    {/* White */}
     <a
         href="https://pmms.subhamsnetworks.in"
         target="_blank"
         rel="noreferrer"
-        style={{ ...maintenanceStyles.appLink, background: '#0f766e' }}
+        style={{
+            ...maintenanceStyles.appLink,
+            background: '#FFFFFF',
+            color: '#172033',
+            border: '2px solid #138808'
+        }}
     >
         💰 Subhams Smart Finance <span>&rarr;</span>
     </a>
 
+    {/* India Green */}
     <a
         href="https://subhamsnetworks.in"
         target="_blank"
         rel="noreferrer"
-        style={{ ...maintenanceStyles.appLink, background: '#16a34a' }}
+        style={{
+            ...maintenanceStyles.appLink,
+            background: '#138808',
+            color: '#FFFFFF'
+        }}
     >
         🌐 Subhams Networks <span>&rarr;</span>
     </a>
 </div>
+
 
                     </div>
 
