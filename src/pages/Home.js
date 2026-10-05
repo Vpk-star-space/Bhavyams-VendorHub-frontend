@@ -1,23 +1,14 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, Grid, BellRing } from 'lucide-react'; 
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, Grid } from 'lucide-react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify'; 
 import ProductCard from '../components/ProductCard';
 import { AppContext } from '../context/AppContext'; 
-import PromotionsSection from '../components/PromotionsSection'; 
 
 const getBackendUrl = () => {
-    // 🟢 TOGGLE SWITCH: Set to true for Laptop testing, false for Live Render Server
-    const USE_LOCAL_TESTING = false; 
-    
-   if (USE_LOCAL_TESTING) {
-    return 'http://localhost:5000/api';
-}
-
-    return process.env.NODE_ENV === 'production' || window.Capacitor?.isNativePlatform()
-        ? 'https://bhavyams-vendorhub-backend.onrender.com/api' 
-        : 'http://localhost:5000/api';
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    return isLocal ? 'http://localhost:5000/api' : 'https://bhavyams-vendorhub-backend.onrender.com/api';
 };
 
 const getOptimizedImage = (url) => {
@@ -372,58 +363,6 @@ const Home = () => {
                     </div>
                     
                     <div style={{display: 'flex', gap: '8px'}}>
-                        
-{/* 🟢 INSTANT SUBHAMS HUB BANNER TEST BUTTON */}
-{typeof window !== 'undefined' && window.Capacitor?.isNativePlatform() && (
-    <button 
-        onClick={async () => {
-            const { PushNotifications } = require('@capacitor/push-notifications');
-            try {
-                // 1. ADD THE LISTENER FIRST (Turn on the radio before the song plays)
-                const myListener = await PushNotifications.addListener('registration', async (token) => {
-                    // Remove listener instantly so it doesn't double-fire if you click twice
-                    myListener.remove(); 
-                    
-                    // 2. Alert you to close the app
-                    alert("✅ Network Connected! Press OK, then IMMEDIATELY press your phone's Home Button to minimize the app.");
-                    
-                    // 3. Wait 5 seconds while the app is in the background, then shoot the backend!
-                    setTimeout(async () => {
-                        try {
-                            await axios.post(`${getBackendUrl()}/notifications/test-trigger-alert`, {
-                                fcmToken: token.value
-                            });
-                        } catch (err) {
-                            console.error("Test failed", err);
-                        }
-                    }, 5000);
-                });
-
-                // 4. NOW ASK FOR THE TOKEN (This will trigger the listener above)
-                let permStatus = await PushNotifications.checkPermissions();
-                if (permStatus.receive === 'prompt') {
-                    permStatus = await PushNotifications.requestPermissions();
-                }
-                await PushNotifications.register();
-
-            } catch (e) {
-                console.error(e);
-                toast.error("Test failed.");
-            }
-        }} 
-        style={{...styles.adminBtn, background: '#ef4444', color: 'white'}}
-    >
-        🔔 Test Pavan
-    </button>
-)}
-{window.Capacitor?.isNativePlatform() && (
-  <button style={{...styles.adminBtn, background:'#16a34a', color:'white'}}
-    onClick={() => require('@capacitor/core').registerPlugin('TruecallerBanner')
-      .showBanner({ title:'Ravi Kumar', body:'📞 Incoming order call...', roomId:'test-123', callerName:'Ravi Kumar', type:'voice_call' })
-      .catch(e => toast.error(String(e.message || e)))}>
-    🪟 Test Popup
-  </button>
-)}
                         {isAdmin ? (
                             <button onClick={() => navigate('/admin')} style={styles.adminBtn}>
                                 <ShieldCheck size={18} /> {isMobile ? "" : ht.admin}
@@ -435,7 +374,6 @@ const Home = () => {
                         ) : null}
                     </div>
                 </div>
-                
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 15px 12px 15px', background: '#2874f0', width: '100%', boxSizing: 'border-box' }}>
                     <div className="touch-scale" style={styles.locationPill} onClick={() => setShowLocModal(true)}>
@@ -505,10 +443,11 @@ const Home = () => {
                 </div>
             </div>
 
+            {/* 🟢 SUBHAMS HUB SECURITY WARNING BANNER */}
             {localUser?.account_status === 'warned' && (
                 <div style={{ background: '#fef2f2', borderBottom: '2px solid #ef4444', padding: '10px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'sticky', top: '150px', zIndex: 99, overflow: 'hidden' }}>
-                    <div className="warning-text">
-                        ⚠️ OFFICIAL WARNING: {localUser.ban_reason || 'Please adhere to our community guidelines.'}
+                    <div className="warning-text" style={{ fontSize: '13px', fontWeight: 'bold', color: '#b91c1c', textAlign: 'center', padding: '0 15px' }}>
+                        🛡️ SUBHAMS HUB SECURITY WARNING: {localUser.ban_reason || 'Please adhere to our community guidelines.'}
                     </div>
                 </div>
             )}
@@ -576,144 +515,159 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
+                                {/* ========================================== */}
+                                {/* 🔥 TRENDING TAB (CATEGORIES[1])            */}
+                                {/* ========================================== */}
                                 {selectedCategory === CATEGORIES[1] && (
-                                    <div style={styles.sectionBlock}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '0 5px' }}>
-                                            <h2 style={{ fontSize: '16px', margin: 0, color: '#0f172a', fontWeight: '900' }}>📍 {ht.localArea}</h2>
-                                        </div>
-                                        
-                                        {!customLocation && !localUser?.address ? (
-                                            <div className="touch-scale" style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe', margin: '0 5px' }} onClick={() => setShowLocModal(true)}>
-                                                <MapPin size={16} color="#2563eb"/> Set Location to discover nearby shops!
+                                    <>
+                                        <div style={styles.sectionBlock}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '0 5px' }}>
+                                                <h2 style={{ fontSize: '16px', margin: 0, color: '#0f172a', fontWeight: '900' }}>📍 {ht.localArea}</h2>
                                             </div>
-                                        ) : nearbyShops.length > 0 ? (
-                                            <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '15px', overflowX: 'auto', paddingBottom: '5px', paddingLeft: '5px', paddingRight: '5px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
-                                                {nearbyShops.map(shop => (
-                                                    <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '70px', flexShrink: 0, cursor: 'pointer' }}>
-                                                        <div style={{ filter: 'drop-shadow(0 4px 6px rgba(40, 116, 240, 0.3))', marginBottom: '8px' }}>
-                                                            <div style={{ position: 'relative', width: '64px', height: '64px', margin: '0 auto' }}>
-                                                                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #2874f0, #facc15, #f59e0b)', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)' }}></div>
-                                                                <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: '3px', left: '3px', width: '58px', height: '58px', objectFit: 'cover', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)', background: 'white' }} />
-                                                            </div>
-                                                        </div>
-                                                        <div className="scroll-container">
-                                                            <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                                {shop.business_name}
-                                                                {shop.is_verified && <ShieldCheck size={10} color="#10b981" />}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p style={{fontSize: '12px', color: '#64748b', margin: '0 5px', padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No shops matched in {activeLocationName} yet.</p>
-                                        )}
-                                    </div>
-                                )}
-
-                                {selectedCategory === CATEGORIES[1] && (
-                                    <div style={styles.sectionBlock}>
-                                        <h2 style={styles.sectionTitle}>{ht.explore}</h2>
-                                        <div style={styles.upiGrid}>
-                                            <div 
-                                                onClick={() => {
-                                                    if (officialHubShop) navigate(`/shop/${officialHubShop.id}`);
-                                                    else navigate('/shop/1');
-                                                }} 
-                                                className="touch-scale" 
-                                                style={styles.miniAppItem}
-                                            >
-                                                <div style={{...styles.miniAppIconBox, background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', color: '#d97706', border: '1.5px solid #fde68a'}}>
-                                                    🏬
+                                            
+                                            {!customLocation && !localUser?.address ? (
+                                                <div className="touch-scale" style={{ padding: '12px 15px', background: '#eff6ff', borderRadius: '10px', color: '#1e3a8a', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: '1px solid #bfdbfe', margin: '0 5px' }} onClick={() => setShowLocModal(true)}>
+                                                    <MapPin size={16} color="#2563eb"/> Set Location to discover nearby shops!
                                                 </div>
-                                                <span style={styles.miniAppText}>{ht.officialShop}</span>
-                                            </div>
-
-                                            {CATEGORIES.filter(c => c !== CATEGORIES[1]).map(cat => {
-                                                const { icon, bg, color } = getCatIcon(cat);
-                                                return (
-                                                    <div key={cat} onClick={() => handleCategoryClick(cat)} className="touch-scale" style={styles.miniAppItem}>
-                                                        <div style={{...styles.miniAppIconBox, background: bg, color: color, border: '1px solid #e2e8f0'}}>
-                                                            {icon}
-                                                        </div>
-                                                        <span style={styles.miniAppText}>{cat}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {selectedCategory === CATEGORIES[1] && (
-                                    <div style={styles.sectionBlock}>
-                                        <h2 style={{...styles.sectionTitle, display: 'flex', alignItems: 'center', gap: '6px'}}>
-                                            <Grid size={16} color="#2563eb" /> {ht.usefulApps}
-                                        </h2>
-                                        <div style={styles.upiGrid}>
-                                            <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
-                                                <div style={{...styles.miniAppIconBox, background: '#eff6ff', color: '#2563eb'}}>💰</div>
-                                                <span style={styles.miniAppText}>{ht.pmms}</span>
-                                            </div>
-
-                                            <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
-                                                <div style={{...styles.miniAppIconBox, background: '#fef3c7', color: '#d97706'}}>🖨️</div>
-                                                <span style={styles.miniAppText}>{ht.agent}</span>
-                                            </div>
-
-                                            <div onClick={() => window.open('https://subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
-                                                <div style={{...styles.miniAppIconBox, background: '#fce7f3', color: '#db2777'}}>🌐</div>
-                                                <span style={styles.miniAppText}>{ht.network}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {selectedCategory === CATEGORIES[1] && (
-                                    <div style={{padding: '0 10px'}}>
-                                        <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
-                                            {ht.topTrending}
-                                        </h2>
-                                        
-                                        <div style={isMobile ? styles.mobileGrid3 : styles.desktopProductGrid}>
-                                            {activeShops
-                                                .filter(shop => (shop.shop_type || 'Products').includes('Trending'))
-                                                .map(shop => (
-                                                    <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
-                                                        <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
-                                                            {shop.is_online ? ht.open : ht.closed}
-                                                        </span>
-
-                                                        {shop.shop_logo ? (
-                                                            <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={isMobile ? styles.shopImageMobile : styles.shopImageDesktop} />
-                                                        ) : (
-                                                            <div style={{...(isMobile ? styles.shopImageMobile : styles.shopImageDesktop), background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                                                                <Store size={isMobile ? 20 : 30} color="#cbd5e1"/>
+                                            ) : nearbyShops.length > 0 ? (
+                                                <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '15px', overflowX: 'auto', paddingBottom: '5px', paddingLeft: '5px', paddingRight: '5px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
+                                                    {nearbyShops.map(shop => (
+                                                        <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '70px', flexShrink: 0, cursor: 'pointer' }}>
+                                                            <div style={{ filter: 'drop-shadow(0 4px 6px rgba(40, 116, 240, 0.3))', marginBottom: '8px' }}>
+                                                                <div style={{ position: 'relative', width: '64px', height: '64px', margin: '0 auto' }}>
+                                                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #2874f0, #facc15, #f59e0b)', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)' }}></div>
+                                                                    <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: '3px', left: '3px', width: '58px', height: '58px', objectFit: 'cover', clipPath: 'polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)', background: 'white' }} />
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                        
-                                                        <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
-                                                            <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                                {shop.business_name}
-                                                                {shop.is_verified && <ShieldCheck size={12} color="#10b981" />}
-                                                            </h4>
+                                                            <div className="scroll-container">
+                                                                <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '10px', fontWeight: '900', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                    {shop.business_name}
+                                                                    {shop.is_verified && <ShieldCheck size={10} color="#10b981" />}
+                                                                </span>
+                                                            </div>
                                                         </div>
-
-                                                        <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                                            {tc(shop.category)}
-                                                        </p>
-                                                        
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: isMobile ? '8px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                            <MapPin size={isMobile ? 10 : 14} color="#ef4444" /> {getDistanceTag(shop)}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p style={{fontSize: '12px', color: '#64748b', margin: '0 5px', padding: '10px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1'}}>No shops matched in {activeLocationName} yet.</p>
+                                            )}
                                         </div>
-                                    </div>
+
+                                        <div style={styles.sectionBlock}>
+                                            <h2 style={styles.sectionTitle}>{ht.explore}</h2>
+                                            <div style={styles.upiGrid}>
+                                                <div 
+                                                    onClick={() => {
+                                                        if (officialHubShop) navigate(`/shop/${officialHubShop.id}`);
+                                                        else navigate('/shop/1');
+                                                    }} 
+                                                    className="touch-scale" 
+                                                    style={styles.miniAppItem}
+                                                >
+                                                    <div style={{...styles.miniAppIconBox, background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', color: '#d97706', border: '1.5px solid #fde68a'}}>
+                                                        🏬
+                                                    </div>
+                                                    <span style={styles.miniAppText}>{ht.officialShop}</span>
+                                                </div>
+
+                                                <div onClick={() => localUser ? navigate('/my-orders') : requireLogin('view your orders')} className="touch-scale" style={styles.miniAppItem}>
+                                                    <div style={{...styles.miniAppIconBox, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0'}}>
+                                                        <Package size={24} />
+                                                    </div>
+                                                    <span style={styles.miniAppText}>{ht.orders}</span>
+                                                </div>
+
+                                                <div onClick={() => localUser ? navigate('/profile') : requireLogin('view your profile')} className="touch-scale" style={styles.miniAppItem}>
+                                                    <div style={{...styles.miniAppIconBox, background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1'}}>
+                                                        <User size={24} />
+                                                    </div>
+                                                    <span style={styles.miniAppText}>{ht.profile}</span>
+                                                </div>
+
+                                                {CATEGORIES.filter(c => c !== CATEGORIES[1]).map(cat => {
+                                                    const { icon, bg, color } = getCatIcon(cat);
+                                                    return (
+                                                        <div key={cat} onClick={() => handleCategoryClick(cat)} className="touch-scale" style={styles.miniAppItem}>
+                                                            <div style={{...styles.miniAppIconBox, background: bg, color: color, border: '1px solid #e2e8f0'}}>
+                                                                {icon}
+                                                            </div>
+                                                            <span style={styles.miniAppText}>{cat}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div style={styles.sectionBlock}>
+                                            <h2 style={{...styles.sectionTitle, display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                                <Grid size={16} color="#2563eb" /> {ht.usefulApps}
+                                            </h2>
+                                            <div style={styles.upiGrid}>
+                                                <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                    <div style={{...styles.miniAppIconBox, background: '#eff6ff', color: '#2563eb'}}>💰</div>
+                                                    <span style={styles.miniAppText}>{ht.pmms}</span>
+                                                </div>
+
+                                                <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                    <div style={{...styles.miniAppIconBox, background: '#fef3c7', color: '#d97706'}}>🖨️</div>
+                                                    <span style={styles.miniAppText}>{ht.agent}</span>
+                                                </div>
+
+                                                <div onClick={() => window.open('https://subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                    <div style={{...styles.miniAppIconBox, background: '#fce7f3', color: '#db2777'}}>🌐</div>
+                                                    <span style={styles.miniAppText}>{ht.network}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{padding: '0 10px'}}>
+                                            <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
+                                                {ht.topTrending}
+                                            </h2>
+                                            
+                                            <div style={isMobile ? styles.mobileGrid3 : styles.desktopProductGrid}>
+                                                {activeShops
+                                                    .filter(shop => (shop.shop_type || 'Products').includes('Trending'))
+                                                    .map(shop => (
+                                                        <div key={shop.id} className="touch-scale" onClick={() => navigate(`/shop/${shop.id}`)} style={isMobile ? styles.shopCardMobile : styles.shopCardDesktop}>
+                                                            <span style={{ position: 'absolute', top: '6px', right: '6px', background: shop.is_online ? '#dcfce7' : '#fef2f2', color: shop.is_online ? '#16a34a' : '#dc2626', fontSize: '8px', padding: '2px 5px', borderRadius: '6px', fontWeight: 'bold', zIndex: 5 }}>
+                                                                {shop.is_online ? ht.open : ht.closed}
+                                                            </span>
+
+                                                            {shop.shop_logo ? (
+                                                                <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={isMobile ? styles.shopImageMobile : styles.shopImageDesktop} />
+                                                            ) : (
+                                                                <div style={{...(isMobile ? styles.shopImageMobile : styles.shopImageDesktop), background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                                                    <Store size={isMobile ? 20 : 30} color="#cbd5e1"/>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            <div className="scroll-container" style={{ margin: '0 0 2px 0' }}>
+                                                                <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '11px' : '16px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                    {shop.business_name}
+                                                                    {shop.is_verified && <ShieldCheck size={12} color="#10b981" />}
+                                                                </h4>
+                                                            </div>
+
+                                                            <p style={{ margin: '0 0 4px 0', color: '#2874f0', fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                                {tc(shop.category)}
+                                                            </p>
+                                                            
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: isMobile ? '8px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                <MapPin size={isMobile ? 10 : 14} color="#ef4444" /> {getDistanceTag(shop)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    </>
                                 )}
 
+                                {/* ========================================== */}
+                                {/* 🌟 EXPO TAB (CATEGORIES[0])                */}
+                                {/* ========================================== */}
                                 {selectedCategory === CATEGORIES[0] && (
                                     <>
-                                        <PromotionsSection />
                                         <div style={{padding: '0 10px'}}>
                                             <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
                                                 {ht.subhamsExpo}
@@ -760,6 +714,9 @@ const Home = () => {
                                     </>
                                 )}
 
+                                {/* ========================================== */}
+                                {/* 🛍️ SHOPPING & 🧑‍🔧 SERVICES TABS          */}
+                                {/* ========================================== */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div style={{padding: '0 10px'}}>
                                         {!selectedSubCategory ? (

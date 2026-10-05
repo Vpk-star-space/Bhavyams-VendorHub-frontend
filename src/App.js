@@ -3,10 +3,9 @@ import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'r
 import { ToastContainer } from 'react-toastify';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import axios from 'axios';
-import { io } from 'socket.io-client'; 
 import 'react-toastify/dist/ReactToastify.css';
 
-import { AppProvider } from './context/AppContext'; 
+import { AppProvider, socket } from './context/AppContext'; 
 import { CartProvider } from './context/CartContext'; 
 
 import Home from './pages/Home'; 
@@ -14,7 +13,6 @@ import Welcome from './pages/Welcome';
 import AdminDashboard from './pages/AdminDashboard';
 import BusinessRegistration from './pages/BusinessRegistration';
 import VendorDashboard from './pages/VendorDashboard';
-
 import AddProduct from './pages/AddProduct';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProductDetails from './pages/ProductDetails';
@@ -27,15 +25,10 @@ import VendorOrders from './pages/VendorOrders';
 import Expo from './pages/Expo';
 import Chat from './pages/Chat';
 import GlobalAlert from './components/GlobalAlert';
-import IncomingCallScreen from './pages/IncomingCallScreen';
 
-// 🟢 Import native push initialization
-import { initNativePush } from './utils/nativePush';
-import { registerPlugin } from '@capacitor/core';
-const TruecallerBanner = registerPlugin('TruecallerBanner');
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const API_BASE_URL = isLocal ? 'http://localhost:5000/api' : 'https://bhavyams-vendorhub-backend.onrender.com/api';
 
-// 🟢 ULTRA-PREMIUM MAINTENANCE MODE TOGGLE
-// Set to 'true' to block the app and show the upgrade screen. Set to 'false' to open the app.
 const isMaintenanceMode = false; 
 
 function ScrollToTop() {
@@ -49,11 +42,10 @@ const AdminRoute = ({ children }) => {
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
     const isAdmin = (user.role && user.role.toLowerCase() === 'admin') || user.email === 'pavanvenkat63@gmail.com';
     return isAdmin ? children : <Navigate to="/" replace />;
-};
+}
 
 const PremiumLoader = ({ onComplete }) => {
     const [fadeOut, setFadeOut] = useState(false);
-
     useEffect(() => {
         const timer = setTimeout(() => {
             setFadeOut(true);
@@ -97,30 +89,7 @@ function App() {
         const str = localStorage.getItem('user');
         return str && str !== 'undefined' ? JSON.parse(str) : null;
     });
-// 🟢 INITIALIZE NATIVE PUSH & TRUECALLER CHANNEL REGARDLESS OF LOGIN
-useEffect(() => {
-    initNativePush(currentUser?.id);
-    
-    if (window.Capacitor?.isNativePlatform()) {
-        import('./utils/nativePush').then(({ initTruecallerNotificationChannel }) => {
-            initTruecallerNotificationChannel();
-        });
 
-        import('@capacitor/push-notifications').then(({ PushNotifications }) => {
-            // This handles when they click the banner!
-            PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-                const data = notification.notification.data;
-                if (data && data.roomId) {
-                    window.location.href = `/incoming-call?callerName=${encodeURIComponent(data.callerName || 'Subhams Hub')}&roomId=${data.roomId}&type=${data.type}`;
-                } else {
-                    window.location.href = '/';
-                }
-            });
-        });
-    }
-}, [currentUser?.id]);
-
-    // 🟢 TICKING CLOCK FOR MAINTENANCE MODE
     useEffect(() => {
         if (isMaintenanceMode) {
             const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -133,8 +102,7 @@ useEffect(() => {
             const token = localStorage.getItem('token');
             if (token && currentUser?.id) {
                 try {
-                   const BACKEND_URL = 'http://10.240.70.206:5000/api';
-                    const res = await axios.get(`${BACKEND_URL}/admin/my-security-status`, {
+                    const res = await axios.get(`${API_BASE_URL}/admin/my-security-status`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     
@@ -147,26 +115,16 @@ useEffect(() => {
                     
                     setCurrentUser(updatedUser);
                     localStorage.setItem('user', JSON.stringify(updatedUser));
-                } catch (err) { 
-                    if (err.response && err.response.status !== 401) {
-                        console.error("Silent sync failed", err); 
-                    }
-                }
+                } catch (err) {}
             }
         };
         syncStatus();
     }, []); 
 
- useEffect(() => {
+    useEffect(() => {
         if (!currentUser) return;
         
-const BACKEND_URL = 'http://localhost:5000/api';
-      const SOCKET_URL = 'http://localhost:5000';
-        
-        const localSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-
-
-        localSocket.on('force_logout', (data) => {
+        socket.on('force_logout', (data) => {
             if (String(data.userId) === String(currentUser.id)) {
                 const updatedUser = { ...currentUser };
                 
@@ -195,15 +153,55 @@ const BACKEND_URL = 'http://localhost:5000/api';
         });
 
         return () => {
-            setTimeout(() => {
-                if (localSocket) localSocket.disconnect();
-            }, 500);
+            socket.off('force_logout');
         };
-    }, [currentUser?.id]);
+    }, [currentUser]);
+
+    // 🟢 ZERO-LAG TIMER 
+    useEffect(() => {
+        if (currentUser?.account_status === 'temp_block' && currentUser?.ban_until) {
+            
+            const runTimer = () => {
+                let dateStr = String(currentUser.ban_until);
+                if (!dateStr.endsWith('Z') && !dateStr.includes('+')) dateStr += 'Z'; 
+                
+                const unblockTime = new Date(dateStr).getTime();
+                const now = Date.now();
+                const diff = unblockTime - now;
+
+                if (isNaN(unblockTime)) {
+                    setTimeLeft('Admin Lock Active');
+                    return;
+                }
+
+                if (diff <= 0) {
+                    setTimeLeft('Unblocking...');
+                    const activeUser = { ...currentUser, account_status: 'active', ban_reason: null, ban_until: null };
+                    setCurrentUser(activeUser);
+                    localStorage.setItem('user', JSON.stringify(activeUser));
+                    
+                    axios.get(`${API_BASE_URL}/admin/my-security-status`, { 
+                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+                    }).finally(() => {
+                        window.location.reload(); 
+                    });
+                } else {
+                    const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const s = Math.floor((diff % (1000 * 60)) / 1000);
+                    setTimeLeft(`${h > 0 ? h + 'h ' : ''}${m}m ${s}s`);
+                }
+            };
+
+            runTimer(); // Runs instantly so "Calculating..." is never shown
+            const interval = setInterval(runTimer, 1000);
+            return () => clearInterval(interval);
+        }
+    }, [currentUser]); 
 
     useEffect(() => {
         let isMounted = true;
-        axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/auth/google-client-id').catch(() => {});
+        axios.get(`${API_BASE_URL}/auth/google-client-id`).catch(() => {});
 
         const handleBeforeInstallPrompt = (e) => {
             e.preventDefault(); 
@@ -217,39 +215,6 @@ const BACKEND_URL = 'http://localhost:5000/api';
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         };
     }, []); 
-
-    useEffect(() => {
-        if (currentUser?.account_status === 'temp_block' && currentUser?.ban_until) {
-            const interval = setInterval(() => {
-                const now = new Date().getTime();
-                const unblockTime = new Date(currentUser.ban_until).getTime();
-                const diff = unblockTime - now;
-
-                if (diff <= 0) {
-                    setTimeLeft('Unblocking...');
-                    clearInterval(interval);
-                    
-                    const activeUser = { ...currentUser, account_status: 'active', ban_reason: null, ban_until: null };
-                    setCurrentUser(activeUser);
-                    localStorage.setItem('user', JSON.stringify(activeUser));
-                    
-                    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
-                    axios.get(`${BACKEND_URL}/admin/my-security-status`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).catch(()=>{});
-                } else {
-                    const d = Math.floor(diff / (1000 * 60 * 60 * 24));
-                    const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                    const s = Math.floor((diff % (1000 * 60)) / 1000);
-                    let timeString = '';
-                    if (d > 0) timeString += `${d}d `;
-                    if (h > 0) timeString += `${h}h `;
-                    timeString += `${m}m ${s}s`;
-                    setTimeLeft(timeString);
-                }
-            }, 1000);
-            return () => clearInterval(interval);
-        }
-    }, [currentUser]);
 
     const handleAppReady = useCallback(() => { setIsAppReady(true); }, []);
 
@@ -308,56 +273,18 @@ const BACKEND_URL = 'http://localhost:5000/api';
 
                     <div style={maintenanceStyles.linksBox}>
                         <p style={maintenanceStyles.linksTitle}>Explore our other platforms <br/> <span style={{fontSize: '10px', color: '#64748b'}}>మా ఇతర ప్లాట్‌ఫారమ్‌లను అన్వేషించండి:</span></p>
-                        
-
-<div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-    {/* Saffron */}
-    <a
-        href="https://agent.subhamsnetworks.in"
-        target="_blank"
-        rel="noreferrer"
-        style={{
-            ...maintenanceStyles.appLink,
-            background: '#FF9933',
-            color: '#172033'
-        }}
-    >
-        🔐 Subhams Secure Agent <span>&rarr;</span>
-    </a>
-
-    {/* White */}
-    <a
-        href="https://pmms.subhamsnetworks.in"
-        target="_blank"
-        rel="noreferrer"
-        style={{
-            ...maintenanceStyles.appLink,
-            background: '#FFFFFF',
-            color: '#172033',
-            border: '2px solid #138808'
-        }}
-    >
-        💰 Subhams Smart Finance <span>&rarr;</span>
-    </a>
-
-    {/* India Green */}
-    <a
-        href="https://subhamsnetworks.in"
-        target="_blank"
-        rel="noreferrer"
-        style={{
-            ...maintenanceStyles.appLink,
-            background: '#138808',
-            color: '#FFFFFF'
-        }}
-    >
-        🌐 Subhams Networks <span>&rarr;</span>
-    </a>
-</div>
-
-
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <a href="https://agent.subhamsnetworks.in" target="_blank" rel="noreferrer" style={{ ...maintenanceStyles.appLink, background: '#FF9933', color: '#172033' }}>
+                                🔐 Subhams Secure Agent <span>&rarr;</span>
+                            </a>
+                            <a href="https://pmms.subhamsnetworks.in" target="_blank" rel="noreferrer" style={{ ...maintenanceStyles.appLink, background: '#FFFFFF', color: '#172033', border: '2px solid #138808' }}>
+                                💰 Subhams Smart Finance <span>&rarr;</span>
+                            </a>
+                            <a href="https://subhamsnetworks.in" target="_blank" rel="noreferrer" style={{ ...maintenanceStyles.appLink, background: '#138808', color: '#FFFFFF' }}>
+                                🌐 Subhams Networks <span>&rarr;</span>
+                            </a>
+                        </div>
                     </div>
-
                 </div>
             </div>
         );
@@ -372,6 +299,10 @@ const BACKEND_URL = 'http://localhost:5000/api';
             return (
                 <div style={lockStyles.page}>
                     <div style={{...lockStyles.card, border: '2px solid #ea580c'}}>
+                        <div style={{...lockStyles.brandHeader, background: 'linear-gradient(135deg, #fef3c7, #fefce8)'}}>
+                            <h2 style={{margin: '0', fontSize: '18px', color: '#b45309', fontWeight: '900', letterSpacing: '1px'}}>SUBHAMS HUB</h2>
+                            <p style={{margin: '2px 0 0 0', fontSize: '10px', color: '#d97706', fontWeight: '700', textTransform: 'uppercase'}}>Security & Privacy Network</p>
+                        </div>
                         <h1 style={{ color: '#ea580c', ...lockStyles.title }}>⏳ Temporarily Blocked</h1>
                         <p style={lockStyles.subtitle}>Your access is paused due to a violation.</p>
                         <div style={{...lockStyles.reasonBox, background: '#ffedd5'}}>
@@ -381,7 +312,7 @@ const BACKEND_URL = 'http://localhost:5000/api';
                         <div style={{...lockStyles.reasonBox, background: '#f1f5f9', marginTop: '10px'}}>
                             <p style={{...lockStyles.reasonTitle, color: '#334155'}}>Time Remaining:</p>
                             <p style={{ margin: 0, fontSize: '28px', color: '#0f172a', fontWeight: '900', letterSpacing: '2px', textAlign: 'center' }}>
-                                {timeLeft || 'Calculating...'}
+                                {timeLeft}
                             </p>
                         </div>
                         <p style={lockStyles.infoText}>The app will automatically unlock when the timer reaches zero.</p>
@@ -394,6 +325,10 @@ const BACKEND_URL = 'http://localhost:5000/api';
             return (
                 <div style={{...lockStyles.page, background: '#fef2f2'}}>
                     <div style={{...lockStyles.card, border: '2px solid #dc2626'}}>
+                        <div style={{...lockStyles.brandHeader, background: '#7f1d1d'}}>
+                            <h2 style={{margin: '0', fontSize: '18px', color: '#ffffff', fontWeight: '900', letterSpacing: '1px'}}>SUBHAMS HUB</h2>
+                            <p style={{margin: '2px 0 0 0', fontSize: '10px', color: '#fca5a5', fontWeight: '700', textTransform: 'uppercase'}}>Security & Privacy Network</p>
+                        </div>
                         <h1 style={{ color: '#dc2626', ...lockStyles.title }}>⛔ Permanently Banned</h1>
                         <p style={lockStyles.subtitle}>This account has been permanently disabled due to severe violations.</p>
                         <div style={{...lockStyles.reasonBox, background: '#fee2e2'}}>
@@ -437,13 +372,11 @@ const BACKEND_URL = 'http://localhost:5000/api';
                            
                             <GlobalAlert />
                             <Routes>
-                                {/* 🟢 FULLY UNLOCKED FOR PUBLIC & AI */}
                                 <Route path="/" element={<Home />} />
                                 <Route path="/shop/:id" element={<ShopProfile />} />
                                 <Route path="/product/:id" element={<ProductDetails />} /> 
                                 <Route path="/item/:itemId" element={<ItemDetail />} />
 
-                                {/* 🔒 PROTECTED CORE FEATURES */}
                                 <Route path="/welcome" element={<Welcome />} />
                                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                                 <Route path="/dashboard" element={<ProtectedRoute><VendorDashboard /></ProtectedRoute>} />
@@ -455,9 +388,7 @@ const BACKEND_URL = 'http://localhost:5000/api';
                                 <Route path="/my-orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
                                 <Route path="/vendor/orders" element={<ProtectedRoute><VendorOrders /></ProtectedRoute>} />
                                 <Route element={<Expo />} path="/expo" />
-                               <Route path="/chat/:conversationId" element={<Chat />} />
-                               <Route path="/incoming-call" element={<IncomingCallScreen />} />
-                               
+                                <Route path="/chat/:conversationId" element={<Chat />} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </div>
@@ -468,7 +399,6 @@ const BACKEND_URL = 'http://localhost:5000/api';
     );
 }
 
-// 🟢 STYLES FOR BILINGUAL MAINTENANCE MODE
 const maintenanceStyles = {
     page: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0f172a', padding: '20px', fontFamily: 'Inter, sans-serif' },
     card: { background: 'white', padding: '30px 20px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)', width: '100%', maxWidth: '420px', textAlign: 'center', boxSizing: 'border-box' },
@@ -476,18 +406,15 @@ const maintenanceStyles = {
     title: { margin: 0, fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '1px' },
     hubBadge: { fontSize: '11px', background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', padding: '4px 8px', borderRadius: '6px', fontWeight: '900', letterSpacing: '2px' },
     subtitle: { color: '#2563eb', fontSize: '18px', fontWeight: '800', margin: '0 0 20px 0', lineHeight: '1.4' },
-    
     timeGrid: { display: 'flex', justifyContent: 'space-between', background: '#f8fafc', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #e2e8f0' },
     timeLabel: { fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' },
     timeSubLabel: { fontSize: '9px', color: '#94a3b8', marginBottom: '4px' },
     timeValueCurrent: { fontSize: '12px', fontWeight: '800', color: '#0f172a', whiteSpace: 'nowrap' },
     timeValueTarget: { fontSize: '12px', fontWeight: '900', color: '#b45309', whiteSpace: 'nowrap' },
     timeDivider: { width: '1px', background: '#cbd5e1', margin: '0 15px' },
-
     statusBox: { background: '#fef3c7', border: '1px solid #fde68a', padding: '10px 15px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '20px' },
     pulseIndicator: { width: '10px', height: '10px', background: '#f59e0b', borderRadius: '50%', animation: 'pulse-glow 2s infinite', flexShrink: 0 },
     statusText: { color: '#b45309', fontSize: '13px', fontWeight: '700', textAlign: 'left', lineHeight: '1.3' },
-
     linksBox: { marginTop: '10px', textAlign: 'left', background: '#eff6ff', padding: '15px', borderRadius: '12px', border: '1px solid #bfdbfe' },
     linksTitle: { margin: '0 0 10px 0', fontSize: '12px', fontWeight: '800', color: '#1e3a8a' },
     appLink: { color: 'white', padding: '10px 15px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }
@@ -495,19 +422,20 @@ const maintenanceStyles = {
 
 const lockStyles = {
     page: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8fafc', padding: '20px', fontFamily: 'Inter, sans-serif' },
-    card: { background: 'white', padding: '30px 20px', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px', textAlign: 'center', boxSizing: 'border-box' },
-    title: { margin: '0 0 10px 0', fontSize: '22px', fontWeight: '900' },
-    subtitle: { color: '#475569', fontSize: '14px', margin: '0 0 20px 0', lineHeight: '1.5' },
-    reasonBox: { padding: '15px', borderRadius: '12px', textAlign: 'left' },
+    card: { background: 'white', padding: '0px 0px 30px 0px', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px', textAlign: 'center', boxSizing: 'border-box', overflow: 'hidden' },
+    brandHeader: { padding: '15px', marginBottom: '20px', borderBottom: '1px solid rgba(0,0,0,0.05)' },
+    title: { margin: '0 0 10px 0', fontSize: '22px', fontWeight: '900', padding: '0 20px' },
+    subtitle: { color: '#475569', fontSize: '14px', margin: '0 0 20px 0', lineHeight: '1.5', padding: '0 20px' },
+    reasonBox: { padding: '15px', borderRadius: '12px', textAlign: 'left', margin: '0 20px' },
     reasonTitle: { margin: '0 0 5px 0', fontSize: '12px', fontWeight: '900', textTransform: 'uppercase' },
     reasonText: { margin: 0, fontSize: '14px', fontWeight: '600' },
-    infoText: { fontSize: '13px', color: '#64748b', marginTop: '20px', fontWeight: '500' }
+    infoText: { fontSize: '13px', color: '#64748b', marginTop: '20px', fontWeight: '500', padding: '0 20px' }
 };
 
 const sStyles = {
     wrapper: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh', backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, fontFamily: "'Inter', sans-serif", transition: 'opacity 0.5s ease-in-out' },
     container: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '30px', borderRadius: '24px', background: 'rgba(30, 41, 59, 0.5)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.1)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', width: '280px' },
-    iconBox: { width: '75px', height: '75px', borderRadius: '50%', background: 'linear-gradient(135deg, #2563eb, #1e40af)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px', boxShadow: '0 10px 20px rgba(37, 99, 235, 0.3)' },
+    iconBox: { width: '75px', height: '75px', borderRadius: '50%', background: 'linear-gradient(135deg, #2563eb, #1e40af)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto', boxShadow: '0 10px 20px rgba(37, 99, 235, 0.3)' },
     brandName: { fontSize: '28px', color: '#ffffff', fontWeight: '900', margin: 0, letterSpacing: '1px' },
     hubBadge: { fontSize: '13px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', padding: '3px 8px', borderRadius: '6px', fontWeight: '900', letterSpacing: '2px' },
     statusText: { color: '#94a3b8', fontSize: '13px', fontWeight: '500', marginTop: '10px', marginBottom: '20px' },

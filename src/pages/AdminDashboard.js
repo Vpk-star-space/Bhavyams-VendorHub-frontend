@@ -5,7 +5,6 @@ import { io } from 'socket.io-client';
 import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus, MessageSquare, Lock, Edit, UserX, Unlock, Clock, Ban, Search, Users, Store, User } from 'lucide-react';
 import { toast } from 'react-toastify';
 
-// 🟢 CLOUDINARY OPTIMIZER: Stops browser tracker blocks!
 const getOptimizedImage = (url) => {
     if (!url) return null;
     if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
@@ -30,22 +29,23 @@ const AdminDashboard = () => {
     const [newCatSection, setNewCatSection] = useState('Products');
     const [newCatImage, setNewCatImage] = useState(null);
 
-    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
-    const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://bhavyams-vendorhub-backend.onrender.com';
+    // 🟢 DYNAMIC SYNC: Ensures admin connects to the same backend as the rest of the app
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const BACKEND_URL = isLocal ? 'http://localhost:5000/api' : 'https://bhavyams-vendorhub-backend.onrender.com/api';
+    const SOCKET_URL = isLocal ? 'http://localhost:5000' : 'https://bhavyams-vendorhub-backend.onrender.com';
 
-    // 🟢 Live Sync WebSockets
     useEffect(() => {
         const localSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
-        localSocket.on('connect', () => console.log('🟢 Admin Live Sync Connected'));
+        localSocket.on('connect', () => console.log('🟢 Admin Socket Live Sync Connected'));
         
         localSocket.on('admin_refresh', () => {
-            fetchVendors(); fetchCategories(); fetchAllUsers(); 
+            fetchVendors(); 
+            fetchCategories(); 
+            fetchAllUsers(); 
         });
 
         return () => {
-            if (localSocket.connected) {
-                localSocket.disconnect();
-            }
+            if (localSocket.connected) localSocket.disconnect();
         };
     }, [SOCKET_URL]);
 
@@ -61,7 +61,11 @@ const AdminDashboard = () => {
             const token = localStorage.getItem('token');
             const res = await axios.get(`${BACKEND_URL}/admin/pending-vendors`, { headers: { Authorization: `Bearer ${token}` } });
             setVendors(res.data || []);
-        } catch (err) { setErrorMsg("Failed to load data."); } finally { setLoading(false); }
+        } catch (err) { 
+            setErrorMsg("Failed to connect to backend server."); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     const fetchCategories = async () => {
@@ -76,7 +80,9 @@ const AdminDashboard = () => {
             const token = localStorage.getItem('token');
             const res = await axios.get(`${BACKEND_URL}/admin/all-users`, { headers: { Authorization: `Bearer ${token}` } });
             setAllUsers(res.data || []);
-        } catch (err) { }
+        } catch (err) { 
+            console.error("Failed to load user list:", err.message);
+        }
     };
 
     useEffect(() => { fetchVendors(); fetchCategories(); fetchAllUsers(); }, []);
@@ -174,9 +180,8 @@ const AdminDashboard = () => {
         } catch (err) { toast.error("Failed to delete category."); }
     };
 
-    // 🟢 VIOLATION ENGINE: GRANULAR FEATURE TOGGLE
     const toggleUserFeature = async (user, featureKey) => {
-        const currentValue = user[featureKey] !== false; // Defaults to true if null
+        const currentValue = user[featureKey] !== false; 
         const newValue = !currentValue;
         const featureName = featureKey.replace('can_', '').toUpperCase();
         
@@ -203,13 +208,15 @@ const AdminDashboard = () => {
             
             toast.success(`✅ ${featureName} is now ${newValue ? 'ON' : 'OFF'} for ${user.username}`);
             fetchAllUsers();
-        } catch (err) { toast.error("Failed to toggle feature."); }
+        } catch (err) { 
+            toast.error(err.response?.data?.message || "Failed to toggle feature."); 
+        }
     };
 
-    // 🟢 SECURITY ENGINE CORE
+    // 🟢 SECURITY ACTION HANDLER WITH PROPER ERROR REPORTING
     const handleUserSecurity = async (userId, username, action) => {
         let reason = '';
-        let minutes = 0;
+        let minutes = 30; // Default fallback
 
         if (action === 'warn') {
             reason = window.prompt(`⚠️ SEND WARNING TO ${username}:\nType the message that will scroll on their home screen:`);
@@ -220,34 +227,43 @@ const AdminDashboard = () => {
         } else if (action === 'temp_block') {
             reason = window.prompt(`⏳ TEMP BLOCK ${username}:\nReason for block:`);
             if (!reason) return;
-            const timeInput = window.prompt(`How long? Type number followed by m, h, or d.\nExamples:\n"30m" = 30 minutes\n"5h" = 5 hours\n"2d" = 2 days`);
+            const timeInput = window.prompt(`How long? Enter minutes or use h/d:\nExamples:\n"30" = 30 minutes\n"2h" = 2 hours\n"1d" = 1 day`);
             if (!timeInput) return;
-            const val = parseInt(timeInput);
-            if (isNaN(val)) return alert("Invalid time format.");
+            const val = parseInt(timeInput, 10);
+            if (isNaN(val) || val <= 0) return alert("Please enter a valid positive number.");
             if (timeInput.toLowerCase().includes('d')) minutes = val * 1440;
             else if (timeInput.toLowerCase().includes('h')) minutes = val * 60;
             else minutes = val;
         } else if (action === 'perma_banned') {
             reason = window.prompt(`⛔ PERMA BAN ${username}:\nState the reason for permanent ban:`);
             if (!reason) return;
-            if (!window.confirm(`Are you absolutely sure you want to PERMANENTLY BAN ${username}? They will never be able to access the app again.`)) return;
+            if (!window.confirm(`Are you sure you want to PERMANENTLY BAN ${username}?`)) return;
         } else if (action === 'unblock') {
             if (!window.confirm(`Remove all restrictions, strikes, and bans from ${username}?`)) return;
         } else if (action === 'delete') {
-            if (!window.confirm(`🚨 CRITICAL WARNING 🚨\nAre you sure you want to PERMANENTLY WIPE ${username} and ALL their data (shop, cart, products) from the database?`)) return;
+            if (!window.confirm(`🚨 CRITICAL: Permanently wipe ${username} and all their shop/orders data?`)) return;
         }
 
         try {
             const token = localStorage.getItem('token');
             if (action === 'delete') {
                 await axios.delete(`${BACKEND_URL}/admin/delete-user/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
-                toast.success(`🗑️️ User ${username} completely deleted.`);
+                toast.success(`🗑 User ${username} deleted.`);
             } else {
-                const res = await axios.put(`${BACKEND_URL}/admin/user-security/${userId}`, { action, reason, minutes }, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await axios.put(`${BACKEND_URL}/admin/user-security/${userId}`, { 
+                    action, 
+                    reason, 
+                    minutes 
+                }, { headers: { Authorization: `Bearer ${token}` } });
+                
                 toast.success(`✅ ${res.data.message}`);
             }
-            fetchAllUsers(); fetchVendors(); 
-        } catch (err) { toast.error("Failed to update security status."); }
+            fetchAllUsers(); 
+            fetchVendors(); 
+        } catch (err) { 
+            console.error("Action error:", err);
+            toast.error(err.response?.data?.message || `🚨 Failed to apply ${action}. Backend error.`); 
+        }
     };
 
     const formatIST = (dateString) => {
@@ -337,7 +353,7 @@ const AdminDashboard = () => {
                     <button style={activeTab === 'pending' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('pending')}>⏳ Pending</button>
                     <button style={activeTab === 'active' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('active')}>✅ Active Shops</button>
                     <button style={activeTab === 'categories' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('categories')}>📂 Folders</button>
-                    <button style={activeTab === 'security' ? {...styles.activeTab, background: '#ef4444'} : styles.inactiveTab} onClick={() => setActiveTab('security')}>🛡️️ Security</button>
+                    <button style={activeTab === 'security' ? {...styles.activeTab, background: '#ef4444'} : styles.inactiveTab} onClick={() => setActiveTab('security')}>🛡 Security</button>
                 </div>
 
                 {activeTab === 'security' ? (
@@ -362,7 +378,7 @@ const AdminDashboard = () => {
                                     
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
                                         <span style={{fontSize: '12px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '6px', background: u.account_status === 'active' ? '#dcfce7' : '#fee2e2', color: u.account_status === 'active' ? '#166534' : '#991b1b'}}>
-                                            Status: {u.account_status.replace('_', ' ').toUpperCase()}
+                                            Status: {(u.account_status || 'active').replace('_', ' ').toUpperCase()}
                                         </span>
                                         {u.account_status === 'temp_block' && u.ban_until && (
                                             <span style={{fontSize: '11px', color: '#b45309', display: 'flex', alignItems: 'center', gap: '4px'}}><Clock size={12}/> Unblocks: {formatIST(u.ban_until)}</span>
@@ -370,7 +386,6 @@ const AdminDashboard = () => {
                                     </div>
                                     {u.ban_reason && <p style={{margin: '8px 0 0 0', fontSize: '12px', color: '#b91c1c', fontWeight: 'bold'}}>⚠️ Msg: {u.ban_reason}</p>}
 
-                                    {/* 🟢 GRANULAR FEATURE TOGGLES & STRIKE BADGE */}
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
                                         <div onClick={() => toggleUserFeature(u, 'can_message')} style={{ cursor: 'pointer', padding: '4px 8px', background: chatOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: chatOn ? '#166534' : '#991b1b', border: `1px solid ${chatOn ? '#bbf7d0' : '#fecaca'}` }}>
                                             💬 Chat: {chatOn ? 'ON' : 'OFF'}
@@ -527,7 +542,6 @@ const AdminDashboard = () => {
                                                 </div>
                                             </div>
 
-                                            {/* 🟢 CLOUDINARY OPTIMIZED VAULT IMAGES */}
                                             <div style={styles.docBox}>
                                                 <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
                                                     <Lock size={14}/> Secure Vault (ID Proofs & Evidence)
