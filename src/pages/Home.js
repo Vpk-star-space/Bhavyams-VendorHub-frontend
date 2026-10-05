@@ -9,7 +9,7 @@ import PromotionsSection from '../components/PromotionsSection';
 
 const getBackendUrl = () => {
     // 🟢 TOGGLE SWITCH: Set to true for Laptop testing, false for Live Render Server
-    const USE_LOCAL_TESTING = true; 
+    const USE_LOCAL_TESTING = false; 
     
    if (USE_LOCAL_TESTING) {
     return 'http://localhost:5000/api';
