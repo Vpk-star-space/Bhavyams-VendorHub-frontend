@@ -7,7 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:465013694995:android:187f5049f9e12495cc95e6",
+        "mobilesdk_app_id": "1:465013694995:android:e465d8acf6eedb99cc95e6",
         "android_client_info": {
           "package_name": "com.subhamshub.app"
         }
@@ -20,7 +20,7 @@
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyBc2BbEbae5Jfgqz8V7AaJoFQb3qyEUzmQ"
+          "current_key": "AIzaSyARkfnOYiGgEMb6rZHa3DQJIynULz3PryM"
         }
       ],
       "services": {
