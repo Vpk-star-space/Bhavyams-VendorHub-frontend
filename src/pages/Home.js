@@ -6,10 +6,16 @@ import { toast } from 'react-toastify';
 import ProductCard from '../components/ProductCard';
 import { AppContext } from '../context/AppContext'; 
 import PromotionsSection from '../components/PromotionsSection'; 
-import { subscribeUserToPush } from '../utils/pushHelper'; // 🟢 IMPORT ADDED
 
 const getBackendUrl = () => {
-    return process.env.NODE_ENV === 'production' 
+    // 🟢 TOGGLE SWITCH: Set to true for Laptop testing, false for Live Render Server
+    const USE_LOCAL_TESTING = true; 
+    
+   if (USE_LOCAL_TESTING) {
+    return 'http://localhost:5000/api';
+}
+
+    return process.env.NODE_ENV === 'production' || window.Capacitor?.isNativePlatform()
         ? 'https://bhavyams-vendorhub-backend.onrender.com/api' 
         : 'http://localhost:5000/api';
 };
@@ -22,77 +28,35 @@ const getOptimizedImage = (url) => {
     return url; 
 };
 
-// 🌐 TRANSLATIONS UPDATED
 const homeTranslations = {
     en: { 
-        syncing: "Syncing Market...", 
-        searchFor: "Search shops & items...", 
-        searchResults: "Search Results for", 
-        topTrending: "🔥 Top Trending Shops", 
-        subhamsExpo: "🌟 Subhams Expo", 
-        browse: "Browse", 
-        sellers: "Sellers", 
-        open: "Open", 
-        closed: "Closed", 
-        localArea: "Shops In Your Area", 
-        home: "Home", 
-        dashboard: "Dashboard", 
-        shopOrders: "Shop", 
-        orders: "Orders", 
-        expo: "Expo", 
-        profile: "Profile", 
-        admin: "Admin", 
-        explore: "Explore Subhams Hub",
-        officialShop: "Subhams Store", 
-        usefulApps: "Subhams Ecosystem", 
-        pmms: "Subhams PMMS", 
-        agent: "Subhams Agent", 
-        network: "Subhams Network" 
+        syncing: "Syncing Market...", searchFor: "Search shops & items...", searchResults: "Search Results for", 
+        topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", 
+        sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Shops In Your Area", 
+        home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", 
+        expo: "Expo", profile: "Profile", admin: "Admin", explore: "Explore Subhams Hub",
+        officialShop: "Subhams Store", usefulApps: "Subhams Ecosystem", pmms: "Subhams PMMS", 
+        agent: "Subhams Agent", network: "Subhams Network" 
     },
     te: { 
-        syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", 
-        searchFor: "దుకాణాలు, వస్తువుల కోసం వెతకండి...", 
-        searchResults: "దీని కోసం శోధన ఫలితాలు", 
-        topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", 
-        subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌పో", 
-        browse: "బ్రౌజ్ చేయండి", 
-        sellers: "విక్రేతలు", 
-        open: "తెరిచి ఉంది", 
-        closed: "మూసివేయబడింది", 
-        localArea: "మీ ప్రాంతంలోని షాపులు", 
-        home: "హోమ్", 
-        dashboard: "డాష్‌బోర్డ్", 
-        shopOrders: "షాప్", 
-        orders: "ఆర్డర్‌లు", 
-        expo: "ఎక్స్‌పో", 
-        profile: "ప్రొఫైల్", 
-        admin: "అడ్మిన్", 
-        explore: "సుభమ్స్ హబ్ అన్వేషించండి", 
-        usefulApps: "సుభమ్స్ హబ్ ఎకోసిస్టమ్", 
-        officialShop: "సుభమ్స్ స్టోర్",
-        pmms: "సుభమ్స్ PMMS", 
-        agent: "సుభమ్స్ ఏజెంట్", 
-        network: "సుభమ్స్ నెట్‌‌వర్క్" 
+        syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "దుకాణాలు, వస్తువుల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", 
+        topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌‌పో", browse: "బ్రౌజ్ చేయండి", 
+        sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "మీ ప్రాంతంలోని షాపులు", 
+        home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", 
+        expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్", explore: "సుభమ్స్ హబ్ అన్వేషించండి", 
+        usefulApps: "సుభమ్స్ హబ్ ఎకోసిస్టమ్", officialShop: "సుభమ్స్ స్టోర్", pmms: "సుభమ్స్ PMMS", 
+        agent: "సుభమ్స్ ఏజెంట్", network: "సుభమ్స్ నెట్‌‌వర్క్" 
     }
 };
 
 const categoryTranslations = {
-    'Vegetables': 'కూరగాయలు',
-    'Fruits': 'పండ్లు',
-    'Groceries': 'కిరాణా',
-    'Electronics': 'ఎలక్ట్రానిక్స్',
-    'Clothing': 'బట్టలు',
-    'Food': 'ఆహారం',
-    'Meat': 'మాంసం',
-    'Fish': 'చేపలు',
-    'Services': 'సేవలు'
+    'Vegetables': 'కూరగాయలు', 'Fruits': 'పండ్లు', 'Groceries': 'కిరాణా', 'Electronics': 'ఎలక్ట్రానిక్స్',
+    'Clothing': 'బట్టలు', 'Food': 'ఆహారం', 'Meat': 'మాంసం', 'Fish': 'చేపలు', 'Services': 'సేవలు'
 };
 
 const locationAliases = {
-    'konanki': ['konanki', 'కోణంకి', 'kona'],
-    'martur': ['martur', 'మార్టూరు'],
-    'bapatla': ['bapatla', 'బాపట్ల'],
-    'tirupati': ['tirupati', 'తిరుపతి']
+    'konanki': ['konanki', 'కోణంకి', 'kona'], 'martur': ['martur', 'మార్టూరు'],
+    'bapatla': ['bapatla', 'బాపట్ల'], 'tirupati': ['tirupati', 'తిరుపతి']
 };
 
 const Home = () => {
@@ -140,9 +104,6 @@ const Home = () => {
     const [showLocModal, setShowLocModal] = useState(false);
     const [locSearch, setLocSearch] = useState('');
     const [locResults, setLocResults] = useState([]);
-
-    // 🟢 CHECK PERMISSION STATUS
-    const [pushPermission, setPushPermission] = useState(Notification.permission);
 
     useEffect(() => {
         const checkUser = () => {
@@ -402,7 +363,7 @@ const Home = () => {
             </style>
 
             <div style={styles.headerStack}>
-          <div style={styles.headerTopRow}>
+                <div style={styles.headerTopRow}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
                         <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                             <span className="animated-logo" style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '-0.5px' }}>SUBHAMS</span>
@@ -411,43 +372,58 @@ const Home = () => {
                     </div>
                     
                     <div style={{display: 'flex', gap: '8px'}}>
-                        {/* 🟢 FIXED: VISIBLE TO ADMIN ONLY, HANDLES PERMISSIONS AND TESTS PUSH */}
-                        {isAdmin && (
-                            <>
-                                {pushPermission !== 'granted' ? (
-                                    <button 
-                                        onClick={async () => {
-                                            await subscribeUserToPush();
-                                            setPushPermission(Notification.permission);
-                                        }} 
-                                        style={{...styles.adminBtn, background: '#f59e0b', color: 'white'}}
-                                    >
-                                        <BellRing size={14} /> Enable Popups
-                                    </button>
-                                ) : (
-                                    <button 
-                                        onClick={async () => {
-                                            try {
-                                                const token = localStorage.getItem('token');
-                                                const res = await axios.post(`${getBackendUrl()}/notifications/test`, {}, { headers: { Authorization: `Bearer ${token}` }});
-                                                
-                                                if (res.data.delivered > 0) {
-                                                    toast.success("✅ Push sent! Minimize your app NOW.");
-                                                } else {
-                                                    toast.error("❌ No device registered. Did you click Allow?");
-                                                }
-                                            } catch (e) {
-                                                toast.error("Failed to connect to Push Server.");
-                                            }
-                                        }} 
-                                        style={{...styles.adminBtn, background: '#10b981', color: 'white'}}
-                                    >
-                                        🔔 Test Popup
-                                    </button>
-                                )}
-                            </>
-                        )}
+                        
+{/* 🟢 INSTANT SUBHAMS HUB BANNER TEST BUTTON */}
+{typeof window !== 'undefined' && window.Capacitor?.isNativePlatform() && (
+    <button 
+        onClick={async () => {
+            const { PushNotifications } = require('@capacitor/push-notifications');
+            try {
+                // 1. ADD THE LISTENER FIRST (Turn on the radio before the song plays)
+                const myListener = await PushNotifications.addListener('registration', async (token) => {
+                    // Remove listener instantly so it doesn't double-fire if you click twice
+                    myListener.remove(); 
+                    
+                    // 2. Alert you to close the app
+                    alert("✅ Network Connected! Press OK, then IMMEDIATELY press your phone's Home Button to minimize the app.");
+                    
+                    // 3. Wait 5 seconds while the app is in the background, then shoot the backend!
+                    setTimeout(async () => {
+                        try {
+                            await axios.post(`${getBackendUrl()}/notifications/test-trigger-alert`, {
+                                fcmToken: token.value
+                            });
+                        } catch (err) {
+                            console.error("Test failed", err);
+                        }
+                    }, 5000);
+                });
 
+                // 4. NOW ASK FOR THE TOKEN (This will trigger the listener above)
+                let permStatus = await PushNotifications.checkPermissions();
+                if (permStatus.receive === 'prompt') {
+                    permStatus = await PushNotifications.requestPermissions();
+                }
+                await PushNotifications.register();
+
+            } catch (e) {
+                console.error(e);
+                toast.error("Test failed.");
+            }
+        }} 
+        style={{...styles.adminBtn, background: '#ef4444', color: 'white'}}
+    >
+        🔔 Test Pavan
+    </button>
+)}
+{window.Capacitor?.isNativePlatform() && (
+  <button style={{...styles.adminBtn, background:'#16a34a', color:'white'}}
+    onClick={() => require('@capacitor/core').registerPlugin('TruecallerBanner')
+      .showBanner({ title:'Ravi Kumar', body:'📞 Incoming order call...', roomId:'test-123', callerName:'Ravi Kumar', type:'voice_call' })
+      .catch(e => toast.error(String(e.message || e)))}>
+    🪟 Test Popup
+  </button>
+)}
                         {isAdmin ? (
                             <button onClick={() => navigate('/admin')} style={styles.adminBtn}>
                                 <ShieldCheck size={18} /> {isMobile ? "" : ht.admin}
@@ -600,7 +576,6 @@ const Home = () => {
                             </div>
                         ) : (
                             <>
-                                {/* 🟢 1. SHOPS IN YOUR AREA */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={styles.sectionBlock}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '0 5px' }}>
@@ -636,12 +611,10 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 🟢 2. EXPLORE SUBHAMS HUB (4-COLUMN GRID, NO SCROLLING / NO SWIPE BUGS) */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={styles.sectionBlock}>
                                         <h2 style={styles.sectionTitle}>{ht.explore}</h2>
                                         <div style={styles.upiGrid}>
-                                            {/* Subhams Official Store Quick Tile */}
                                             <div 
                                                 onClick={() => {
                                                     if (officialHubShop) navigate(`/shop/${officialHubShop.id}`);
@@ -671,7 +644,6 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 🟢 3. SUBHAMS HUB ECOSYSTEM (4-COLUMN GRID) */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={styles.sectionBlock}>
                                         <h2 style={{...styles.sectionTitle, display: 'flex', alignItems: 'center', gap: '6px'}}>
@@ -696,7 +668,6 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* 🟢 4. TRENDING SHOPS GRID */}
                                 {selectedCategory === CATEGORIES[1] && (
                                     <div style={{padding: '0 10px'}}>
                                         <h2 style={{ fontSize: '18px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>
@@ -740,7 +711,6 @@ const Home = () => {
                                     </div>
                                 )}
 
-                                {/* EXPO TAB */}
                                 {selectedCategory === CATEGORIES[0] && (
                                     <>
                                         <PromotionsSection />
@@ -790,7 +760,6 @@ const Home = () => {
                                     </>
                                 )}
 
-                                {/* SHOPPING & SERVICES TABS (Admin Folders) */}
                                 {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
                                     <div style={{padding: '0 10px'}}>
                                         {!selectedSubCategory ? (
@@ -945,7 +914,6 @@ const styles = {
     sectionBlock: { padding: '15px 10px', background: 'white', margin: '0 5px 15px 5px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
     sectionTitle: { fontSize: '15px', marginBottom: '15px', color: '#0f172a', fontWeight: '900', paddingLeft: '5px' },
     
-    // 🟢 NEW 4-COLUMN GRID LAYOUT (Eliminates horizontal scrolling / swipe bugs)
     upiGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: '15px', columnGap: '5px', padding: '5px', justifyItems: 'center' },
 
     miniAppItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', width: '100%' },

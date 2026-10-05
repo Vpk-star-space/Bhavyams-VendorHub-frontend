@@ -28,9 +28,15 @@ import Expo from './pages/Expo';
 import Chat from './pages/Chat';
 import GlobalAlert from './components/GlobalAlert';
 import IncomingCallScreen from './pages/IncomingCallScreen';
+
+// 🟢 Import native push initialization
+import { initNativePush } from './utils/nativePush';
+import { registerPlugin } from '@capacitor/core';
+const TruecallerBanner = registerPlugin('TruecallerBanner');
+
 // 🟢 ULTRA-PREMIUM MAINTENANCE MODE TOGGLE
 // Set to 'true' to block the app and show the upgrade screen. Set to 'false' to open the app.
-const isMaintenanceMode = true; 
+const isMaintenanceMode = false; 
 
 function ScrollToTop() {
     const { pathname } = useLocation();
@@ -85,12 +91,34 @@ function App() {
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [isInstallable, setIsInstallable] = useState(false);
     const [timeLeft, setTimeLeft] = useState(''); 
-    const [currentTime, setCurrentTime] = useState(new Date()); // 🟢 For the live clock
+    const [currentTime, setCurrentTime] = useState(new Date()); 
 
     const [currentUser, setCurrentUser] = useState(() => {
         const str = localStorage.getItem('user');
         return str && str !== 'undefined' ? JSON.parse(str) : null;
     });
+// 🟢 INITIALIZE NATIVE PUSH & TRUECALLER CHANNEL REGARDLESS OF LOGIN
+useEffect(() => {
+    initNativePush(currentUser?.id);
+    
+    if (window.Capacitor?.isNativePlatform()) {
+        import('./utils/nativePush').then(({ initTruecallerNotificationChannel }) => {
+            initTruecallerNotificationChannel();
+        });
+
+        import('@capacitor/push-notifications').then(({ PushNotifications }) => {
+            // This handles when they click the banner!
+            PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+                const data = notification.notification.data;
+                if (data && data.roomId) {
+                    window.location.href = `/incoming-call?callerName=${encodeURIComponent(data.callerName || 'Subhams Hub')}&roomId=${data.roomId}&type=${data.type}`;
+                } else {
+                    window.location.href = '/';
+                }
+            });
+        });
+    }
+}, [currentUser?.id]);
 
     // 🟢 TICKING CLOCK FOR MAINTENANCE MODE
     useEffect(() => {
@@ -105,7 +133,7 @@ function App() {
             const token = localStorage.getItem('token');
             if (token && currentUser?.id) {
                 try {
-                    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
+                   const BACKEND_URL = 'http://10.240.70.206:5000/api';
                     const res = await axios.get(`${BACKEND_URL}/admin/my-security-status`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
@@ -129,12 +157,14 @@ function App() {
         syncStatus();
     }, []); 
 
-    useEffect(() => {
+ useEffect(() => {
         if (!currentUser) return;
-        const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
-        const SOCKET_URL = BACKEND_URL.replace('/api', '');
+        
+const BACKEND_URL = 'http://localhost:5000/api';
+      const SOCKET_URL = 'http://localhost:5000';
         
         const localSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+
 
         localSocket.on('force_logout', (data) => {
             if (String(data.userId) === String(currentUser.id)) {
@@ -230,7 +260,6 @@ function App() {
         if (outcome === 'accepted') { setIsInstallable(false); setDeferredPrompt(null); }
     };
 
-    // 🟢 FORMATS THE CLOCK TO INDIAN STANDARD TIME
     const formatTimeIST = (date) => {
         return date.toLocaleString('en-IN', {
             timeZone: 'Asia/Kolkata',
@@ -239,7 +268,6 @@ function App() {
         }).toUpperCase();
     };
 
-    // 🟢 BILINGUAL MAINTENANCE MODE UI
     if (isMaintenanceMode) {
         return (
             <div style={maintenanceStyles.page}>
@@ -259,7 +287,6 @@ function App() {
                     </div>
                     <h2 style={maintenanceStyles.subtitle}>System Maintenance<br/><span style={{fontSize: '14px', color: '#64748b', fontWeight: '600'}}>సిస్టమ్ నిర్వహణ</span></h2>
 
-                    {/* 🟢 DUAL CLOCK: LIVE vs TARGET */}
                     <div style={maintenanceStyles.timeGrid}>
                         <div style={{ textAlign: 'left', flex: 1 }}>
                             <div style={maintenanceStyles.timeLabel}>Current Time</div>
@@ -279,7 +306,6 @@ function App() {
                         <span style={maintenanceStyles.statusText}>Upgrading System... <br/> <span style={{fontSize: '11px', opacity: 0.8}}>సిస్టమ్ అప్‌గ్రేడ్ అవుతోంది...</span></span>
                     </div>
 
-                    {/* 🟢 CROSS-PROMOTION LINKS */}
                     <div style={maintenanceStyles.linksBox}>
                         <p style={maintenanceStyles.linksTitle}>Explore our other platforms <br/> <span style={{fontSize: '10px', color: '#64748b'}}>మా ఇతర ప్లాట్‌ఫారమ్‌లను అన్వేషించండి:</span></p>
                         
@@ -408,7 +434,8 @@ function App() {
                                     </button>
                                 </div>
                             )}
-<GlobalAlert /> {/* 🟢 Added Here */}
+                           
+                            <GlobalAlert />
                             <Routes>
                                 {/* 🟢 FULLY UNLOCKED FOR PUBLIC & AI */}
                                 <Route path="/" element={<Home />} />
@@ -430,6 +457,7 @@ function App() {
                                 <Route element={<Expo />} path="/expo" />
                                <Route path="/chat/:conversationId" element={<Chat />} />
                                <Route path="/incoming-call" element={<IncomingCallScreen />} />
+                               
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </div>
