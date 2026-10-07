@@ -217,6 +217,17 @@ const Welcome = () => {
                             <button style={styles.langButton} onClick={() => handleLanguageSelect('te')}>తెలుగు</button>
                             <button style={styles.langButton} onClick={() => handleLanguageSelect('en')}>English</button>
                         </div>
+                        <div style={{ textAlign: 'center', marginTop: '15px', fontSize: '12px', color: '#64748b' }}>
+  By continuing, you agree to the Subhams Networks <br/>
+  <a 
+    href="https://subhamsnetworks.in/legal" 
+    target="_blank" 
+    rel="noopener noreferrer" 
+    style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}
+  >
+    Privacy Policy & Terms of Service
+  </a>
+</div>
                     </div>
                 )}
 
