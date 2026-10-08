@@ -19,6 +19,19 @@ const spellCheckMap = {
     "electrician": "Electronics", "repair": "Mobile Repair"
 };
 
+// Error codes from the backend that mean "the problem is on Step 2" (name / phone).
+const STEP2_ERROR_CODES = ['NAME_TAKEN', 'NAME_RESERVED', 'NAME_BLOCKED', 'NAME_TOO_SHORT', 'NAME_TOO_LONG', 'PHONE_INVALID'];
+
+// 🟢 A corrupted 'user' value in localStorage used to crash the whole page (JSON.parse outside try/catch).
+const readStoredUser = () => {
+    try {
+        const raw = localStorage.getItem('user');
+        return raw && raw !== 'undefined' ? JSON.parse(raw) : {};
+    } catch (e) {
+        return {};
+    }
+};
+
 const compressImage = (file) => {
     return new Promise((resolve) => {
         if (!file || !file.type || !file.type.startsWith('image/')) return resolve(file); 
@@ -35,6 +48,9 @@ const compressImage = (file) => {
                 canvas.height = img.height * (scaleSize < 1 ? scaleSize : 1);
 
                 const ctx = canvas.getContext('2d');
+                // JPEG has no transparency: without a white base, transparent PNGs turn black.
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
                 canvas.toBlob((blob) => {
@@ -103,7 +119,10 @@ const translations = {
         
         checkingName: "⏳ Checking availability...",
         nameAvailable: "✅ Name is available!",
-        nameTaken: "❌ Name taken! Click a suggestion below:"
+        nameTaken: "❌ Name taken! Click a suggestion below:",
+        nameReserved: "🚫 This name is reserved for the platform. Please choose a different shop name.",
+        nameBlocked: "🚫 This name contains words that are not allowed. Please change it.",
+        nameTooShort: "⚠️ Shop name must be at least 3 characters."
     },
     te: {
         title: "మీ వ్యాపారాన్ని నమోదు చేయండి",
@@ -157,7 +176,10 @@ const translations = {
         
         checkingName: "⏳ లభ్యతను తనిఖీ చేస్తోంది...",
         nameAvailable: "✅ పేరు అందుబాటులో ఉంది!",
-        nameTaken: "❌ పేరు ఇప్పటికే ఉంది! వీటిని ఎంచుకోండి:"
+        nameTaken: "❌ పేరు ఇప్పటికే ఉంది! వీటిని ఎంచుకోండి:",
+        nameReserved: "🚫 ఈ పేరు ప్లాట్‌ఫామ్ కోసం రిజర్వ్ చేయబడింది. దయచేసి వేరే షాప్ పేరును ఎంచుకోండి.",
+        nameBlocked: "🚫 ఈ పేరులో అనుమతించబడని పదాలు ఉన్నాయి. దయచేసి మార్చండి.",
+        nameTooShort: "⚠️ షాప్ పేరు కనీసం 3 అక్షరాలు ఉండాలి."
     }
 };
 
@@ -167,8 +189,7 @@ const BusinessRegistration = () => {
     const lang = language === 'te' ? 'te' : 'en';
     const t = translations[lang];
 
-    const userStr = localStorage.getItem('user');
-    const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
+    const user = readStoredUser();
 
     const [viewState, setViewState] = useState('loading');
     const [currentStep, setCurrentStep] = useState(1); 
@@ -179,6 +200,7 @@ const BusinessRegistration = () => {
     const [adminMessage, setAdminMessage] = useState(null);
 
     // 🟢 SMART NAME CHECKER STATES
+    // idle | loading | available | taken | reserved | blocked
     const [nameStatus, setNameStatus] = useState('idle'); 
     const [nameSuggestions, setNameSuggestions] = useState([]);
 
@@ -196,7 +218,9 @@ const BusinessRegistration = () => {
 
     const [regForm, setRegForm] = useState({
         name: user.username || '',
-        phone: user.phone || '',
+        // A saved "+91 98765 43210" would stay in state even though the box only shows 10 characters
+        // (maxLength doesn't trim existing values) and then fail the 10-digit check. Keep the last 10 digits.
+        phone: String(user.phone || '').replace(/\D/g, '').slice(-10),
         businessName: '',
         shop_type: 'Products', 
         location: user.address || '',
@@ -224,38 +248,94 @@ const BusinessRegistration = () => {
 
     // 🟢 LIVE SHOP NAME CHECKER
     useEffect(() => {
-        const checkShopName = async () => {
-            if (regForm.businessName.trim().length < 3) {
-                setNameStatus('idle');
-                setNameSuggestions([]);
-                return;
-            }
+        const trimmed = regForm.businessName.trim();
 
-            setNameStatus('loading');
+        if (trimmed.length < 3) {
+            setNameStatus('idle');
+            setNameSuggestions([]);
+            return;
+        }
+
+        // Ignore answers that arrive after the user has already typed something else.
+        let cancelled = false;
+
+        // Flip to "loading" immediately (not after the debounce) so a stale green tick from the
+        // previous name can never be on screen while the new name is unchecked.
+        setNameStatus('loading');
+
+        const timerId = setTimeout(async () => {
             try {
-                const res = await axios.get(`${BACKEND_URL}/check-shop-name?name=${encodeURIComponent(regForm.businessName)}&location=${encodeURIComponent(regForm.location || 'Area')}`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                const res = await axios.get(`${BACKEND_URL}/check-shop-name`, {
+                    params: { name: trimmed, location: regForm.location || 'Area' },
+                    headers: { Authorization: `Bearer ${token}` },
+                    timeout: 8000
                 });
+                if (cancelled) return;
 
                 if (res.data.available) {
                     setNameStatus('available');
+                    setNameSuggestions([]);
+                } else if (res.data.code === 'NAME_RESERVED') {
+                    setNameStatus('reserved');
+                    setNameSuggestions([]);
+                } else if (res.data.code === 'NAME_BLOCKED') {
+                    setNameStatus('blocked');
                     setNameSuggestions([]);
                 } else {
                     setNameStatus('taken');
                     setNameSuggestions(res.data.suggestions || []);
                 }
             } catch (err) {
-                console.error("Name check failed silently", err);
-                setNameStatus('available'); 
+                if (cancelled) return;
+                // IMPORTANT: a failed check must NOT show a green "available" tick (that hid the 404/401/500
+                // problems). Show nothing; the server re-validates on submit anyway.
+                console.error("Name check failed", err);
+                setNameStatus('idle');
+                setNameSuggestions([]);
             }
+        }, 600);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timerId);
         };
-
-        const timerId = setTimeout(() => {
-            checkShopName();
-        }, 600); 
-
-        return () => clearTimeout(timerId);
     }, [regForm.businessName, regForm.location, BACKEND_URL, token]);
+
+
+    // 🟢 DEBOUNCED LOCATION SEARCH (Nominatim)
+    useEffect(() => {
+        if (!showLocModal) return;
+
+        const query = locSearch.trim();
+        if (query.length < 3) {
+            setLocResults([]);
+            setIsSearching(false);
+            return;
+        }
+
+        let cancelled = false;
+        setIsSearching(true);
+
+        const timerId = setTimeout(async () => {
+            try {
+                // `params` URL-encodes the query (the old string-concatenated URL broke on "&", "#", etc.)
+                const res = await axios.get('https://nominatim.openstreetmap.org/search', {
+                    params: { format: 'json', countrycodes: 'in', q: query }
+                });
+                if (!cancelled) setLocResults(res.data);
+            } catch (e) {
+                console.error("Location search failed", e);
+                if (!cancelled) setLocResults([]);
+            } finally {
+                if (!cancelled) setIsSearching(false);
+            }
+        }, 800);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timerId);
+        };
+    }, [locSearch, showLocModal]);
 
 
     // 🟢 FETCH EXISTING SHOP PROFILE
@@ -305,22 +385,6 @@ const BusinessRegistration = () => {
         }
     };
 
-    // 🟢 HANDLE LOCATION SEARCH IN MODAL
-    const handleLocationSearch = async (query) => {
-        setLocSearch(query);
-        if (query.length < 3) return setLocResults([]);
-        
-        setIsSearching(true);
-        try {
-            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`);
-            setLocResults(res.data);
-        } catch (e) {
-            console.error("Location search failed", e);
-        } finally {
-            setIsSearching(false);
-        }
-    };
-
     // 🟢 DYNAMICALLY FILL EITHER SHOP ADDRESS OR DELIVERY AREAS
     const selectCustomLocation = (loc) => {
         if (showLocModal === 'location') {
@@ -337,6 +401,10 @@ const BusinessRegistration = () => {
             }
         }
         
+        closeLocModal();
+    };
+
+    const closeLocModal = () => {
         setShowLocModal(false);
         setLocSearch('');
         setLocResults([]);
@@ -367,22 +435,38 @@ const BusinessRegistration = () => {
         setSelectedCategories(selectedCategories.filter(c => c !== cat));
     };
 
+    // Names that must not be submitted. Computed once so Step 2 and Step 3 use the same rule.
+    const nameBlocked = ['taken', 'reserved', 'blocked'].includes(nameStatus);
+
     const handleNextStep = () => {
         setFormError(null);
         if (currentStep === 1) {
-            if (!regForm.location) {
+            if (!regForm.location.trim()) {
                 return setFormError(t.errFillAll);
             }
         }
         if (currentStep === 2) {
-            if (!regForm.name || !regForm.businessName || selectedCategories.length === 0) {
+            const trimmedName = regForm.businessName.trim();
+            if (!regForm.name.trim() || !trimmedName || selectedCategories.length === 0) {
                 return setFormError(t.errFillAll);
+            }
+            if (trimmedName.length < 3) {
+                return setFormError(t.nameTooShort);
             }
             if (regForm.phone.length !== 10) {
                 return setFormError(t.errPhoneLength);
             }
+            if (nameStatus === 'loading') {
+                return setFormError(t.checkingName);
+            }
             if (nameStatus === 'taken') {
                 return setFormError(t.nameTaken);
+            }
+            if (nameStatus === 'reserved') {
+                return setFormError(t.nameReserved);
+            }
+            if (nameStatus === 'blocked') {
+                return setFormError(t.nameBlocked);
             }
         }
         setCurrentStep(prev => prev + 1);
@@ -399,6 +483,10 @@ const BusinessRegistration = () => {
         e.preventDefault();
         setFormError(null);
 
+        // Pressing Enter inside a text box submits the <form> on ANY step (Step 1 has a single text input).
+        // Only Step 3 may really submit; otherwise treat Enter as "Next".
+        if (currentStep !== 3) return handleNextStep();
+
         if (!isUpdate) {
             if (!idFront || !idBack) return setFormError(t.errMissingIDs);
             if (workMode === 'physical' && !shopPhoto) return setFormError(t.errMissingShopPhoto);
@@ -414,9 +502,9 @@ const BusinessRegistration = () => {
             ]);
 
             const formData = new FormData();
-            formData.append('name', regForm.name);
+            formData.append('name', regForm.name.trim());
             formData.append('phone', regForm.phone);
-            formData.append('businessName', regForm.businessName);
+            formData.append('businessName', regForm.businessName.trim());
             formData.append('products', finalCategories); 
             formData.append('shop_type', regForm.shop_type); 
             formData.append('work_mode', workMode); 
@@ -440,16 +528,41 @@ const BusinessRegistration = () => {
 
             setSuccessModal(true);
         } catch (error) {
-            let errorMsg = error.response?.data?.message || error.message;
-            setFormError(`❌ Server Error: ${errorMsg}`);
-            
-            if (errorMsg.toLowerCase().includes('taken') || errorMsg.toLowerCase().includes('unique')) {
+            const code = error.response?.data?.code;
+            const errorMsg = error.response?.data?.message || error.message || 'Something went wrong.';
+            setFormError(`❌ ${errorMsg}`);
+
+            // Show the matching inline message on Step 2 as well.
+            if (code === 'NAME_RESERVED') setNameStatus('reserved');
+            else if (code === 'NAME_BLOCKED') setNameStatus('blocked');
+            else if (code === 'NAME_TAKEN') setNameStatus('taken');
+
+            // Name / phone problems live on Step 2. Match on the error CODE (the old check searched the
+            // message text for "taken"/"unique", so reserved-name errors left the user stuck on Step 3).
+            if (STEP2_ERROR_CODES.includes(code) || /taken|unique/i.test(errorMsg)) {
                 setCurrentStep(2);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
         } finally {
             setSubmitting(false);
         }
+    };
+
+    // After a successful FIRST submission the application exists, so "Edit Application" must use the
+    // update endpoint. Before this, isUpdate stayed false and editing sent a second POST that the
+    // server rejected with "You already have a shop application".
+    const handleSuccessClose = () => {
+        setSuccessModal(false);
+        setIsUpdate(true);
+        setAdminMessage(null); // server clears status_note when the vendor resubmits
+        // Forget the files that were just uploaded; otherwise the next edit would upload them again.
+        setIdFront(null);
+        setIdBack(null);
+        setShopPhoto(null);
+        setCertificate(null);
+        setCurrentStep(1);
+        setViewState('pending');
+        window.scrollTo(0, 0);
     };
 
     if (viewState === 'loading') {
@@ -611,8 +724,8 @@ const BusinessRegistration = () => {
                                         type="text" 
                                         style={{
                                             ...styles.input, 
-                                            borderColor: nameStatus === 'taken' ? '#ef4444' : nameStatus === 'available' ? '#10b981' : '#cbd5e1',
-                                            boxShadow: nameStatus === 'taken' ? '0 0 0 3px rgba(239, 68, 68, 0.2)' : 'none'
+                                            borderColor: nameBlocked ? '#ef4444' : nameStatus === 'available' ? '#10b981' : '#cbd5e1',
+                                            boxShadow: nameBlocked ? '0 0 0 3px rgba(239, 68, 68, 0.2)' : 'none'
                                         }} 
                                         value={regForm.businessName} 
                                         onChange={e => setRegForm({...regForm, businessName: e.target.value})} 
@@ -620,6 +733,14 @@ const BusinessRegistration = () => {
                                     
                                     {nameStatus === 'loading' && <span style={{fontSize: '12px', color: '#64748b', display:'flex', alignItems: 'center', gap:'5px', marginTop:'4px'}}><Loader size={14} className="spin"/> {t.checkingName}</span>}
                                     {nameStatus === 'available' && <span style={{fontSize: '12px', color: '#10b981', fontWeight: 'bold', display:'flex', alignItems: 'center', gap:'5px', marginTop:'4px'}}><Check size={14}/> {t.nameAvailable}</span>}
+                                    
+                                    {/* 🛡️ Reserved platform names / prohibited words: no suggestions, just a clear message */}
+                                    {(nameStatus === 'reserved' || nameStatus === 'blocked') && (
+                                        <div style={{fontSize: '12px', color: '#ef4444', fontWeight: 'bold', background: '#fef2f2', padding: '10px', borderRadius: '8px', border: '1px solid #fca5a5', marginTop:'4px'}}>
+                                            {nameStatus === 'reserved' ? t.nameReserved : t.nameBlocked}
+                                        </div>
+                                    )}
+
                                     {nameStatus === 'taken' && (
                                         <div style={{fontSize: '12px', color: '#ef4444', fontWeight: 'bold', background: '#fef2f2', padding: '10px', borderRadius: '8px', border: '1px solid #fca5a5', marginTop:'4px'}}>
                                             {t.nameTaken}
@@ -627,10 +748,7 @@ const BusinessRegistration = () => {
                                                 {nameSuggestions.map((sug, i) => (
                                                     <span 
                                                         key={i} 
-                                                        onClick={() => {
-                                                            setRegForm({...regForm, businessName: sug});
-                                                            setNameStatus('available'); 
-                                                        }} 
+                                                        onClick={() => setRegForm({...regForm, businessName: sug})} 
                                                         style={{background: 'white', color: '#b91c1c', padding: '6px 12px', borderRadius: '15px', cursor: 'pointer', border: '1px solid #ef4444', boxShadow: '0 2px 4px rgba(0,0,0,0.05)'}}
                                                     >
                                                         {sug}
@@ -765,7 +883,7 @@ const BusinessRegistration = () => {
                                     <button type="button" onClick={handlePrevStep} style={{...styles.submitFormBtn, flex: 1, background: '#e2e8f0', color: '#475569', boxShadow: 'none'}}>
                                         {t.btnBack}
                                     </button>
-                                    <button type="submit" disabled={submitting || nameStatus === 'taken'} style={{...styles.submitFormBtn, flex: 2, background: nameStatus === 'taken' ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)'}}>
+                                    <button type="submit" disabled={submitting || nameBlocked} style={{...styles.submitFormBtn, flex: 2, background: nameBlocked ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)'}}>
                                         {isUpdate ? t.btnUpdate : t.btnSubmit}
                                     </button>
                                 </div>
@@ -784,7 +902,7 @@ const BusinessRegistration = () => {
                             <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>
                                 {showLocModal === 'location' ? 'Search Shop Location' : 'Search Delivery Area'}
                             </h3>
-                            <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => { setShowLocModal(false); setLocSearch(''); setLocResults([]); }} />
+                            <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={closeLocModal} />
                         </div>
 
                         <div style={{position: 'relative', marginTop: '15px'}}>
@@ -794,7 +912,7 @@ const BusinessRegistration = () => {
                                 placeholder={showLocModal === 'location' ? "Type full address or pincode..." : "Type village, state, or country..."} 
                                 style={styles.locInput} 
                                 value={locSearch} 
-                                onChange={(e) => handleLocationSearch(e.target.value)} 
+                                onChange={(e) => setLocSearch(e.target.value)} 
                                 autoFocus
                             />
                             {isSearching && <Loader size={16} className="spin" color="#2563eb" style={{position: 'absolute', right: '12px', top: '14px'}} />}
@@ -828,7 +946,7 @@ const BusinessRegistration = () => {
                     <div style={{...styles.modal, background: '#f0fdf4', border: '2px solid #22c55e'}}>
                         <CheckCircle size={50} color="#16a34a" style={{marginBottom: '15px'}} />
                         <h2 style={{margin: '0 0 10px 0', color: '#166534'}}>{isUpdate ? t.updateSuccess : t.success}</h2>
-                        <button onClick={() => {setSuccessModal(false); setViewState('pending'); window.scrollTo(0,0);}} style={{...styles.submitFormBtn, background: '#16a34a', marginTop: '15px'}}>Got it</button>
+                        <button onClick={handleSuccessClose} style={{...styles.submitFormBtn, background: '#16a34a', marginTop: '15px'}}>Got it</button>
                     </div>
                 </div>
             )}
