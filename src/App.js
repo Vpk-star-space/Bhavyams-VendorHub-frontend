@@ -284,6 +284,19 @@ function App() {
                                 🌐 Subhams Networks <span>&rarr;</span>
                             </a>
                         </div>
+                        <footer style={{ padding: '20px', textAlign: 'center', borderTop: '1px solid #e2e8f0', marginTop: 'auto' }}>
+  <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>
+    © 2026 Subhams Networks. 
+    <a 
+      href="https://subhamsnetworks.in/legal" 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      style={{ color: '#64748b', textDecoration: 'underline', marginLeft: '10px' }}
+    >
+      Legal & Privacy
+    </a>
+  </p>
+</footer>
                     </div>
                 </div>
             </div>
