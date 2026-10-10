@@ -29,7 +29,7 @@ import GlobalAlert from './components/GlobalAlert';
 const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const API_BASE_URL = isLocal ? 'http://localhost:5000/api' : 'https://bhavyams-vendorhub-backend.onrender.com/api';
 
-const isMaintenanceMode = true; 
+const isMaintenanceMode = false; 
 
 function ScrollToTop() {
     const { pathname } = useLocation();
