@@ -55,14 +55,23 @@ const AdminDashboard = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const fetchVendors = async () => {
+const fetchVendors = async () => {
         try {
             setErrorMsg(null);
             const token = localStorage.getItem('token');
+            if (!token) {
+                 navigate('/login'); // 🟢 Sends you to login if missing
+                 return;
+            }
             const res = await axios.get(`${BACKEND_URL}/admin/pending-vendors`, { headers: { Authorization: `Bearer ${token}` } });
             setVendors(res.data || []);
         } catch (err) { 
-            setErrorMsg("Failed to connect to backend server."); 
+            if (err.response && err.response.status === 401) {
+                localStorage.removeItem('token');
+                navigate('/login'); // 🟢 Sends you to login if token is expired
+            } else {
+                setErrorMsg("Failed to connect to backend server."); 
+            }
         } finally { 
             setLoading(false); 
         }
@@ -265,10 +274,12 @@ const AdminDashboard = () => {
             toast.error(err.response?.data?.message || `🚨 Failed to apply ${action}. Backend error.`); 
         }
     };
-
-   const openSecureDocument = async (e, publicId) => {
-    e.preventDefault(); 
-    e.stopPropagation(); 
+const openSecureDocument = async (e, publicId) => {
+    // These two lines MUST be first to kill the refresh
+    if (e) {
+        e.preventDefault(); 
+        e.stopPropagation(); 
+    }
     
     const token = localStorage.getItem('token');
     if (!token) return toast.error("Authentication required.");
@@ -566,18 +577,17 @@ const AdminDashboard = () => {
                                                 </div>
                                             </div>
 
-                                            <div style={styles.docBox}>
-                                                <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
-                                                    <Lock size={14}/> Secure Vault (ID Proofs & Evidence)
-                                                </span>
-                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                                    {/* 🟢 FIXED: Using <button> to completely prevent <a> tag refresh behavior */}
-                                                    {vendor.id_front_url && <button onClick={(e) => openSecureDocument(e, vendor.id_front_url)} style={styles.docLink}>Front ID <ExternalLink size={12} /></button>}
-                                                    {vendor.id_back_url && <button onClick={(e) => openSecureDocument(e, vendor.id_back_url)} style={styles.docLink}>Back ID <ExternalLink size={12} /></button>}
-                                                    {vendor.shop_image && <button onClick={(e) => openSecureDocument(e, vendor.shop_image)} style={styles.docLink}>Shop Photo <ExternalLink size={12} /></button>}
-                                                    {vendor.business_certificate && <button onClick={(e) => openSecureDocument(e, vendor.business_certificate)} style={styles.docLink}>Certificate <ExternalLink size={12} /></button>}
-                                                </div>
-                                            </div>
+                                   <div style={styles.docBox}>
+    <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
+        <Lock size={14}/> Secure Vault (ID Proofs & Evidence)
+    </span>
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        {vendor.id_front_url && <button type="button" onClick={(e) => openSecureDocument(e, vendor.id_front_url)} style={styles.docLink}>Front ID <ExternalLink size={12} /></button>}
+        {vendor.id_back_url && <button type="button" onClick={(e) => openSecureDocument(e, vendor.id_back_url)} style={styles.docLink}>Back ID <ExternalLink size={12} /></button>}
+        {vendor.shop_image && <button type="button" onClick={(e) => openSecureDocument(e, vendor.shop_image)} style={styles.docLink}>Shop Photo <ExternalLink size={12} /></button>}
+        {vendor.business_certificate && <button type="button" onClick={(e) => openSecureDocument(e, vendor.business_certificate)} style={styles.docLink}>Certificate <ExternalLink size={12} /></button>}
+    </div>
+</div>
 
                                             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '10px' }}>
                                                 {activeTab === 'pending' ? (
