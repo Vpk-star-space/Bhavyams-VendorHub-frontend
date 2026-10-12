@@ -246,6 +246,28 @@ const BusinessRegistration = () => {
     const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/api';
     const token = localStorage.getItem('token');
 
+    // 🟢 STRICT ANTI-MALWARE FRONTEND SCANNER
+    const handleFileChange = (e, setFileState, isDocument = false) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Ensure ONLY standard safe images (and PDFs for documents) can be selected.
+        // Blocks .exe, .sh, .apk, .bat entirely.
+        const validTypes = isDocument 
+            ? ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'application/pdf']
+            : ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+
+        if (!file.type || !validTypes.includes(file.type)) {
+            setFormError("🚨 SECURITY BLOCK: Invalid file detected. Only standard Images and PDFs are allowed. Executables (.exe, scripts) are strictly forbidden.");
+            e.target.value = ''; // Reset the input box so it is empty
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
+        setFormError(null);
+        setFileState(file);
+    };
+
     // 🟢 LIVE SHOP NAME CHECKER
     useEffect(() => {
         const trimmed = regForm.businessName.trim();
@@ -838,11 +860,11 @@ const BusinessRegistration = () => {
                                     <div style={isMobile ? styles.btnGridMobile : styles.btnGridDesktop}>
                                         <div style={{...styles.uploadBox, border: (!isUpdate && !idFront) ? '2px dashed #ef4444' : '2px solid #10b981', background: idFront ? '#f0fdf4' : '#fafafa'}}>
                                             <label style={styles.uploadLabel}><Upload size={16}/> {t.frontId}</label>
-                                            <input type="file" accept="image/*" onChange={e => setIdFront(e.target.files[0])} style={{fontSize: '12px', marginTop: '5px'}} />
+                                            <input type="file" accept="image/*,application/pdf" onChange={e => handleFileChange(e, setIdFront, true)} style={{fontSize: '12px', marginTop: '5px'}} />
                                         </div>
                                         <div style={{...styles.uploadBox, border: (!isUpdate && !idBack) ? '2px dashed #ef4444' : '2px solid #10b981', background: idBack ? '#f0fdf4' : '#fafafa'}}>
                                             <label style={styles.uploadLabel}><Upload size={16}/> {t.backId}</label>
-                                            <input type="file" accept="image/*" onChange={e => setIdBack(e.target.files[0])} style={{fontSize: '12px', marginTop: '5px'}} />
+                                            <input type="file" accept="image/*,application/pdf" onChange={e => handleFileChange(e, setIdBack, true)} style={{fontSize: '12px', marginTop: '5px'}} />
                                         </div>
                                     </div>
                                 </div>
@@ -854,7 +876,7 @@ const BusinessRegistration = () => {
                                         </h4>
                                         <p style={styles.infoText}><Info size={14}/> {t.infoShop}</p>
                                         <div style={{...styles.uploadBox, border: (!isUpdate && !shopPhoto) ? '2px dashed #ef4444' : '2px solid #10b981', background: shopPhoto ? '#f0fdf4' : '#fafafa'}}>
-                                            <input type="file" accept="image/*" onChange={e => setShopPhoto(e.target.files[0])} style={{fontSize: '12px'}} />
+                                            <input type="file" accept="image/*" onChange={e => handleFileChange(e, setShopPhoto, false)} style={{fontSize: '12px'}} />
                                         </div>
                                     </div>
                                 )}
@@ -864,7 +886,7 @@ const BusinessRegistration = () => {
                                         📜 {t.bizCert}
                                     </h4>
                                     <div style={{...styles.uploadBox, border: '2px solid #cbd5e1', opacity: !hasCertificate ? 0.4 : 1}}>
-                                        <input type="file" accept="image/*,.pdf" disabled={!hasCertificate} onChange={e => setCertificate(e.target.files[0])} style={{fontSize: '12px'}} />
+                                        <input type="file" accept="image/*,application/pdf" disabled={!hasCertificate} onChange={e => handleFileChange(e, setCertificate, true)} style={{fontSize: '12px'}} />
                                     </div>
                                     <label style={{display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', fontSize: '14px', color: '#475569', cursor: 'pointer', fontWeight: 'bold'}}>
                                         <input type="checkbox" checked={!hasCertificate} onChange={() => {setHasCertificate(!hasCertificate); setCertificate(null);}} style={{width: '18px', height: '18px'}} />
@@ -957,6 +979,7 @@ const BusinessRegistration = () => {
 const styles = {
     page: { background: '#f8fafc', minHeight: '100vh', padding: '15px', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' },
     container: { maxWidth: '600px', margin: '0 auto', paddingBottom: '30px' },
+    loading: { textAlign: 'center', padding: '50px', fontSize: '18px', fontWeight: 'bold', color: '#334155' },
     headerBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' },
     backBtn: { background: 'white', border: '1px solid #cbd5e1', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', color: '#475569', fontSize: '13px' },
     card: { background: 'white', padding: '20px', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' },

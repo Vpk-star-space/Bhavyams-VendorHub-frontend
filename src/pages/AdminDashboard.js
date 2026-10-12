@@ -266,6 +266,26 @@ const AdminDashboard = () => {
         }
     };
 
+   const openSecureDocument = async (e, publicId) => {
+    e.preventDefault(); 
+    e.stopPropagation(); 
+    
+    const token = localStorage.getItem('token');
+    if (!token) return toast.error("Authentication required.");
+
+    try {
+        const res = await axios.get(`${BACKEND_URL}/admin/secure-doc/${encodeURIComponent(publicId)}`, { 
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.data?.url) {
+            window.open(res.data.url, '_blank', 'noopener,noreferrer');
+        }
+    } catch (err) { 
+        toast.error(err.response?.data?.error || "Failed to generate secure document link."); 
+    }
+};
+
     const formatIST = (dateString) => {
         if (!dateString) return '';
         const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
@@ -368,8 +388,12 @@ const AdminDashboard = () => {
                             const callOn = u.can_call !== false;
                             const bookOn = u.can_book !== false;
                             
+                            // Highlight bad actors
+                            const isWarned = u.strikes >= 2;
+                            const isBanned = u.account_status === 'perma_banned';
+
                             return (
-                            <div key={u.id} style={{...styles.card, display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px', padding: '15px', borderLeft: u.account_status !== 'active' ? '5px solid #dc2626' : '1px solid #e2e8f0'}}>
+                            <div key={u.id} style={{...styles.card, display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px', padding: '15px', borderLeft: isBanned ? '5px solid #dc2626' : isWarned ? '5px solid #f59e0b' : '1px solid #e2e8f0'}}>
                                 <div style={{width: '100%'}}>
                                     <h4 style={{ margin: '0 0 5px 0', fontSize: '16px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         {u.username} <span style={{fontSize: '10px', background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase'}}>{u.role}</span>
@@ -435,7 +459,7 @@ const AdminDashboard = () => {
                                             <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#0f172a' }}>📁 {catName}</h4>
                                             <div style={{fontSize: '12px', color: '#64748b', marginBottom: '10px'}}>
                                                 <strong>Used by:</strong><br/>
-                                                {dynamicFolders[catName].map((shop, i) => (<span key={i}>• {shop.name}<br/></span>))}
+                                                {dynamicFolders[catName].map((shop, i) => (<span key={i}>- {shop.name}<br/></span>))}
                                             </div>
                                             <button onClick={() => { setNewCatName(catName); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{...styles.approveBtn, width: '100%', padding: '8px', fontSize: '12px', justifyContent: 'center', background: '#d97706'}}>
                                                 <ImagePlus size={14} /> Upload HD Logo
@@ -547,10 +571,11 @@ const AdminDashboard = () => {
                                                     <Lock size={14}/> Secure Vault (ID Proofs & Evidence)
                                                 </span>
                                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                                    {vendor.id_front_url && <a href={getOptimizedImage(vendor.id_front_url)} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Front ID <ExternalLink size={12} /></a>}
-                                                    {vendor.id_back_url && <a href={getOptimizedImage(vendor.id_back_url)} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Back ID <ExternalLink size={12} /></a>}
-                                                    {vendor.shop_image && <a href={getOptimizedImage(vendor.shop_image)} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Shop Photo <ExternalLink size={12} /></a>}
-                                                    {vendor.business_certificate && <a href={getOptimizedImage(vendor.business_certificate)} target="_blank" rel="noopener noreferrer" style={styles.docLink}>Certificate <ExternalLink size={12} /></a>}
+                                                    {/* 🟢 FIXED: Using <button> to completely prevent <a> tag refresh behavior */}
+                                                    {vendor.id_front_url && <button onClick={(e) => openSecureDocument(e, vendor.id_front_url)} style={styles.docLink}>Front ID <ExternalLink size={12} /></button>}
+                                                    {vendor.id_back_url && <button onClick={(e) => openSecureDocument(e, vendor.id_back_url)} style={styles.docLink}>Back ID <ExternalLink size={12} /></button>}
+                                                    {vendor.shop_image && <button onClick={(e) => openSecureDocument(e, vendor.shop_image)} style={styles.docLink}>Shop Photo <ExternalLink size={12} /></button>}
+                                                    {vendor.business_certificate && <button onClick={(e) => openSecureDocument(e, vendor.business_certificate)} style={styles.docLink}>Certificate <ExternalLink size={12} /></button>}
                                                 </div>
                                             </div>
 
@@ -599,7 +624,7 @@ const styles = {
     detailText: { margin: '0', fontSize: '13px', color: '#475569', padding: '5px 0' },
     iconBtn: { background: '#e2e8f0', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' },
     docBox: { background: '#eff6ff', padding: '15px', borderRadius: '12px', border: '1px solid #bfdbfe', marginBottom: '15px' },
-    docLink: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', background: '#ffffff', color: '#2563eb', padding: '6px 10px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', border: '1px solid #bfdbfe' },
+    docLink: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', background: '#ffffff', color: '#2563eb', padding: '6px 10px', borderRadius: '8px', border: '1px solid #bfdbfe', cursor: 'pointer', fontWeight: 'bold' },
     approveBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#16a34a', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
     requestBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#8b5cf6', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
     suspendBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f59e0b', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
