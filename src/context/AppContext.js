@@ -6,7 +6,7 @@ const SOCKET_URL = RAW_BACKEND_URL.replace('/api', '');
 
 // 🟢 Global Socket Definition - Safe from React renders!
 export const socket = io(SOCKET_URL, {
-    transports: ['polling', 'websocket'], 
+    transports: [ 'websocket'], 
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: 5,

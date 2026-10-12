@@ -130,7 +130,7 @@ const Home = () => {
     const activeLat = customLocation?.lat || appLocation?.lat || 0;
     const activeLng = customLocation?.lng || appLocation?.lng || 0;
 
-    useEffect(() => {
+ useEffect(() => {
         let isMounted = true;
         const fetchLocalFeed = async () => {
             try {
@@ -158,7 +158,7 @@ const Home = () => {
         return () => {
             isMounted = false;
         };
-    }, [activeLat, activeLng]); 
+    }, [activeLat, activeLng]);
 
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
@@ -362,6 +362,7 @@ const Home = () => {
                         </h1>
                     </div>
                     
+                    
                     <div style={{display: 'flex', gap: '8px'}}>
                         {isAdmin ? (
                             <button onClick={() => navigate('/admin')} style={styles.adminBtn}>
@@ -374,6 +375,7 @@ const Home = () => {
                         ) : null}
                     </div>
                 </div>
+                
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 15px 12px 15px', background: '#2874f0', width: '100%', boxSizing: 'border-box' }}>
                     <div className="touch-scale" style={styles.locationPill} onClick={() => setShowLocModal(true)}>

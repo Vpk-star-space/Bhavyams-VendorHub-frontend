@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client'; 
 import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus, MessageSquare, Lock, Edit, UserX, Unlock, Clock, Ban, Search, Users, Store, User } from 'lucide-react';
 import { toast } from 'react-toastify';
-
+import Navbar from '../components/Navbar';
 const getOptimizedImage = (url) => {
     if (!url) return null;
     if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
@@ -35,7 +35,7 @@ const AdminDashboard = () => {
     const SOCKET_URL = isLocal ? 'http://localhost:5000' : 'https://bhavyams-vendorhub-backend.onrender.com';
 
     useEffect(() => {
-        const localSocket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+        const localSocket = io(SOCKET_URL, { transports: ['websocket'] });
         localSocket.on('connect', () => console.log('🟢 Admin Socket Live Sync Connected'));
         
         localSocket.on('admin_refresh', () => {
@@ -341,7 +341,10 @@ const openSecureDocument = async (e, publicId) => {
 
     if (loading) return <div style={styles.loading}>Loading Master Control Room...</div>;
 
-    return (
+   return (
+        <> {/* 🟢 1. ADD THIS EMPTY BRACKET HERE */}
+            
+            <Navbar /> {/* 🟢 2. PUT THE NAVBAR HERE */}
         <div style={styles.page}>
             <div style={styles.container}>
                 <div style={styles.headerBar}>
@@ -576,6 +579,7 @@ const openSecureDocument = async (e, publicId) => {
                                                     })}
                                                 </div>
                                             </div>
+                                            
 
                                    <div style={styles.docBox}>
     <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
@@ -612,6 +616,7 @@ const openSecureDocument = async (e, publicId) => {
                 )}
             </div>
         </div>
+        </>
     );
 };
 

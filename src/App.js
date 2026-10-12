@@ -13,7 +13,7 @@ import Welcome from './pages/Welcome';
 import AdminDashboard from './pages/AdminDashboard';
 import BusinessRegistration from './pages/BusinessRegistration';
 import VendorDashboard from './pages/VendorDashboard';
-import AddProduct from './pages/AddProduct';
+
 import ProtectedRoute from './components/ProtectedRoute';
 import ProductDetails from './pages/ProductDetails';
 import Profile from './pages/Profile';
@@ -24,7 +24,7 @@ import UserOrders from './pages/UserOrders';
 import VendorOrders from './pages/VendorOrders';
 import Expo from './pages/Expo';
 import Chat from './pages/Chat';
-import GlobalAlert from './components/GlobalAlert';
+
 
 const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const API_BASE_URL = isLocal ? 'http://localhost:5000/api' : 'https://bhavyams-vendorhub-backend.onrender.com/api';
@@ -380,10 +380,12 @@ function App() {
                                     <button onClick={handleInstallClick} style={{ background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '900', fontSize: '12px', cursor: 'pointer', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)', transition: 'transform 0.2s' }}>
                                         INSTALL NOW
                                     </button>
+                                    
                                 </div>
+                                
                             )}
                            
-                            <GlobalAlert />
+                         
                             <Routes>
                                 <Route path="/" element={<Home />} />
                                 <Route path="/shop/:id" element={<ShopProfile />} />
@@ -396,7 +398,7 @@ function App() {
                                 <Route path="/vendor-dashboard" element={<ProtectedRoute><VendorDashboard /></ProtectedRoute>} />
                                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                                 <Route path="/register-business" element={<ProtectedRoute><BusinessRegistration /></ProtectedRoute>} />
-                                <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+                                
                                 <Route path="/manage-catalog/:id" element={<ProtectedRoute><ManageCatalog /></ProtectedRoute>} />
                                 <Route path="/my-orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
                                 <Route path="/vendor/orders" element={<ProtectedRoute><VendorOrders /></ProtectedRoute>} />
