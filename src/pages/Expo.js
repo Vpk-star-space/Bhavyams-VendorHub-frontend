@@ -1,32 +1,21 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
-import { ArrowLeft, Heart, MessageCircle, Share2, Store, Plus, MoreVertical, MapPin, Image as ImageIcon, Video, Sparkles, X, Loader, BadgeCheck, Trash2, Tag, Clock, ShoppingBag, Search, MessageSquareOff, Reply, UserPlus, Check, Eye, Users } from 'lucide-react';
+import { ArrowLeft, Heart, MessageCircle, Share2, Store, Plus, MoreVertical, MapPin, Image as ImageIcon, Video, Search,Sparkles,X, Loader, BadgeCheck, Trash2, Tag, Clock, ShoppingBag, MessageSquareOff, Reply, UserPlus, Check, Eye, Users, ShieldAlert } from 'lucide-react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
-const getBackendUrl = () => {
-    return process.env.NODE_ENV === 'production' 
-        ? 'https://bhavyams-vendorhub-backend.onrender.com/api' 
-        : 'http://localhost:5000/api';
-};
+const getBackendUrl = () => process.env.NODE_ENV === 'production' ? 'https://bhavyams-vendorhub-backend.onrender.com/api' : 'http://localhost:5000/api';
 
 const resolveMediaUrl = (url, type = 'image') => {
     if (!url) return null;
-    if (type === 'video' || url.match(/\.(mp4|webm|ogg|mov)$/i) || url.includes('video/upload')) {
-        return url.startsWith('http') ? url : `${getBackendUrl().replace('/api', '')}/uploads/${url.replace(/\\/g, '/').split('uploads/').pop()}`;
-    }
-    if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
-        return url.replace('/upload/', '/upload/q_auto,f_auto,w_800/');
-    }
+    if (type === 'video' || url.match(/\.(mp4|webm|ogg|mov)$/i) || url.includes('video/upload')) return url.startsWith('http') ? url : `${getBackendUrl().replace('/api', '')}/uploads/${url.replace(/\\/g, '/').split('uploads/').pop()}`;
+    if (url.includes('cloudinary.com') && !url.includes('q_auto')) return url.replace('/upload/', '/upload/q_auto,f_auto,w_800/');
     if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) return url;
     return `${getBackendUrl().replace('/api', '')}/${url.replace(/\\/g, '/')}`;
 };
 
-const getFallbackAvatar = (name) => {
-    const safeName = name ? encodeURIComponent(name) : 'User';
-    return `https://ui-avatars.com/api/?name=${safeName}&background=random&color=fff&bold=true`;
-};
+const getFallbackAvatar = (name) => `https://ui-avatars.com/api/?name=${name ? encodeURIComponent(name) : 'User'}&background=random&color=fff&bold=true`;
 
 const timeAgo = (dateString) => {
     if (!dateString) return 'Just now';
@@ -46,29 +35,14 @@ const timeAgo = (dateString) => {
     return "Just now";
 };
 
-// 🟢 SMART 3-TIER BADGE RENDERER
-const renderBadge = (isOfficial, isVerified, hasShop = true) => {
-    if (isOfficial) {
-        return (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', border: '1px solid #fde68a', marginLeft: '6px' }}>
-                <BadgeCheck size={12} color="#ffffff" fill="#FFD700" /> Official
-            </span>
-        );
-    }
-    if (isVerified === true || String(isVerified) === 'true') {
-        return (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', border: '1px solid #86efac', marginLeft: '6px' }}>
-                <BadgeCheck size={12} color="#ffffff" fill="#10b981" /> Verified
-            </span>
-        );
-    }
-    if (hasShop) {
-        return (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '800', border: '1px solid #bfdbfe', marginLeft: '6px' }}>
-                <BadgeCheck size={12} color="#ffffff" fill="#3b82f6" /> Standard
-            </span>
-        );
-    }
+// 🟢 SMART 5-TIER BADGE RENDERER
+const renderBadge = (isOfficial, isVerified, accountStatus, hasShop = true) => {
+    const isVer = isVerified === true || String(isVerified).toLowerCase() === 'true';
+    if (accountStatus === 'perma_banned') return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#0f172a', color: 'white', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', border: '1px solid #334155', marginLeft: '6px' }}>⬛ Banned</span>;
+    if (accountStatus === 'temp_block') return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#fef2f2', color: '#dc2626', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', border: '1px solid #fecaca', marginLeft: '6px' }}>🟥 Suspended</span>;
+    if (isOfficial) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', border: '1px solid #fde68a', marginLeft: '6px' }}><BadgeCheck size={12} color="#ffffff" fill="#FFD700" /> Official</span>;
+    if (isVer) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '900', border: '1px solid #86efac', marginLeft: '6px' }}><BadgeCheck size={12} color="#ffffff" fill="#10b981" /> Verified</span>;
+    if (hasShop) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '800', border: '1px solid #bfdbfe', marginLeft: '6px' }}><BadgeCheck size={12} color="#ffffff" fill="#3b82f6" /> Standard</span>;
     return null; 
 };
 
@@ -76,19 +50,18 @@ const Expo = () => {
     const navigate = useNavigate();
     const { language } = useContext(AppContext);
     
+    // 🟢 BASE IDENTITY
     const userStr = localStorage.getItem('user');
     const localUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
-    const isVendor = localUser && localUser.role === 'vendor';
-    const isAdmin = localUser && (localUser.role === 'admin' || localUser.email === 'pavanvenkat63@gmail.com');
-    const canPost = isVendor || isAdmin;
-
+    const isAdmin = Boolean(localUser && (localUser.role === 'admin' || localUser.email === 'pavanvenkat63@gmail.com'));
+    const isVendor = localUser?.role === 'vendor';
+    
     const [allPosts, setAllPosts] = useState([]);
     const [loading, setLoading] = useState(true); 
     const [activeDropdown, setActiveDropdown] = useState(null); 
     const [activeTab, setActiveTab] = useState('All'); 
     
     const [followingMap, setFollowingMap] = useState({});
-    
     const [viewedPosts, setViewedPosts] = useState(() => {
         try { return new Set(JSON.parse(sessionStorage.getItem('subhams_viewed_posts')) || []); } 
         catch (e) { return new Set(); }
@@ -117,10 +90,42 @@ const Expo = () => {
     const [liveTagOptions, setLiveTagOptions] = useState([]);
     const [selectedTag, setSelectedTag] = useState(null); 
 
+    const [myShopStatus, setMyShopStatus] = useState({ is_verified: false, is_official: false, id: null });
+
     useEffect(() => { 
         fetchFeed(); 
-        if (localUser) fetchFollowing(); 
-    }, []);
+        if (localUser) {
+            fetchFollowing();
+            const token = localStorage.getItem('token');
+            if (token) {
+                axios.get(`${getBackendUrl()}/shops/my-shop`, { headers: { Authorization: `Bearer ${token}` } })
+                .then(res => {
+                    if (res.data?.hasShop && res.data?.shop) {
+                        setMyShopStatus({
+                            is_verified: res.data.shop.is_verified === true || String(res.data.shop.is_verified).toLowerCase() === 'true',
+                            is_official: String(res.data.shop.user_id) === "1" || res.data.shop.user_email === 'pavanvenkat63@gmail.com',
+                            id: res.data.shop.id
+                        });
+                    }
+                }).catch(() => {});
+            }
+        }
+    }, [localUser?.id]);
+
+    useEffect(() => {
+        const queryParams = new URLSearchParams(window.location.search);
+        const postIdToOpen = queryParams.get('postId');
+        if (postIdToOpen && allPosts.length > 0) {
+            setTimeout(() => {
+                const element = document.getElementById(`post-${postIdToOpen}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.style.boxShadow = '0 0 20px rgba(79, 70, 229, 0.4)';
+                    setTimeout(() => { element.style.boxShadow = ''; }, 3000);
+                }
+            }, 300);
+        }
+    }, [allPosts.length]);
 
     useEffect(() => {
         if (!isTaggingMenuOpen) return;
@@ -135,13 +140,11 @@ const Expo = () => {
         return () => clearTimeout(delayDebounce);
     }, [tagSearchQuery, isTaggingMenuOpen]);
 
-    // 🟢 FIXED: Sends token to backend to get accurate 'isLikedByMe'
     const fetchFeed = async () => {
         try {
             const token = localStorage.getItem('token');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             const res = await axios.get(`${getBackendUrl()}/expo/feed`, { headers });
-            
             const validPosts = (res.data.posts || []).filter(p => p !== null && p !== undefined);
             setAllPosts(validPosts);
         } catch (err) { toast.error("Failed to fetch feed!"); } finally { setLoading(false); }
@@ -157,13 +160,10 @@ const Expo = () => {
 
     const handleView = async (postId) => {
         if (viewedPosts.has(postId)) return;
-        
         const newSet = new Set(viewedPosts).add(postId);
         setViewedPosts(newSet);
         sessionStorage.setItem('subhams_viewed_posts', JSON.stringify([...newSet]));
-        
         setAllPosts(prevPosts => prevPosts.map(p => p.id === postId ? { ...p, views_count: (Number(p.views_count) || 0) + 1 } : p));
-        
         try { await axios.post(`${getBackendUrl()}/expo/${postId}/view`); } catch (err) {}
     };
 
@@ -171,10 +171,9 @@ const Expo = () => {
         if (!localUser) return navigate('/welcome');
         const isFollowing = followingMap[shopId];
         setFollowingMap(prev => ({ ...prev, [shopId]: !isFollowing }));
-        
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`${getBackendUrl()}/expo/follow/${shopId}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            await axios.post(`${getBackendUrl()}/follow/${shopId}`, {}, { headers: { Authorization: `Bearer ${token}` } });
         } catch (err) {
             setFollowingMap(prev => ({ ...prev, [shopId]: isFollowing }));
             toast.error("Failed to follow shop.");
@@ -192,42 +191,28 @@ const Expo = () => {
         setActiveDropdown(null);
     };
 
-    // 🟢 FIXED: Bulletproof logic to track Likes accurately in UI immediately
     const handleLike = async (postId) => {
         if (!localUser) return navigate('/welcome');
-        
         setAllPosts(allPosts.map(post => {
             if (post && post.id === postId) {
                 const currentlyLiked = post.isLikedByMe === true || String(post.isLikedByMe) === 'true';
-                return { 
-                    ...post, 
-                    isLikedByMe: !currentlyLiked, 
-                    likes_count: currentlyLiked ? Math.max(0, Number(post.likes_count) - 1) : Number(post.likes_count) + 1 
-                };
+                return { ...post, isLikedByMe: !currentlyLiked, likes_count: currentlyLiked ? Math.max(0, Number(post.likes_count) - 1) : Number(post.likes_count) + 1 };
             }
             return post;
         }));
-        
         try {
             const token = localStorage.getItem('token');
             await axios.post(`${getBackendUrl()}/expo/${postId}/like`, {}, { headers: { Authorization: `Bearer ${token}` } });
-        } catch (err) {
-            // Revert state silently if API fails
-            fetchFeed();
-        }
+        } catch (err) { fetchFeed(); }
     };
 
     const fetchLikesList = async (postId) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`${getBackendUrl()}/expo/${postId}/likes`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
+            const res = await axios.get(`${getBackendUrl()}/expo/${postId}/likes`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
             const likesArray = res.data.likes || (Array.isArray(res.data) ? res.data : []);
             setShowLikesModal({ isOpen: true, likes: likesArray });
-        } catch (err) { 
-            toast.error("Could not fetch likes."); 
-        }
+        } catch (err) { toast.error("Could not fetch likes."); }
     };
 
     const toggleComments = async (postId) => {
@@ -242,7 +227,6 @@ const Expo = () => {
         }
     };
 
-    // 🟢 FIXED: Temporary Comment accurately tags your Gold Badge instantly
     const handlePostComment = async (e, postId) => {
         e.preventDefault();
         if (!newComment.trim() || !localUser) return;
@@ -253,16 +237,7 @@ const Expo = () => {
         setReplyingTo(null);
         
         const isMaster = localUser.role === 'admin' || localUser.email === 'pavanvenkat63@gmail.com';
-        
-        const tempComment = { 
-            id: Date.now(), 
-            display_name: isMaster ? 'Subhams Hub Official' : (localUser.business_name || localUser.username || 'You'), 
-            role: localUser.role, 
-            user_email: localUser.email,
-            text: commentText, 
-            parent_comment_id: parentId, 
-            user_id: localUser.id 
-        };
+        const tempComment = { id: Date.now(), display_name: isMaster ? 'Subhams Hub Official' : (localUser.business_name || localUser.username || 'You'), role: localUser.role, user_email: localUser.email, text: commentText, parent_comment_id: parentId, user_id: localUser.id };
         
         setPostComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), tempComment] }));
         setAllPosts(allPosts.map(p => p.id === postId ? { ...p, comments_count: Number(p.comments_count) + 1 } : p));
@@ -314,6 +289,17 @@ const Expo = () => {
         if (videoRef.current) videoRef.current.currentTime = newTime;
     };
 
+    const handleRequestVerification = async () => {
+        if (!myShopStatus.id) return toast.info("Shop profile not loaded yet.");
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`${getBackendUrl()}/shops/${myShopStatus.id}/request-verification`, {}, { headers: { Authorization: `Bearer ${token}` }});
+            toast.success("🛡️ Request sent! Admin will review your shop.");
+        } catch (err) {
+            toast.error("Failed to send verification request.");
+        }
+    };
+
     const submitPost = async (e) => {
         e.preventDefault();
         if (!postText.trim() && !mediaFile) return toast.error("Post cannot be empty!");
@@ -344,7 +330,6 @@ const Expo = () => {
             }
 
             const res = await axios.post(`${getBackendUrl()}/expo/create`, formData, { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } });
-            
             if (res.data.post) { setAllPosts([res.data.post, ...allPosts]); } else { await fetchFeed(); }
             
             toast.success("🎉 Post published!");
@@ -356,9 +341,7 @@ const Expo = () => {
             setIsVideoOversized(false);
             setAllowComments(true);
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        } catch (err) {
-            toast.error(err.response?.data?.message || "Failed to post.");
-        } finally { setIsUploading(false); }
+        } catch (err) { toast.error(err.response?.data?.message || "Failed to post."); } finally { setIsUploading(false); }
     };
 
     const displayPostsData = allPosts.filter(post => {
@@ -368,6 +351,11 @@ const Expo = () => {
         if (activeTab === 'Activity') return isLiked || String(post.owner_id) === String(localUser?.id);
         return true; 
     });
+
+    // 🟢 SECURE PLUS BUTTON AND MEDIA RULES (CLEANED UP DECLARATIONS)
+    const isOwnerOrVendor = Boolean(myShopStatus.id || isVendor);
+    const canPost = (isOwnerOrVendor || isAdmin) && localUser?.account_status !== 'temp_block' && localUser?.account_status !== 'perma_banned';
+    const isVerifiedOrOfficial = myShopStatus.is_verified || myShopStatus.is_official || isAdmin;
 
     return (
         <div style={styles.page}>
@@ -401,10 +389,10 @@ const Expo = () => {
                         const isOfficialApp = String(post.owner_id) === "1" || (post.shop_email && post.shop_email === 'pavanvenkat63@gmail.com') || (post.owner_email === 'pavanvenkat63@gmail.com');
                         const hasTag = post.tagged_item_name && post.tagged_item_type;
                         const isFollowing = followingMap[post.shop_id];
-                        const isLiked = post.isLikedByMe === true || String(post.isLikedByMe) === 'true'; // 🟢 FIXED HEART LOGIC
+                        const isLiked = post.isLikedByMe === true || String(post.isLikedByMe) === 'true'; 
 
                         return (
-                            <div key={post.id} style={{ ...styles.postCard, border: isOfficialApp ? '1px solid #fde68a' : '1px solid #e2e8f0' }}>
+                            <div key={post.id} id={`post-${post.id}`} style={{ ...styles.postCard, border: isOfficialApp ? '1px solid #fde68a' : '1px solid #e2e8f0', transition: 'box-shadow 0.3s ease' }}>
                                 
                                 <div style={{...styles.postHeader, background: isOfficialApp ? '#fffbeb' : 'white'}}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
@@ -414,7 +402,7 @@ const Expo = () => {
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                                 <span onClick={() => navigate(`/shop/${post.shop_id}`)} style={styles.shopName}>{post.shop_name || 'Vendor'}</span>
-                                                {renderBadge(isOfficialApp, post.is_verified, true)}
+                                                {renderBadge(isOfficialApp, post.is_verified, post.account_status, true)}
                                                 
                                                 {!isPostOwner && (
                                                     <button onClick={() => handleFollowToggle(post.shop_id)} style={{...styles.followBtn, background: isFollowing ? '#f1f5f9' : '#e0e7ff', color: isFollowing ? '#64748b' : '#4f46e5'}}>
@@ -442,12 +430,7 @@ const Expo = () => {
                                 </div>
 
                                 {post.content && (
-                                    <div 
-                                        style={{...styles.postContent, background: isOfficialApp ? '#fffbeb' : 'white'}}
-                                        onMouseEnter={() => handleView(post.id)}
-                                        onTouchStart={() => handleView(post.id)}
-                                        onClick={() => handleView(post.id)}
-                                    >
+                                    <div style={{...styles.postContent, background: isOfficialApp ? '#fffbeb' : 'white'}} onMouseEnter={() => handleView(post.id)} onTouchStart={() => handleView(post.id)} onClick={() => handleView(post.id)}>
                                         {post.content}
                                     </div>
                                 )}
@@ -478,12 +461,9 @@ const Expo = () => {
                                 <div style={{...styles.actionBar, background: isOfficialApp ? '#fffbeb' : 'white'}}>
                                     <div style={{ display: 'flex', gap: '18px', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            
-                                            {/* 🟢 HEART RENDER FIXED */}
                                             <button onClick={() => handleLike(post.id)} style={styles.actionBtn}>
                                                 <Heart size={26} color={isLiked ? "#ef4444" : "#1e293b"} fill={isLiked ? "#ef4444" : "transparent"} />
                                             </button>
-                                            
                                             <span onClick={() => fetchLikesList(post.id)} style={{...styles.actionCount, cursor: 'pointer', textDecoration: 'underline'}}>{post.likes_count || 0}</span>
                                         </div>
                                         
@@ -495,14 +475,25 @@ const Expo = () => {
                                         ) : (
                                             <div style={{...styles.actionBtn, opacity: 0.5}} onClick={() => toast.info("Comments disabled.")}><MessageSquareOff size={26} color="#64748b" /></div>
                                         )}
-                                        <button style={styles.actionBtn} onClick={() => {if(navigator.share) navigator.share({title:'Subhams Expo', url:window.location.href}); else toast.success("Link copied!");}}><Share2 size={24} color="#1e293b" /></button>
+                                        
+                                        <button style={styles.actionBtn} onClick={() => {
+                                            const postUrl = `${window.location.origin}/expo?postId=${post.id}`;
+                                            if (navigator.share) {
+                                                navigator.share({ title: `${post.shop_name} on Subhams Expo`, text: post.content || 'Check out this post!', url: postUrl });
+                                            } else {
+                                                navigator.clipboard.writeText(postUrl);
+                                                toast.success("Unique post link copied!");
+                                            }
+                                        }}>
+                                            <Share2 size={24} color="#1e293b" />
+                                        </button>
                                     </div>
                                     <button onClick={() => navigate(`/shop/${post.shop_id}`)} style={{...styles.visitStoreBtn, background: isOfficialApp ? '#facc15' : '#f1f5f9', color: isOfficialApp ? '#713f12' : '#0f172a'}}>
                                         {isOfficialApp ? 'Official Store' : 'Visit Shop'}
                                     </button>
                                 </div>
 
-                                {/* 🟢 COMMENTS SECTION WITH FIXES */}
+                                {/* COMMENTS */}
                                 {expandedComments[post.id] && post.allow_comments !== false && (
                                     <div style={styles.commentSection}>
                                         <div style={styles.commentList} className="hide-scroll">
@@ -518,7 +509,7 @@ const Expo = () => {
                                                             <div style={{ flex: 1 }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                                                     <span style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a' }}>{c.display_name}</span>
-                                                                    {renderBadge(isCommOfficial, isCommVerified, isCommShop)}
+                                                                    {renderBadge(isCommOfficial, isCommVerified, 'active', isCommShop)}
                                                                 </div>
                                                                 <div style={{ fontSize: '13.5px', color: '#334155', marginTop: '2px', wordBreak: 'break-word' }}>{c.text}</div>
                                                                 <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '11.5px', fontWeight: '600', color: '#94a3b8' }}>
@@ -538,7 +529,7 @@ const Expo = () => {
                                                                     <div style={{ flex: 1 }}>
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                                                             <span style={{ fontWeight: '800', fontSize: '13px', color: '#0f172a' }}>{reply.display_name}</span>
-                                                                            {renderBadge(isRepOfficial, isRepVerified, isRepShop)}
+                                                                            {renderBadge(isRepOfficial, isRepVerified, 'active', isRepShop)}
                                                                         </div>
                                                                         <div style={{ fontSize: '13.5px', color: '#334155', marginTop: '2px', wordBreak: 'break-word' }}>{reply.text}</div>
                                                                         <div style={{ display: 'flex', gap: '12px', marginTop: '6px', fontSize: '11.5px', fontWeight: '600', color: '#94a3b8' }}>
@@ -574,7 +565,12 @@ const Expo = () => {
                 )}
             </div>
 
-            {canPost && <button className="touch-scale" style={styles.fabBtn} onClick={() => setShowCreateModal(true)}><Plus size={28} color="white" /></button>}
+            {/* 🟢 THE PLUS BUTTON (UNLOCKED FOR EVERY ACTIVE VENDOR) */}
+            {canPost && (
+                <button className="touch-scale" style={styles.fabBtn} onClick={() => setShowCreateModal(true)}>
+                    <Plus size={28} color="white" />
+                </button>
+            )}
 
             {showCreateModal && (
                 <div style={styles.overlay}>
@@ -608,7 +604,7 @@ const Expo = () => {
                                 </div>
 
                                 <form onSubmit={submitPost} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                    <textarea style={styles.textArea} placeholder="What's happening?" value={postText} onChange={e => setPostText(e.target.value)} />
+                                    <textarea style={styles.textArea} placeholder="What's happening in your shop today?" value={postText} onChange={e => setPostText(e.target.value)} />
 
                                     <div style={styles.tagInputBox} onClick={() => { setIsTaggingMenuOpen(true); setTagSearchQuery(''); }}>
                                         <Tag size={16} color={selectedTag ? "#2563eb" : "#64748b"} />
@@ -642,25 +638,38 @@ const Expo = () => {
                                         </div>
                                     )}
 
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
-                                        <div style={{ display: 'flex', gap: '12px' }}>
-                                            <label style={styles.uploadIconBtn}>
-                                                <ImageIcon size={22} color="#10b981" />
-                                                <input type="file" accept="image/*" style={{display: 'none'}} onChange={handleMediaSelect} />
-                                            </label>
-                                            <label style={styles.uploadIconBtn}>
-                                                <Video size={22} color="#3b82f6" />
-                                                <input type="file" accept="video/mp4,video/quicktime,video/webm,image/gif" style={{display: 'none'}} onChange={handleMediaSelect} />
+                                    {/* 🟢 MEDIA UPLOAD CONTROLS OR VERIFICATION REQUEST BANNER */}
+                                    {isVerifiedOrOfficial ? (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
+                                            <div style={{ display: 'flex', gap: '12px' }}>
+                                                <label style={styles.uploadIconBtn}>
+                                                    <ImageIcon size={22} color="#10b981" />
+                                                    <input type="file" accept="image/*" style={{display: 'none'}} onChange={handleMediaSelect} />
+                                                </label>
+                                                <label style={styles.uploadIconBtn}>
+                                                    <Video size={22} color="#3b82f6" />
+                                                    <input type="file" accept="video/mp4,video/quicktime,video/webm,image/gif" style={{display: 'none'}} onChange={handleMediaSelect} />
+                                                </label>
+                                            </div>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#64748b', cursor: 'pointer' }}>
+                                                <input type="checkbox" checked={allowComments} onChange={(e) => setAllowComments(e.target.checked)} style={{accentColor: '#2563eb', width: '16px', height: '16px'}} />
+                                                Allow Comments
                                             </label>
                                         </div>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#64748b', cursor: 'pointer' }}>
-                                            <input type="checkbox" checked={allowComments} onChange={(e) => setAllowComments(e.target.checked)} style={{accentColor: '#2563eb', width: '16px', height: '16px'}} />
-                                            Allow Comments
-                                        </label>
-                                    </div>
+                                    ) : (
+                                        <div style={{ background: '#eff6ff', padding: '14px', borderRadius: '12px', border: '1px dashed #3b82f6', textAlign: 'center' }}>
+                                            <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e3a8a', lineHeight: '1.4' }}>
+                                                Standard shops can only post text updates. Get verified to post photos & videos! 📸<br/>
+                                                <span style={{fontSize: '11px', color: '#3b82f6'}}>ప్రామాణిక షాపులు కేవలం టెక్స్ట్ మాత్రమే పోస్ట్ చేయగలవు. ఫోటోలు & వీడియోలు కోసం వెరిఫై చేసుకోండి!</span>
+                                            </p>
+                                            <button type="button" onClick={handleRequestVerification} style={{ background: '#16a34a', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', marginTop: '6px' }}>
+                                                <ShieldAlert size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }}/> Request Green Badge
+                                            </button>
+                                        </div>
+                                    )}
 
                                     <button type="submit" disabled={isUploading} style={styles.postBtn}>
-                                        {isUploading ? <Loader size={20} className="spin" /> : 'Post'}
+                                        {isUploading ? <Loader size={20} className="spin" /> : 'Post to Expo'}
                                     </button>
                                 </form>
                             </>
@@ -688,7 +697,7 @@ const Expo = () => {
                                     <div key={u.id} style={{display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid #f1f5f9'}}>
                                         <img src={getFallbackAvatar(displayName)} alt="Avatar" style={{width: '32px', height: '32px', borderRadius: '50%'}} />
                                         <span style={{fontSize: '14px', fontWeight: '700', color: '#0f172a'}}>{displayName}</span>
-                                        {renderBadge(isUserOfficial, isUserVerified, isUserShop)}
+                                        {renderBadge(isUserOfficial, isUserVerified, 'active', isUserShop)}
                                     </div>
                                 );
                             })}

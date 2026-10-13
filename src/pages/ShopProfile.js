@@ -2,21 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { socket } from '../context/AppContext';
 import axios from 'axios';
-import { Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, BellOff, Bell, UserPlus, Trash2, Loader, Play, Heart, Video, MessageCircle, Download } from 'lucide-react';
+import { Share2, BadgeCheck, MapPin, ArrowLeft, Edit, X, Check, Package, Store, Upload, Search, Users, BellRing, Bell, UserPlus, Trash2, Loader, Play, Heart, Video, MessageCircle, Download, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { toast } from 'react-toastify';
 import html2canvas from 'html2canvas';
 
-const getBackendUrl = () => {
-    return process.env.NODE_ENV === 'production' 
-        ? 'https://bhavyams-vendorhub-backend.onrender.com/api' 
-        : 'http://localhost:5000/api';
-};
+const getBackendUrl = () => process.env.NODE_ENV === 'production' ? 'https://bhavyams-vendorhub-backend.onrender.com/api' : 'http://localhost:5000/api';
 
 const getOptimizedImage = (url) => {
     if (!url) return null;
-    if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
-        return url.replace('/upload/', '/upload/q_auto,f_auto,w_600/');
-    }
+    if (url.includes('cloudinary.com') && !url.includes('q_auto')) return url.replace('/upload/', '/upload/q_auto,f_auto,w_600/');
     return url; 
 };
 
@@ -25,53 +19,27 @@ const resolveMediaUrl = (url, type = 'image') => {
     if (type === 'video' || url.match(/\.(mp4|webm|ogg|mov)$/i) || url.includes('video/upload')) {
         return url.startsWith('http') ? url : `${getBackendUrl().replace('/api', '')}/uploads/${url.replace(/\\/g, '/').split('uploads/').pop()}`;
     }
-    if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
-        return url.replace('/upload/', '/upload/q_auto,f_auto,w_400/');
-    }
+    if (url.includes('cloudinary.com') && !url.includes('q_auto')) return url.replace('/upload/', '/upload/q_auto,f_auto,w_400/');
     if (url.startsWith('http')) return url;
     return `${getBackendUrl().replace('/api', '')}/${url.replace(/\\/g, '/')}`;
 };
 
 const getVideoThumbnail = (url) => {
     if (!url) return null;
-    if (url.includes('cloudinary.com')) {
-        return url.replace(/\.(mp4|mov|webm|ogg)$/i, '.jpg'); 
-    }
+    if (url.includes('cloudinary.com')) return url.replace(/\.(mp4|mov|webm|ogg)$/i, '.jpg'); 
     return `${resolveMediaUrl(url, 'video')}#t=0.001`; 
 };
 
-const getFallbackAvatar = (name) => {
-    const safeName = name ? encodeURIComponent(name) : 'User';
-    return `https://ui-avatars.com/api/?name=${safeName}&background=random&color=fff&bold=true`;
-};
+const getFallbackAvatar = (name) => `https://ui-avatars.com/api/?name=${name ? encodeURIComponent(name) : 'User'}&background=random&color=fff&bold=true`;
 
-// 🟢 SMART 3-TIER BADGE SYSTEM (Identity Locked)
-const renderBadge = (isOfficial, isVerified, hasShop = true) => {
-    if (isOfficial) {
-        return (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #fde68a' }}>
-                <BadgeCheck size={16} color="#ffffff" fill="#FFD700" style={{ filter: 'drop-shadow(0 1px 2px rgba(184, 134, 11, 0.4))' }} />
-                Official
-            </span>
-        );
-    }
-    if (isVerified) {
-        return (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #86efac' }}>
-                <BadgeCheck size={16} color="#ffffff" fill="#10b981" />
-                Verified
-            </span>
-        );
-    }
-    // 🟢 FIXED: Extremely strict check to prevent normal users from getting the badge
-    if (hasShop) {
-        return (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#eff6ff', color: '#1d4ed8', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '800', border: '1px solid #bfdbfe' }}>
-                <BadgeCheck size={16} color="#ffffff" fill="#3b82f6" />
-                Standard
-            </span>
-        );
-    }
+// 🟢 SMART 5-TIER BADGE SYSTEM
+const renderBadge = (isOfficial, isVerified, accountStatus, hasShop = true) => {
+    const isVer = isVerified === true || String(isVerified).toLowerCase() === 'true';
+    if (accountStatus === 'perma_banned') return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#0f172a', color: 'white', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #334155' }}>⬛ Banned</span>;
+    if (accountStatus === 'temp_block') return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef2f2', color: '#dc2626', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #fecaca' }}>🟥 Suspended</span>;
+    if (isOfficial) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #fde68a' }}><BadgeCheck size={16} color="#ffffff" fill="#FFD700" style={{ filter: 'drop-shadow(0 1px 2px rgba(184, 134, 11, 0.4))' }} /> Official</span>;
+    if (isVer) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '900', border: '1px solid #86efac' }}><BadgeCheck size={16} color="#ffffff" fill="#10b981" /> Verified</span>;
+    if (hasShop) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#eff6ff', color: '#1d4ed8', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '800', border: '1px solid #bfdbfe' }}><BadgeCheck size={16} color="#ffffff" fill="#3b82f6" /> Standard</span>;
     return null;
 };
 
@@ -86,12 +54,13 @@ const ShopProfile = () => {
 
     const [activeProfileTab, setActiveProfileTab] = useState('Catalog'); 
     const [shopSearch, setShopSearch] = useState('');
+    
     const [isFollowing, setIsFollowing] = useState(false);
+    const [isFollowLoading, setIsFollowLoading] = useState(false);
     const [notifMenuOpen, setNotifMenuOpen] = useState(false);
     const [notifLevel, setNotifLevel] = useState('All');
 
     const [adminCategories, setAdminCategories] = useState([]);
-
     const [showEditModal, setShowEditModal] = useState(false);
     const [imageFile, setImageFile] = useState(null); 
     const [uploadError, setUploadError] = useState('');
@@ -123,7 +92,6 @@ const ShopProfile = () => {
     const currentUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
     const isMasterAdmin = Boolean(currentUser && currentUser.email === 'pavanvenkat63@gmail.com');
 
-    // 🟢 FIXED: Safe, single-pass fetching. Prevents white screens if background requests fail.
     useEffect(() => {
         let isMounted = true;
         
@@ -132,7 +100,6 @@ const ShopProfile = () => {
                 const BACKEND_URL = getBackendUrl();
                 const token = localStorage.getItem('token');
                 
-                // 1. Fetch main shop data FIRST so the screen renders immediately
                 const shopRes = await axios.get(`${BACKEND_URL}/shops/${id}`);
                 if (!isMounted) return;
                 
@@ -150,41 +117,24 @@ const ShopProfile = () => {
                     category: shopInfo.category || '',
                     shop_type: shopInfo.shop_type || 'Products', 
                     is_online: shopInfo.is_online,
-                    address: shopInfo.address || shopInfo.location || '',
+                    address: shopInfo.address || '',
                     delivery_areas: shopInfo.delivery_areas === 'All' ? '' : (shopInfo.delivery_areas || ''),
                     founder_name: shopInfo.founder_name || '',
                     ceo_name: shopInfo.ceo_name || ''
                 });
 
-                // 2. Fetch categories silently in the background
                 axios.get(`${BACKEND_URL}/admin/categories`).then(catRes => {
                     if (isMounted) setAdminCategories(catRes.data || []);
                 }).catch(() => {});
 
-                // 3. Fetch follow status silently in the background
                 if (currentUser && token) {
                     axios.get(`${BACKEND_URL}/expo/following`, { headers: { Authorization: `Bearer ${token}` } }).then(followRes => {
-                        let currentlyFollowing = false;
                         if (isMounted && followRes.data.following && followRes.data.following[id]) {
                             setIsFollowing(true);
-                            currentlyFollowing = true;
-                        }
-
-                        const isThisOfficial = String(shopInfo.user_id) === "1" || shopInfo.user_email === 'pavanvenkat63@gmail.com' || shopInfo.email === 'pavanvenkat63@gmail.com';
-                        const isOwner = String(currentUser.id) === String(shopInfo.user_id);
-                        
-                        // 🟢 FIXED: Owner and Master Admin will NOT auto-follow their own shop
-                        if (isThisOfficial && !currentlyFollowing && !isOwner && !isMasterAdmin) {
-                            axios.post(`${BACKEND_URL}/expo/follow/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } }).catch(()=>{});
-                            if (isMounted) {
-                                setIsFollowing(true);
-                                setShopData(prev => ({ ...prev, followers_count: (Number(prev.followers_count) || 0) + 1 }));
-                            }
                         }
                     }).catch(() => {});
                 }
             } catch (err) {
-                console.error("Frontend fetch error:", err);
                 if (isMounted) toast.error("Failed to load shop.");
             } finally {
                 if (isMounted) setLoading(false);
@@ -210,7 +160,7 @@ const ShopProfile = () => {
     const handleToggleVerified = async () => {
         try {
             const token = localStorage.getItem('token');
-            const newStatus = !shopData.is_verified;
+            const newStatus = !(shopData.is_verified === true || String(shopData.is_verified).toLowerCase() === 'true');
             await axios.put(`${getBackendUrl()}/shops/admin/vendor/${id}/verify-status`,
                 { is_verified: newStatus, is_approved: shopData.is_approved },
                 { headers: { Authorization: `Bearer ${token}` } }
@@ -220,51 +170,58 @@ const ShopProfile = () => {
         } catch (err) { toast.error("Failed to update verification status."); }
     };
 
+    // 🟢 SENDS VERIFICATION REQUEST DIRECTLY TO MASTER ADMIN
+    const handleRequestVerification = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`${getBackendUrl()}/shops/${id}/request-verification`, {}, { headers: { Authorization: `Bearer ${token}` }});
+            toast.success("🛡️ Request sent! Admin will review your shop soon.");
+        } catch (err) {
+            toast.error("Failed to send verification request.");
+        }
+    };
+
     const handleFollowToggle = async () => {
         if (!currentUser) {
             toast.info("Please login to follow this shop!");
             return navigate('/welcome');
         }
-        
-        const isOfficialApp = String(shopData.user_id) === "1" || shopData.user_email === 'pavanvenkat63@gmail.com' || shopData.email === 'pavanvenkat63@gmail.com';
-        if (isOfficialApp && isFollowing) {
-            toast.info("The Subhams Hub Official Store is a mandatory ecosystem channel and cannot be unfollowed.");
-            return;
-        }
+        if (isFollowLoading) return;
 
-        const prevFollow = isFollowing;
-        setIsFollowing(!prevFollow);
+        setIsFollowLoading(true);
+        const nextState = !isFollowing;
+        setIsFollowing(nextState);
         
         setShopData(prev => ({
             ...prev,
-            followers_count: prevFollow ? Math.max(0, (Number(prev.followers_count) || 0) - 1) : (Number(prev.followers_count) || 0) + 1
+            followers_count: nextState ? (Number(prev.followers_count) || 0) + 1 : Math.max(0, (Number(prev.followers_count) || 0) - 1)
         }));
         
         try {
             const token = localStorage.getItem('token');
-            await axios.post(`${getBackendUrl()}/expo/follow/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
-            toast.success(!prevFollow ? "Following!" : "Unfollowed");
+            const res = await axios.post(`${getBackendUrl()}/follow/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            
+            if (res.data.isFollowing !== nextState) {
+                setIsFollowing(res.data.isFollowing);
+                setShopData(prev => ({ ...prev, followers_count: res.data.isFollowing ? (Number(prev.followers_count) || 0) + 1 : Math.max(0, (Number(prev.followers_count) || 0) - 1) }));
+            }
+            toast.success(res.data.isFollowing ? "Following! Push alerts enabled." : "Unfollowed.");
         } catch (err) {
-            setIsFollowing(prevFollow); 
-            setShopData(prev => ({
-                ...prev,
-                followers_count: prevFollow ? (Number(prev.followers_count) || 0) + 1 : Math.max(0, (Number(prev.followers_count) || 0) - 1)
-            }));
+            setIsFollowing(!nextState);
+            setShopData(prev => ({ ...prev, followers_count: !nextState ? (Number(prev.followers_count) || 0) + 1 : Math.max(0, (Number(prev.followers_count) || 0) - 1) }));
             toast.error("Failed to update follow status.");
+        } finally {
+            setIsFollowLoading(false);
         }
     };
 
     const fetchFollowersList = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`${getBackendUrl()}/shops/${id}/followers`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get(`${getBackendUrl()}/shops/${id}/followers`, { headers: { Authorization: `Bearer ${token}` } });
             setFollowersList(res.data.followers || []);
             setShowFollowersModal(true);
-        } catch (err) {
-            toast.error("Failed to load followers list.");
-        }
+        } catch (err) { toast.error("Failed to load followers list."); }
     };
 
     const userArea = currentUser?.address ? currentUser.address.split(',')[0].trim() : null;
@@ -273,10 +230,7 @@ const ShopProfile = () => {
     );
 
     const handleRequestDelivery = async () => {
-        if (!currentUser) {
-            toast.info("Please login to request delivery!");
-            return navigate('/welcome');
-        }
+        if (!currentUser) return navigate('/welcome');
         try {
             const token = localStorage.getItem('token');
             const basicUserAddress = currentUser.address || 'Unknown Location';
@@ -399,9 +353,7 @@ const ShopProfile = () => {
             link.download = `${shopData.business_name}_SubhamsHub.jpg`;
             link.click();
             toast.success("Image saved! You can now share it on WhatsApp.");
-        } catch (err) {
-            toast.error("Failed to generate image. Try again.");
-        }
+        } catch (err) { toast.error("Failed to generate image. Try again."); }
     };
 
     const handleShare = async () => {
@@ -439,30 +391,17 @@ const ShopProfile = () => {
         );
     };
 
-    // 🟢 INITIATE SECURE CHAT (Only for Official Store)
     const handleInitiateChat = async () => {
-        if (!currentUser) {
-            toast.info("Please login to message this shop!");
-            return navigate('/welcome');
-        }
-
-        if (currentUser.can_message === false) {
-            toast.error("⚠️ Your messaging privileges have been suspended by Admin.");
-            return;
-        }
+        if (!currentUser) return navigate('/welcome');
+        if (currentUser.can_message === false) return toast.error("⚠️ Your messaging privileges have been suspended by Admin.");
 
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post(`${getBackendUrl()}/chats/initiate/${id}`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.post(`${getBackendUrl()}/chats/initiate/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
             navigate(`/chat/${res.data.conversation_id}`);
-        } catch (err) {
-            toast.error(err.response?.data?.message || "Failed to start chat.");
-        }
+        } catch (err) { toast.error(err.response?.data?.message || "Failed to start chat."); }
     };
 
-    // 🟢 FIXED: Proper Loading State and Error Fallback (Prevents White Screen)
     if (loading) return (
         <div style={{...styles.page, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
             <Loader className="spin" size={40} color="#2874f0" style={{marginBottom: '10px'}} />
@@ -478,15 +417,33 @@ const ShopProfile = () => {
         </div>
     );
 
-    // 🟢 ACCURATE OWNER AND OFFICIAL STATUS CHECKS
     const isOwner = Boolean(currentUser?.id && shopData?.user_id && String(currentUser.id) === String(shopData.user_id));
-    const isOfficialApp = Boolean(
-        String(shopData?.user_id) === "1" || 
-        shopData?.user_email === 'pavanvenkat63@gmail.com' || 
-        shopData?.email === 'pavanvenkat63@gmail.com'
-    );
-    
-    const hideFollowButton = isOwner || (isMasterAdmin && isOfficialApp);
+    const isOfficialApp = Boolean(String(shopData?.user_id) === "1" || shopData?.user_email === 'pavanvenkat63@gmail.com' || shopData?.email === 'pavanvenkat63@gmail.com');
+    const isShopSuspended = shopData?.account_status === 'temp_block' || shopData?.account_status === 'perma_banned';
+    const isVer = shopData?.is_verified === true || String(shopData?.is_verified).toLowerCase() === 'true';
+
+    // FORMAT UNLOCK TIME
+    let unlockTimeStr = '';
+    if (shopData?.account_status === 'temp_block' && shopData?.ban_until) {
+        const date = new Date(shopData.ban_until);
+        unlockTimeStr = date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+
+    const getBannerBackground = () => {
+        if (shopData?.account_status === 'perma_banned') return 'linear-gradient(135deg, #090d16 0%, #1e293b 100%)'; 
+        if (shopData?.account_status === 'temp_block') return 'linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)'; 
+        if (isOfficialApp) return 'linear-gradient(135deg, #b45309 0%, #facc15 100%)'; 
+        if (isVer) return 'linear-gradient(135deg, #14532d 0%, #16a34a 100%)'; 
+        return 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)'; 
+    };
+
+    const getLogoStyle = () => {
+        if (shopData?.account_status === 'perma_banned') return { ...styles.businessLogo, border: '4px solid #0f172a', boxShadow: '0 4px 15px rgba(0,0,0,0.6)' };
+        if (shopData?.account_status === 'temp_block') return { ...styles.businessLogo, border: '4px solid #dc2626', boxShadow: '0 4px 15px rgba(220,38,38,0.4)' };
+        if (isOfficialApp) return styles.businessLogoGold;
+        if (isVer) return { ...styles.businessLogo, border: '4px solid #16a34a', boxShadow: '0 4px 15px rgba(22,163,74,0.4)' };
+        return { ...styles.businessLogo, border: '4px solid #3b82f6', boxShadow: '0 4px 15px rgba(59,130,246,0.3)' };
+    };
 
     const dbShopType = shopData.shop_type || 'Products'; 
     const shopImageSrc = getOptimizedImage(shopData.shop_logo);
@@ -511,8 +468,36 @@ const ShopProfile = () => {
                 </div>
             </div>
 
-            <div id="shop-card-export" style={{ background: '#f8fafc', paddingBottom: '20px' }}>
-                <div style={{...styles.bannerBackground, background: isOfficialApp ? 'linear-gradient(135deg, #b45309 0%, #facc15 100%)' : 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)'}}>
+            {/* 🟢 SUSPENSION WARNING BANNER */}
+            {isShopSuspended && (
+                <div style={{ background: shopData.account_status === 'perma_banned' ? '#0f172a' : '#fef2f2', color: shopData.account_status === 'perma_banned' ? '#f8fafc' : '#dc2626', padding: '16px 20px', textAlign: 'center', borderBottom: `2px solid ${shopData.account_status === 'perma_banned' ? '#334155' : '#ef4444'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: '900' }}>
+                        <AlertTriangle size={18} color={shopData.account_status === 'perma_banned' ? '#facc15' : '#dc2626'} /> 
+                        {shopData.account_status === 'perma_banned' ? 'THIS SHOP IS PERMANENTLY DISABLED' : 'THIS SHOP IS TEMPORARILY SUSPENDED'}
+                    </div>
+                    
+                    <div style={{ background: shopData.account_status === 'perma_banned' ? '#1e293b' : '#fee2e2', color: shopData.account_status === 'perma_banned' ? '#cbd5e1' : '#991b1b', padding: '8px 15px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 'bold', maxWidth: '600px', width: '100%', border: `1px solid ${shopData.account_status === 'perma_banned' ? '#334155' : '#fecaca'}` }}>
+                        Admin Reason: {shopData.ban_reason || 'Violation of Subhams Hub marketplace policy guidelines.'}
+                    </div>
+
+                    {shopData.account_status === 'temp_block' && unlockTimeStr && (
+                        <div style={{ fontSize: '13px', color: '#b91c1c', fontWeight: '800', marginTop: '4px', background: '#fecaca', padding: '4px 10px', borderRadius: '12px' }}>
+                            ⏳ Unblocks at: {unlockTimeStr}
+                        </div>
+                    )}
+
+                    <span style={{ fontSize: '11px', color: shopData.account_status === 'perma_banned' ? '#94a3b8' : '#b91c1c', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>
+                        Ordering, messaging, and Expo feeds are completely disabled for this shop.
+                    </span>
+
+                    <a href="https://subhamsnetworks.in/#contact" target="_blank" rel="noreferrer" style={{ marginTop: '4px', fontSize: '12px', color: shopData.account_status === 'perma_banned' ? '#60a5fa' : '#dc2626', fontWeight: '800', textDecoration: 'underline' }}>
+                        Need help? Contact Subhams Hub Support →
+                    </a>
+                </div>
+            )}
+
+            <div id="shop-card-export" style={{ background: '#f8fafc', paddingBottom: '20px', opacity: isShopSuspended ? 0.75 : 1, pointerEvents: isShopSuspended ? 'none' : 'auto' }}>
+                <div style={{...styles.bannerBackground, background: getBannerBackground()}}>
                     <div style={styles.bannerTextContainer}>
                         <span style={styles.bannerCategoryText}>{shopData.category || 'Local Business'}</span>
                         <h1 style={styles.bannerTitleText}>{shopData.business_name}</h1>
@@ -523,18 +508,18 @@ const ShopProfile = () => {
                     <div style={styles.avatarRow}>
                         <div style={styles.avatarContainer}>
                             {shopImageSrc ? (
-                                <img src={shopImageSrc} alt="Shop Logo" crossOrigin="anonymous" referrerPolicy="no-referrer" style={isOfficialApp ? styles.businessLogoGold : styles.businessLogo} />
+                                <img src={shopImageSrc} alt="Shop Logo" crossOrigin="anonymous" referrerPolicy="no-referrer" style={getLogoStyle()} />
                             ) : (
-                                <div style={{...styles.businessLogo, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                                <div style={{...getLogoStyle(), background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                     <Store size={40} color="#94a3b8" />
                                 </div>
                             )}
-                            {shopData.is_online && <div style={styles.onlineBadge}></div>}
+                            {shopData.is_online && !isShopSuspended && <div style={styles.onlineBadge}></div>}
                         </div>
                         
                         <div style={styles.realMetricsBox}>
                             <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                                <Package size={20} color={isOfficialApp ? "#d97706" : "#2874f0"} />
+                                <Package size={20} color={isOfficialApp ? "#d97706" : isVer ? "#16a34a" : "#2874f0"} />
                                 <div style={{display: 'flex', flexDirection: 'column'}}>
                                     <span style={styles.metricNumber}>{products.length}</span>
                                     <span style={styles.metricLabel}>Live Items</span>
@@ -542,11 +527,8 @@ const ShopProfile = () => {
                             </div>
                             <div style={{width: '1px', height: '35px', background: '#e2e8f0', margin: '0 8px'}}></div>
                             
-                            <div 
-                                style={{display: 'flex', alignItems: 'center', gap: '10px', cursor: (isOwner || isMasterAdmin) ? 'pointer' : 'default'}}
-                                onClick={() => { if (isOwner || isMasterAdmin) fetchFollowersList(); }}
-                            >
-                                <Users size={20} color={isOfficialApp ? "#d97706" : "#2874f0"} />
+                            <div style={{display: 'flex', alignItems: 'center', gap: '10px', cursor: (isOwner || isMasterAdmin) ? 'pointer' : 'default'}} onClick={() => { if ((isOwner || isMasterAdmin) && !isShopSuspended) fetchFollowersList(); }}>
+                                <Users size={20} color={isOfficialApp ? "#d97706" : isVer ? "#16a34a" : "#2874f0"} />
                                 <div style={{display: 'flex', flexDirection: 'column'}}>
                                     <span style={styles.metricNumber}>{shopData.followers_count || 0}</span>
                                     <span style={styles.metricLabel}>Followers</span>
@@ -558,11 +540,13 @@ const ShopProfile = () => {
                     <div style={styles.bioSection}>
                         <h2 style={styles.shopName}>
                             {shopData.business_name} 
-                            {renderBadge(isOfficialApp, shopData.is_verified)}
+                            {renderBadge(isOfficialApp, shopData.is_verified, shopData.account_status)}
                         </h2>
-                        <span style={{...styles.categoryTag, background: isOfficialApp ? '#fef3c7' : '#e0e7ff', color: isOfficialApp ? '#b45309' : '#1d4ed8'}}>{shopData.category}</span>
+                        <span style={{...styles.categoryTag, background: isOfficialApp ? '#fef3c7' : isVer ? '#dcfce7' : '#eff6ff', color: isOfficialApp ? '#b45309' : isVer ? '#15803d' : '#1d4ed8'}}>{shopData.category}</span>
                         
-                        <p style={styles.address}><MapPin size={14} /> {shopData.address ? shopData.address.split(',')[0].trim() : 'Local Business'}</p>
+                        {shopData.address && (
+                            <p style={styles.address}><MapPin size={14} /> {shopData.address.split(',')[0].trim()}</p>
+                        )}
                         
                         <p style={{ margin: '5px 0 0 0', color: '#16a34a', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
                             🚚 Delivers to: {shopData.delivery_areas || 'All Areas'}
@@ -574,7 +558,19 @@ const ShopProfile = () => {
             </div>
 
             <div style={{ padding: '0 20px', maxWidth: '800px', margin: '0 auto' }}>
-                {(isOwner || isMasterAdmin) && (
+                {isOwner && !isOfficialApp && !isVer && !isShopSuspended && (
+                    <div style={{ background: '#eff6ff', padding: '15px', borderRadius: '12px', border: '1px dashed #3b82f6', marginBottom: '15px', textAlign: 'center' }}>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 'bold', color: '#1e3a8a', lineHeight: '1.4' }}>
+                            Standard shops can only post text updates on Expo. Get verified to post photos & videos! 📸<br/>
+                            <span style={{fontSize: '11.5px', color: '#3b82f6'}}>ప్రామాణిక షాపులు కేవలం టెక్స్ట్ మాత్రమే పోస్ట్ చేయగలవు. ఫోటోలు & వీడియోలు పోస్ట్ చేయడానికి వెరిఫై చేసుకోండి!</span>
+                        </p>
+                        <button onClick={handleRequestVerification} style={{ background: '#16a34a', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', marginTop: '5px' }}>
+                            <ShieldAlert size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} /> Request Green Badge Verification
+                        </button>
+                    </div>
+                )}
+
+                {(isOwner || isMasterAdmin) && !isShopSuspended && (
                     <div style={{...styles.adminControlPanel, border: isOfficialApp ? '1px dashed #f59e0b' : '1px dashed #94a3b8', background: isOfficialApp ? '#fffbeb' : '#f8fafc'}}>
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
                             <span style={{fontSize: '12px', fontWeight: 'bold', color: isMasterAdmin ? '#b45309' : '#475569'}}>
@@ -587,17 +583,9 @@ const ShopProfile = () => {
                             <button onClick={openTeamModal} style={{...styles.primaryAdminBtn, background: '#3b82f6'}}><UserPlus size={16}/> Manage Team</button>
                             
                             {isMasterAdmin && !isOfficialApp && (
-                                <button 
-                                    onClick={handleToggleVerified} 
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '6px', padding: '10px', flex: 1, justifyContent: 'center',
-                                        background: shopData.is_verified ? '#dcfce7' : '#f1f5f9', 
-                                        border: `1px solid ${shopData.is_verified ? '#86efac' : '#cbd5e1'}`, 
-                                        color: shopData.is_verified ? '#15803d' : '#475569', 
-                                        borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer'
-                                    }}>
-                                    <BadgeCheck size={16} fill={shopData.is_verified ? "#10b981" : "#94a3b8"} color={shopData.is_verified ? "white" : "#cbd5e1"} />
-                                    {shopData.is_verified ? "Revoke Verification" : "Grant Green Badge"}
+                                <button onClick={handleToggleVerified} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px', flex: 1, justifyContent: 'center', background: isVer ? '#dcfce7' : '#f1f5f9', border: `1px solid ${isVer ? '#86efac' : '#cbd5e1'}`, color: isVer ? '#15803d' : '#475569', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}>
+                                    <BadgeCheck size={16} fill={isVer ? "#10b981" : "#94a3b8"} color={isVer ? "white" : "#cbd5e1"} />
+                                    {isVer ? "Revoke Verification" : "Grant Green Badge"}
                                 </button>
                             )}
                         </div>
@@ -618,7 +606,7 @@ const ShopProfile = () => {
                                             return (
                                                 <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} color="#64748b" /> {basicArea}</span>
-                                                    <span style={{ background: '#ef4444', color: 'white', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{req.count} {req.count == 1 ? 'Person' : 'People'}</span>
+                                                    <span style={{ background: '#ef4444', color: 'white', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{req.count} {req.count === 1 ? 'Person' : 'People'}</span>
                                                 </div>
                                             );
                                         })}
@@ -629,37 +617,37 @@ const ShopProfile = () => {
                     </div>
                 )}
 
-                {/* 🟢 FIXED: ACTION BUTTONS (Message Button ONLY for Official Store) */}
                 {!isOwner && (
                     <div style={{ display: 'flex', gap: '10px', marginTop: '20px', width: '100%' }}>
+                        <button 
+                            disabled={isShopSuspended} 
+                            style={{...isFollowing ? styles.followingBtn : styles.primaryActionBtn, flex: 1, opacity: isShopSuspended ? 0.4 : 1, cursor: isShopSuspended ? 'not-allowed' : 'pointer', background: isFollowing ? '#f1f5f9' : (isOfficialApp ? 'linear-gradient(135deg, #facc15, #d97706)' : '#2874f0')}} 
+                            onClick={handleFollowToggle}
+                        >
+                            {isFollowing ? <Check size={18} color="#0f172a" /> : <Users size={18} color="white" />} 
+                            <span style={{color: isFollowing ? '#0f172a' : 'white'}}>{isFollowing ? 'Following' : 'Follow Store'}</span>
+                        </button>
                         
-                        {!hideFollowButton && (
-                            <button style={{...isFollowing ? styles.followingBtn : styles.primaryActionBtn, flex: 1, background: isFollowing ? '#f1f5f9' : (isOfficialApp ? 'linear-gradient(135deg, #facc15, #d97706)' : '#2874f0')}} onClick={handleFollowToggle}>
-                                {isFollowing ? <Check size={18} color="#0f172a" /> : <Users size={18} color="white" />} 
-                                <span style={{color: isFollowing ? '#0f172a' : 'white'}}>{isFollowing ? 'Following' : 'Follow Store'}</span>
-                            </button>
-                        )}
-                        
-                        {/* 🟢 SHOW MESSAGE BUTTON ONLY IF IT IS THE OFFICIAL SUBHAMS HUB STORE */}
                         {isOfficialApp && (
-                            <button onClick={handleInitiateChat} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', background: '#16a34a', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', flex: 1, boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
-                                <MessageCircle size={18} color="white" />
-                                Contact Subhams Hub
+                            <button 
+                                disabled={isShopSuspended}
+                                onClick={handleInitiateChat} 
+                                style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', background: '#16a34a', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 'bold', fontSize: '15px', cursor: isShopSuspended ? 'not-allowed' : 'pointer', opacity: isShopSuspended ? 0.4 : 1, flex: 1, boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}
+                            >
+                                <MessageCircle size={18} color="white" /> Contact Subhams Hub
                             </button>
                         )}
 
-                        {!hideFollowButton && isFollowing && (
+                        {isFollowing && !isShopSuspended && (
                             <div style={{ position: 'relative' }}>
                                 <button style={{...styles.secondaryActionBtn, padding: '12px 15px'}} onClick={() => setNotifMenuOpen(!notifMenuOpen)}>
                                     {notifLevel === 'All' && <BellRing size={18} color={isOfficialApp ? "#d97706" : "#2563eb"} />}
                                     {notifLevel === 'Silent' && <Bell size={18} color="#f59e0b" />}
-                                    {notifLevel === 'Off' && <BellOff size={18} color="#94a3b8" />}
                                 </button>
                                 {notifMenuOpen && (
                                     <div style={styles.notifMenu}>
-                                        <div style={styles.notifItem} onClick={() => handleNotificationChange('All')}><BellRing size={14}/> All Alerts</div>
-                                        <div style={styles.notifItem} onClick={() => handleNotificationChange('Silent')}><Bell size={14}/> Silent</div>
-                                        <div style={styles.notifItem} onClick={() => handleNotificationChange('Off')}><BellOff size={14}/> Off</div>
+                                        <div style={styles.notifItem} onClick={() => handleNotificationChange('All')}><BellRing size={14}/> Loud (All Alerts)</div>
+                                        <div style={styles.notifItem} onClick={() => handleNotificationChange('Silent')}><Bell size={14}/> Silent Mode</div>
                                     </div>
                                 )}
                             </div>
@@ -672,7 +660,7 @@ const ShopProfile = () => {
                 <div style={styles.feedTabs}>
                     <div onClick={() => setActiveProfileTab('Catalog')} style={activeProfileTab === 'Catalog' ? styles.activeTab : styles.inactiveTab}>Store Catalog</div>
                     <div onClick={() => setActiveProfileTab('Expo')} style={activeProfileTab === 'Expo' ? styles.activeTab : styles.inactiveTab}>
-                        Expo Feed {expoPosts.length > 0 && <span style={styles.tabCount}>{expoPosts.length}</span>}
+                        Expo Feed {!isShopSuspended && expoPosts.length > 0 && <span style={styles.tabCount}>{expoPosts.length}</span>}
                     </div>
                 </div>
 
@@ -697,8 +685,8 @@ const ShopProfile = () => {
                                     const prodImg = getOptimizedImage(product.image_url) || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=200&q=80';
 
                                     return (
-                                        <div key={product.id} style={styles.listItem}>
-                                            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', cursor: 'pointer', flex: 1 }} onClick={() => navigate(`/item/${product.id}`)}>
+                                        <div key={product.id} style={{...styles.listItem, opacity: isShopSuspended ? 0.5 : 1}}>
+                                            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', cursor: isShopSuspended ? 'default' : 'pointer', flex: 1 }} onClick={() => { if (!isShopSuspended) navigate(`/item/${product.id}`) }}>
                                                 <img src={prodImg} alt={product.name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={styles.listImg} />
                                                 <div style={styles.listDetails}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -706,7 +694,7 @@ const ShopProfile = () => {
                                                             <h4 style={styles.listTitle}>{product.name}</h4>
                                                             <span style={styles.unitText}>{product.unit_value || '1'} {product.unit_type || 'Piece'}</span>
                                                         </div>
-                                                        <span style={styles.stockBadge}>In Stock</span>
+                                                        <span style={styles.stockBadge}>{isShopSuspended ? 'Unavailable' : 'In Stock'}</span>
                                                     </div>
                                                     <p style={styles.listDesc}>{product.description || 'Premium quality item.'}</p>
                                                     <div style={styles.priceRow}>
@@ -718,16 +706,10 @@ const ShopProfile = () => {
                                             </div>
                                             {!isOwner && (
                                                 <div style={styles.listActionBox}>
-                                                    <button style={styles.addBtn} onClick={() => {
-                                                        if (!currentUser) {
-                                                            toast.info("Please login to add to cart!");
-                                                            return navigate('/welcome');
-                                                        }
-                                                        if (!isDeliverable) {
-                                                            handleRequestDelivery();
-                                                            toast.error(`Delivery not currently available to your area.`);
-                                                            return;
-                                                        }
+                                                    <button disabled={isShopSuspended} style={{...styles.addBtn, cursor: isShopSuspended ? 'not-allowed' : 'pointer', background: isShopSuspended ? '#f1f5f9' : '#eff6ff', color: isShopSuspended ? '#94a3b8' : '#2563eb', border: isShopSuspended ? '1px solid #cbd5e1' : '1px solid #bfdbfe'}} onClick={() => {
+                                                        if (isShopSuspended) return toast.error("This shop is suspended. Orders are disabled.");
+                                                        if (!currentUser) return navigate('/welcome');
+                                                        if (!isDeliverable) { handleRequestDelivery(); toast.error(`Delivery not currently available to your area.`); return; }
                                                         toast.success("Added to cart!");
                                                     }}>
                                                         {dbShopType.includes('Services') ? 'Book' : 'Add +'}
@@ -742,7 +724,13 @@ const ShopProfile = () => {
                     </>
                 ) : (
                     <>
-                        {expoPosts.length === 0 ? (
+                        {isShopSuspended ? (
+                            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#fef2f2', borderRadius: '16px', border: '1px dashed #fecaca' }}>
+                                <AlertTriangle size={36} color="#dc2626" style={{ marginBottom: '10px' }} />
+                                <h4 style={{ margin: '0 0 5px 0', color: '#991b1b', fontSize: '15px' }}>Expo Content Hidden</h4>
+                                <p style={{ margin: 0, fontSize: '13px', color: '#b91c1c' }}>This store's Expo posts, likes, and comment interactions have been paused due to active account restrictions.</p>
+                            </div>
+                        ) : expoPosts.length === 0 ? (
                             <div style={styles.emptyFeed}>
                                 <Video size={40} color="#cbd5e1" style={{marginBottom: '10px'}} />
                                 <p style={{margin: 0, fontWeight: 'bold', color: '#64748b'}}>{shopData.business_name} hasn't posted to Expo yet.</p>
@@ -754,7 +742,7 @@ const ShopProfile = () => {
                                     const isTextOnly = !post.media_url || post.media_type === 'text';
 
                                     return (
-                                        <div key={post.id} onClick={() => navigate('/expo')} style={{ aspectRatio: '1', position: 'relative', background: '#000', cursor: 'pointer', overflow: 'hidden' }}>
+                                        <div key={post.id} onClick={() => navigate(`/expo?postId=${post.id}`)} style={{ aspectRatio: '1', position: 'relative', background: '#000', cursor: 'pointer', overflow: 'hidden' }}>
                                             {isTextOnly ? (
                                                 <div style={{ padding: '10px', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'linear-gradient(135deg, #2563eb, #8b5cf6)', boxSizing: 'border-box' }}>
                                                     <MessageCircle size={14} color="white" style={{ opacity: 0.8, marginBottom: '4px' }} />
@@ -856,7 +844,7 @@ const ShopProfile = () => {
                             <div>
                                 <label style={styles.modalLabel}>Shop Address / Location</label>
                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                    <input style={{...styles.input, flex: 1}} value={editForm.address} onChange={e => setEditForm({...editForm, address: e.target.value})} placeholder="Enter full shop address..." required />
+                                    <input style={{...styles.input, flex: 1}} value={editForm.address} onChange={e => setEditForm({...editForm, address: e.target.value})} placeholder="Enter public business location..." required />
                                     <button type="button" onClick={() => setShowLocModal('location')} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '0 15px', cursor: 'pointer', color: '#2563eb' }}><MapPin size={18} /></button>
                                 </div>
                             </div>
@@ -921,7 +909,6 @@ const ShopProfile = () => {
                 </div>
             )}
 
-            {/* 🟢 FOLLOWERS MODAL (STRICT PRIVACY: USERNAME ONLY, NO EMAILS) */}
             {showFollowersModal && (
                 <div style={styles.overlay} onClick={() => setShowFollowersModal(false)}>
                     <div style={{...styles.modal, maxHeight: '400px'}} onClick={e => e.stopPropagation()}>
@@ -936,7 +923,6 @@ const ShopProfile = () => {
                             {followersList.map(u => {
                                 const isUserOfficial = u.role === 'admin' || u.id === 1;
                                 const isUserVerified = u.is_verified;
-                                // 🟢 FIXED: Extremely strict check against actual 'null' strings
                                 const isUserShop = u.shop_id && String(u.shop_id) !== 'null' && String(u.shop_id) !== 'undefined';
                                 const displayName = u.business_name || u.username || 'User';
 
@@ -944,7 +930,7 @@ const ShopProfile = () => {
                                     <div key={u.id} style={{display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid #f1f5f9'}}>
                                         <img src={getFallbackAvatar(displayName)} alt="Avatar" style={{width: '32px', height: '32px', borderRadius: '50%'}} />
                                         <span style={{fontSize: '14px', fontWeight: '700', color: '#0f172a'}}>{displayName}</span>
-                                        {renderBadge(isUserOfficial, isUserVerified, isUserShop)}
+                                        {renderBadge(isUserOfficial, isUserVerified, 'active', isUserShop)}
                                     </div>
                                 );
                             })}
@@ -970,14 +956,14 @@ const styles = {
     profileContentWrapper: { padding: '0 20px', marginTop: '-45px', position: 'relative', zIndex: 2, maxWidth: '800px', margin: '-45px auto 0 auto' },
     avatarRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' },
     avatarContainer: { position: 'relative' },
-    businessLogo: { width: '90px', height: '90px', borderRadius: '16px', objectFit: 'cover', border: '4px solid white', backgroundColor: 'white', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
+    businessLogo: { width: '90px', height: '90px', borderRadius: '16px', objectFit: 'cover', backgroundColor: 'white' },
     businessLogoGold: { width: '90px', height: '90px', borderRadius: '16px', objectFit: 'cover', border: '4px solid #facc15', backgroundColor: 'white', boxShadow: '0 4px 15px rgba(250, 204, 21, 0.4)' },
     onlineBadge: { position: 'absolute', bottom: '-4px', right: '-4px', width: '18px', height: '18px', background: '#22c55e', border: '3px solid white', borderRadius: '50%' },
     realMetricsBox: { background: 'white', padding: '10px 15px', borderRadius: '12px', display: 'flex', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', marginBottom: '10px' },
     metricNumber: { fontSize: '16px', fontWeight: '900', color: '#0f172a', lineHeight: '1' },
     metricLabel: { fontSize: '11px', color: '#64748b', fontWeight: 'bold' },
     bioSection: { marginTop: '15px' },
-    shopName: { margin: '0 0 5px 0', fontSize: '22px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '6px', color: '#0f172a' },
+    shopName: { margin: '0 0 5px 0', fontSize: '22px', fontWeight: '900', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', color: '#0f172a' },
     categoryTag: { display: 'inline-block', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' },
     address: { margin: 0, color: '#475569', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '500' },
     adminControlPanel: { marginTop: '20px', padding: '15px', borderRadius: '12px' },

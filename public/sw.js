@@ -5,66 +5,70 @@ self.addEventListener('install', (event) => {
     console.log("Subhams Hub Service Worker Installed!");
 });
 
-self.addEventListener('fetch', (event) => {});
-self.addEventListener('push', function(event) {
-    if (event.data) {
-        const data = event.data.json();
-        
-        // 1. Build the URL for the Full-Screen Call Page
-        const callUrl = `/incoming-call?callerName=${encodeURIComponent(data.title)}&roomId=${data.roomId}&type=${data.type || 'message'}`;
-        
-        // 2. We STILL show a high-priority notification as a fallback in case the OS blocks auto-opening
-        const options = {
-            body: data.body,
-            icon: '/logo192.png',
-            vibrate: [500, 250, 500, 250, 500, 250, 500],
-            requireInteraction: true,
-            data: { url: callUrl },
-            actions: [
-                { action: 'answer', title: '🟢 Answer' }
-            ]
-        };
-
-        const notificationPromise = self.registration.showNotification(data.title, options);
-
-        // 3. 🟢 THE MAGIC TRICK: Force open the Web App instantly!
-        const openWindowPromise = clients.matchAll({ type: 'window', includeUncontrolled: true })
-            .then(windowClients => {
-                // If app is already open, just redirect the active window to the call screen
-                for (let i = 0; i < windowClients.length; i++) {
-                    let client = windowClients[i];
-                    if (client.url.includes(self.registration.scope) && 'focus' in client) {
-                        client.navigate(callUrl);
-                        return client.focus();
-                    }
-                }
-                // If app is closed, FORCE OPEN it (Works best when PWA is installed)
-                if (clients.openWindow) {
-                    return clients.openWindow(callUrl);
-                }
-            });
-
-        // Wait for both to execute
-        event.waitUntil(Promise.all([notificationPromise, openWindowPromise]));
-    }
+self.addEventListener('activate', (event) => {
+    event.waitUntil(clients.claim());
 });
 
+self.addEventListener('fetch', (event) => {});
+
+self.addEventListener('push', function(event) {
+    if (!event.data) return;
+
+    let data = {};
+    try {
+        data = event.data.json();
+    } catch (e) {
+        data = { title: "Subhams Hub", body: event.data.text() };
+    }
+
+    const targetUrl = data.url || data.link || (data.roomId 
+        ? `/incoming-call?callerName=${encodeURIComponent(data.title)}&roomId=${data.roomId}&type=${data.type || 'message'}`
+        : '/');
+
+    // 🟢 FIXED: Added 'image: data.image' so Chrome renders your HD push banners safely!
+    const options = {
+        body: data.body || "New update from Subhams Hub",
+        icon: data.icon || '/logo192.png',
+        badge: '/favicon.ico',
+        image: data.image || null, 
+        vibrate: [200, 100, 200],
+        requireInteraction: Boolean(data.requireInteraction),
+        data: { url: targetUrl },
+        actions: data.roomId 
+            ? [{ action: 'answer', title: '🟢 Open Call' }] 
+            : [{ action: 'open', title: 'View' }]
+    };
+
+    const notificationPromise = self.registration.showNotification(
+        data.title || "Subhams Hub Alert", 
+        options
+    );
+
+    event.waitUntil(notificationPromise);
+});
+
+// 🟢 FIXED: Smooth client focus and targeted routing to prevent refresh loops
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
-    if (event.notification.data && event.notification.data.url) {
-        event.waitUntil(
-            clients.matchAll({ type: 'window' }).then(windowClients => {
-                for (var i = 0; i < windowClients.length; i++) {
-                    var client = windowClients[i];
-                    if (client.url.includes(self.registration.scope) && 'focus' in client) {
-                        client.navigate(event.notification.data.url);
-                        return client.focus();
-                    }
+    const destination = (event.notification.data && event.notification.data.url) 
+        ? event.notification.data.url 
+        : '/';
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+            // Check if app is already open in a tab
+            for (let i = 0; i < windowClients.length; i++) {
+                let client = windowClients[i];
+                if ('focus' in client) {
+                    client.focus();
+                    client.postMessage({ type: 'NAVIGATE_TO', url: destination });
+                    return;
                 }
-                if (clients.openWindow) {
-                    return clients.openWindow(event.notification.data.url);
-                }
-            })
-        );
-    }
+            }
+            // Otherwise open a fresh window pointing directly to the link
+            if (clients.openWindow) {
+                return clients.openWindow(destination);
+            }
+        })
+    );
 });

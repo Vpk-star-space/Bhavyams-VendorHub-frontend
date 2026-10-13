@@ -2,15 +2,27 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client'; 
-import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus, MessageSquare, Lock, Edit, UserX, Unlock, Clock, Ban, Search, Users, Store, User } from 'lucide-react';
+import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus, MessageSquare, Lock, Edit, UserX, Unlock, Clock, Ban, Search, Users, Store, User, BellRing } from 'lucide-react';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
+
 const getOptimizedImage = (url) => {
     if (!url) return null;
     if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
         return url.replace('/upload/', '/upload/q_auto,f_auto,w_400/');
     }
     return url; 
+};
+
+// 🟢 SMART 5-TIER BADGE RENDERER FOR ADMIN
+const renderAdminBadge = (isOfficial, isVerified, accountStatus) => {
+    const baseStyle = { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '900', whiteSpace: 'nowrap' };
+    
+    if (accountStatus === 'perma_banned') return <span style={{...baseStyle, background: '#0f172a', color: 'white'}}>⬛ Banned</span>;
+    if (accountStatus === 'temp_block') return <span style={{...baseStyle, background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca'}}>🟥 Suspended</span>;
+    if (isOfficial) return <span style={{...baseStyle, background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a'}}>🌟 Official</span>;
+    if (isVerified) return <span style={{...baseStyle, background: '#dcfce7', color: '#15803d', border: '1px solid #86efac'}}>✅ Verified</span>;
+    return <span style={{...baseStyle, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe'}}>🔹 Standard</span>;
 };
 
 const AdminDashboard = () => {
@@ -29,7 +41,6 @@ const AdminDashboard = () => {
     const [newCatSection, setNewCatSection] = useState('Products');
     const [newCatImage, setNewCatImage] = useState(null);
 
-    // 🟢 DYNAMIC SYNC: Ensures admin connects to the same backend as the rest of the app
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const BACKEND_URL = isLocal ? 'http://localhost:5000/api' : 'https://bhavyams-vendorhub-backend.onrender.com/api';
     const SOCKET_URL = isLocal ? 'http://localhost:5000' : 'https://bhavyams-vendorhub-backend.onrender.com';
@@ -55,20 +66,18 @@ const AdminDashboard = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-const fetchVendors = async () => {
+    const fetchVendors = async () => {
         try {
             setErrorMsg(null);
             const token = localStorage.getItem('token');
-            if (!token) {
-                 navigate('/login'); // 🟢 Sends you to login if missing
-                 return;
-            }
+            if (!token) return navigate('/welcome');
+            
             const res = await axios.get(`${BACKEND_URL}/admin/pending-vendors`, { headers: { Authorization: `Bearer ${token}` } });
             setVendors(res.data || []);
         } catch (err) { 
-            if (err.response && err.response.status === 401) {
+            if (err.response?.status === 401) {
                 localStorage.removeItem('token');
-                navigate('/login'); // 🟢 Sends you to login if token is expired
+                navigate('/welcome'); 
             } else {
                 setErrorMsg("Failed to connect to backend server."); 
             }
@@ -94,7 +103,11 @@ const fetchVendors = async () => {
         }
     };
 
-    useEffect(() => { fetchVendors(); fetchCategories(); fetchAllUsers(); }, []);
+    useEffect(() => { 
+        fetchVendors(); 
+        fetchCategories(); 
+        fetchAllUsers(); 
+    }, []);
 
     useEffect(() => {
         if (activeTab === 'security') {
@@ -146,7 +159,7 @@ const fetchVendors = async () => {
             reason = window.prompt(`What needs to be fixed by "${businessName}"?`);
             if (!reason) return; 
         } else {
-            const prompts = { approve: `Approve "${businessName}"?`, suspend: `Suspend "${businessName}"?`, delete: `PERMANENTLY DELETE "${businessName}"?` };
+            const prompts = { approve: `Approve "${businessName}"?`, suspend: `Unlist "${businessName}" back to Pending?`, delete: `PERMANENTLY DELETE "${businessName}"?` };
             if (!window.confirm(prompts[actionType])) return;
         }
 
@@ -209,12 +222,7 @@ const fetchVendors = async () => {
                 [featureKey]: newValue
             };
             
-            await axios.put(`${BACKEND_URL}/admin/user-security/${user.id}`, { 
-                action: 'toggle_features', 
-                reason: reason, 
-                features 
-            }, { headers: { Authorization: `Bearer ${token}` } });
-            
+            await axios.put(`${BACKEND_URL}/admin/user-security/${user.id}`, { action: 'toggle_features', reason: reason, features }, { headers: { Authorization: `Bearer ${token}` } });
             toast.success(`✅ ${featureName} is now ${newValue ? 'ON' : 'OFF'} for ${user.username}`);
             fetchAllUsers();
         } catch (err) { 
@@ -222,10 +230,9 @@ const fetchVendors = async () => {
         }
     };
 
-    // 🟢 SECURITY ACTION HANDLER WITH PROPER ERROR REPORTING
     const handleUserSecurity = async (userId, username, action) => {
         let reason = '';
-        let minutes = 30; // Default fallback
+        let minutes = 30;
 
         if (action === 'warn') {
             reason = window.prompt(`⚠️ SEND WARNING TO ${username}:\nType the message that will scroll on their home screen:`);
@@ -259,43 +266,28 @@ const fetchVendors = async () => {
                 await axios.delete(`${BACKEND_URL}/admin/delete-user/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
                 toast.success(`🗑 User ${username} deleted.`);
             } else {
-                const res = await axios.put(`${BACKEND_URL}/admin/user-security/${userId}`, { 
-                    action, 
-                    reason, 
-                    minutes 
-                }, { headers: { Authorization: `Bearer ${token}` } });
-                
+                const res = await axios.put(`${BACKEND_URL}/admin/user-security/${userId}`, { action, reason, minutes }, { headers: { Authorization: `Bearer ${token}` } });
                 toast.success(`✅ ${res.data.message}`);
             }
             fetchAllUsers(); 
             fetchVendors(); 
         } catch (err) { 
-            console.error("Action error:", err);
             toast.error(err.response?.data?.message || `🚨 Failed to apply ${action}. Backend error.`); 
         }
     };
-const openSecureDocument = async (e, publicId) => {
-    // These two lines MUST be first to kill the refresh
-    if (e) {
-        e.preventDefault(); 
-        e.stopPropagation(); 
-    }
-    
-    const token = localStorage.getItem('token');
-    if (!token) return toast.error("Authentication required.");
 
-    try {
-        const res = await axios.get(`${BACKEND_URL}/admin/secure-doc/${encodeURIComponent(publicId)}`, { 
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        if (res.data?.url) {
-            window.open(res.data.url, '_blank', 'noopener,noreferrer');
+    const openSecureDocument = async (e, publicId) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        const token = localStorage.getItem('token');
+        if (!token) return toast.error("Authentication required.");
+
+        try {
+            const res = await axios.get(`${BACKEND_URL}/admin/secure-doc/${encodeURIComponent(publicId)}`, { headers: { Authorization: `Bearer ${token}` } });
+            if (res.data?.url) window.open(res.data.url, '_blank', 'noopener,noreferrer');
+        } catch (err) { 
+            toast.error(err.response?.data?.error || "Failed to generate secure document link."); 
         }
-    } catch (err) { 
-        toast.error(err.response?.data?.error || "Failed to generate secure document link."); 
-    }
-};
+    };
 
     const formatIST = (dateString) => {
         if (!dateString) return '';
@@ -311,13 +303,7 @@ const openSecureDocument = async (e, publicId) => {
     const filteredUsers = allUsers.filter(u => u.username?.toLowerCase().includes(safeSearch) || u.phone?.includes(safeSearch) || u.email?.toLowerCase().includes(safeSearch));
 
     const TYPE_OPTIONS = ["Trending", "Products", "Services", "Expo", "Business"];
-    const displayNames = {
-        'Products': '🛍️ Shopping',
-        'Services': '🧑‍🔧 Services',
-        'Business': '📈 Business',
-        'Trending': '🔥 Trending',
-        'Expo': '🌟 Expo'
-    };
+    const displayNames = { 'Products': '🛍️ Shopping', 'Services': '🧑‍🔧 Services', 'Business': '📈 Business', 'Trending': '🔥 Trending', 'Expo': '🌟 Expo' };
 
     const activeShops = vendors.filter(v => v.is_approved === true);
     let extractedVendorCategories = [];
@@ -342,11 +328,12 @@ const openSecureDocument = async (e, publicId) => {
     if (loading) return <div style={styles.loading}>Loading Master Control Room...</div>;
 
    return (
-        <> {/* 🟢 1. ADD THIS EMPTY BRACKET HERE */}
-            
-            <Navbar /> {/* 🟢 2. PUT THE NAVBAR HERE */}
+       <> 
+           <Navbar /> 
         <div style={styles.page}>
             <div style={styles.container}>
+                
+                {/* HEADER */}
                 <div style={styles.headerBar}>
                     <button onClick={() => navigate('/')} style={styles.backBtn}><ArrowLeft size={18} /> {isMobile ? "" : "Back"}</button>
                     <h1 style={styles.title}><ShieldCheck size={22} color="#2874f0" /> Master Admin</h1>
@@ -354,7 +341,22 @@ const openSecureDocument = async (e, publicId) => {
 
                 {errorMsg && <div style={styles.errorBox}>❌ {errorMsg}</div>}
 
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '5px' }}>
+                {/* CRM PORTAL BUTTON */}
+                <div style={{ background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)', borderRadius: '16px', padding: isMobile ? '20px' : '24px', marginBottom: '24px', color: 'white', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px', boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)' }}>
+                    <div>
+                        <h3 style={{ margin: '0 0 5px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px' }}>
+                            <BellRing size={22} /> Push & Engagement CRM
+                        </h3>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#bfdbfe', lineHeight: '1.4' }}>Manage automated triggers, broadcast manual pushes, and view live install analytics.</p>
+                        <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#60a5fa', fontWeight: 'bold' }}>⚡ Subhams Push Engine automatically delivers offline.</p>
+                    </div>
+                    <button onClick={() => navigate('/admin/push')} style={{ background: '#facc15', color: '#713f12', border: 'none', padding: '12px 24px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', width: isMobile ? '100%' : 'auto', justifyContent: 'center' }}>
+                        Open CRM <ExternalLink size={16} />
+                    </button>
+                </div>
+
+                {/* STATS */}
+                <div style={styles.statsContainer}>
                     <div style={{...styles.statCard, background: '#eff6ff', border: '1px solid #bfdbfe'}}>
                         <Users size={20} color="#2563eb" />
                         <div>
@@ -378,41 +380,43 @@ const openSecureDocument = async (e, publicId) => {
                     </div>
                 </div>
 
+                {/* SEARCH */}
                 <div style={{ display: 'flex', alignItems: 'center', background: 'white', padding: '12px 15px', borderRadius: '12px', border: '1px solid #cbd5e1', marginBottom: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
                     <Search size={18} color="#64748b" />
-                    <input type="text" placeholder="Search users, shops, emails, or phone numbers..." value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', marginLeft: '10px', fontSize: '14px', background: 'transparent' }} />
+                    <input type="text" placeholder="Search users, shops, emails..." value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', marginLeft: '10px', fontSize: '14px', background: 'transparent' }} />
                 </div>
 
-                <div style={styles.tabContainer}>
+                {/* TABS */}
+                <div className="hide-scroll" style={styles.tabContainer}>
                     <button style={activeTab === 'pending' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('pending')}>⏳ Pending</button>
                     <button style={activeTab === 'active' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('active')}>✅ Active Shops</button>
                     <button style={activeTab === 'categories' ? styles.activeTab : styles.inactiveTab} onClick={() => setActiveTab('categories')}>📂 Folders</button>
                     <button style={activeTab === 'security' ? {...styles.activeTab, background: '#ef4444'} : styles.inactiveTab} onClick={() => setActiveTab('security')}>🛡 Security</button>
                 </div>
 
+                {/* 🛡️ SECURITY TAB */}
                 {activeTab === 'security' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{...styles.card, background: '#fef2f2', border: '1px solid #ef4444'}}>
                             <h2 style={{marginTop: 0, color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px'}}><AlertTriangle /> Global Security Center</h2>
-                            <p style={{color: '#991b1b', fontSize: '13px', margin: 0}}>Manage all accounts. Toggle features individually or issue Strikes. 3 Strikes = Auto Ban.</p>
+                            <p style={{color: '#991b1b', fontSize: '13px', margin: 0, lineHeight: '1.4'}}>Manage all accounts. Toggle features individually or issue Strikes. 3 Strikes = Auto Ban.</p>
                         </div>
 
                         {filteredUsers.length === 0 ? <div style={styles.emptyBox}>No users found.</div> : filteredUsers.map(u => {
                             const chatOn = u.can_message !== false;
                             const callOn = u.can_call !== false;
                             const bookOn = u.can_book !== false;
-                            
-                            // Highlight bad actors
                             const isWarned = u.strikes >= 2;
                             const isBanned = u.account_status === 'perma_banned';
+                            const isMasterAccount = u.email === 'pavanvenkat63@gmail.com' || String(u.id) === "1";
 
                             return (
                             <div key={u.id} style={{...styles.card, display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '15px', padding: '15px', borderLeft: isBanned ? '5px solid #dc2626' : isWarned ? '5px solid #f59e0b' : '1px solid #e2e8f0'}}>
                                 <div style={{width: '100%'}}>
-                                    <h4 style={{ margin: '0 0 5px 0', fontSize: '16px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <h4 style={{ margin: '0 0 5px 0', fontSize: '16px', color: '#0f172a', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                                         {u.username} <span style={{fontSize: '10px', background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase'}}>{u.role}</span>
                                     </h4>
-                                    <p style={{margin: '0 0 4px 0', fontSize: '12px', color: '#475569'}}>📧 {u.email || 'No email'} | 📱 {u.phone || 'No phone'}</p>
+                                    <p style={{margin: '0 0 4px 0', fontSize: '12px', color: '#475569', wordBreak: 'break-all'}}>📧 {u.email || 'No email'} | 📱 {u.phone || 'No phone'}</p>
                                     
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
                                         <span style={{fontSize: '12px', fontWeight: 'bold', padding: '3px 8px', borderRadius: '6px', background: u.account_status === 'active' ? '#dcfce7' : '#fee2e2', color: u.account_status === 'active' ? '#166534' : '#991b1b'}}>
@@ -425,13 +429,13 @@ const openSecureDocument = async (e, publicId) => {
                                     {u.ban_reason && <p style={{margin: '8px 0 0 0', fontSize: '12px', color: '#b91c1c', fontWeight: 'bold'}}>⚠️ Msg: {u.ban_reason}</p>}
 
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                                        <div onClick={() => toggleUserFeature(u, 'can_message')} style={{ cursor: 'pointer', padding: '4px 8px', background: chatOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: chatOn ? '#166534' : '#991b1b', border: `1px solid ${chatOn ? '#bbf7d0' : '#fecaca'}` }}>
+                                        <div onClick={() => !isMasterAccount && toggleUserFeature(u, 'can_message')} style={{ cursor: isMasterAccount ? 'default' : 'pointer', padding: '4px 8px', background: chatOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: chatOn ? '#166534' : '#991b1b', border: `1px solid ${chatOn ? '#bbf7d0' : '#fecaca'}` }}>
                                             💬 Chat: {chatOn ? 'ON' : 'OFF'}
                                         </div>
-                                        <div onClick={() => toggleUserFeature(u, 'can_call')} style={{ cursor: 'pointer', padding: '4px 8px', background: callOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: callOn ? '#166534' : '#991b1b', border: `1px solid ${callOn ? '#bbf7d0' : '#fecaca'}` }}>
+                                        <div onClick={() => !isMasterAccount && toggleUserFeature(u, 'can_call')} style={{ cursor: isMasterAccount ? 'default' : 'pointer', padding: '4px 8px', background: callOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: callOn ? '#166534' : '#991b1b', border: `1px solid ${callOn ? '#bbf7d0' : '#fecaca'}` }}>
                                             📞 Call: {callOn ? 'ON' : 'OFF'}
                                         </div>
-                                        <div onClick={() => toggleUserFeature(u, 'can_book')} style={{ cursor: 'pointer', padding: '4px 8px', background: bookOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: bookOn ? '#166534' : '#991b1b', border: `1px solid ${bookOn ? '#bbf7d0' : '#fecaca'}` }}>
+                                        <div onClick={() => !isMasterAccount && toggleUserFeature(u, 'can_book')} style={{ cursor: isMasterAccount ? 'default' : 'pointer', padding: '4px 8px', background: bookOn ? '#f0fdf4' : '#fef2f2', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: bookOn ? '#166534' : '#991b1b', border: `1px solid ${bookOn ? '#bbf7d0' : '#fecaca'}` }}>
                                             📅 Book: {bookOn ? 'ON' : 'OFF'}
                                         </div>
                                         <div style={{ padding: '4px 8px', background: u.strikes >= 2 ? '#fef08a' : '#f1f5f9', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', color: u.strikes >= 2 ? '#a16207' : '#475569', border: '1px solid #cbd5e1' }}>
@@ -440,29 +444,37 @@ const openSecureDocument = async (e, publicId) => {
                                     </div>
                                 </div>
                                 
-                                <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', alignContent: 'flex-start'}}>
-                                    {u.account_status !== 'active' ? (
-                                        <button onClick={() => handleUserSecurity(u.id, u.username, 'unblock')} style={{...styles.approveBtn, flex: isMobile ? 1 : 'auto', background: '#16a34a'}}><Unlock size={14}/> Unblock All</button>
-                                    ) : (
-                                        <>
-                                            <button onClick={() => handleUserSecurity(u.id, u.username, 'warn')} style={{...styles.suspendBtn, flex: isMobile ? 1 : 'auto'}}><AlertTriangle size={14}/> Warn</button>
-                                            <button onClick={() => handleUserSecurity(u.id, u.username, 'add_strike')} style={{...styles.suspendBtn, background: '#d97706', flex: isMobile ? 1 : 'auto'}}><AlertTriangle size={14}/> Strike</button>
-                                            <button onClick={() => handleUserSecurity(u.id, u.username, 'temp_block')} style={{...styles.suspendBtn, background: '#ea580c', flex: isMobile ? 1 : 'auto'}}><Clock size={14}/> Block Time</button>
-                                        </>
-                                    )}
-                                    {u.account_status !== 'perma_banned' && (
-                                        <button onClick={() => handleUserSecurity(u.id, u.username, 'perma_banned')} style={{...styles.deleteBtn, background: '#7f1d1d', flex: isMobile ? 1 : 'auto'}}><Ban size={14}/> Perma Ban</button>
-                                    )}
-                                    <button onClick={() => handleUserSecurity(u.id, u.username, 'delete')} style={{...styles.deleteBtn, flex: isMobile ? 1 : 'auto', background: '#0f172a'}}><UserX size={14}/> Wipe DB</button>
-                                </div>
+                                {isMasterAccount ? (
+                                    <div style={{ padding: '12px 15px', background: '#fef9c3', color: '#a16207', borderRadius: '10px', fontWeight: '900', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto', justifyContent: 'center', border: '1px dashed #eab308' }}>
+                                        🛡️ Master Admin (Immune)
+                                    </div>
+                                ) : (
+                                    <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', alignContent: 'flex-start'}}>
+                                        {u.account_status !== 'active' ? (
+                                            <button onClick={() => handleUserSecurity(u.id, u.username, 'unblock')} style={{...styles.approveBtn, flex: 1, background: '#16a34a', justifyContent: 'center'}}><Unlock size={14}/> Unblock All</button>
+                                        ) : (
+                                            <>
+                                                <button onClick={() => handleUserSecurity(u.id, u.username, 'warn')} style={{...styles.suspendBtn, flex: 1, justifyContent: 'center'}}><AlertTriangle size={14}/> Warn</button>
+                                                <button onClick={() => handleUserSecurity(u.id, u.username, 'add_strike')} style={{...styles.suspendBtn, background: '#d97706', flex: 1, justifyContent: 'center'}}><AlertTriangle size={14}/> Strike</button>
+                                                <button onClick={() => handleUserSecurity(u.id, u.username, 'temp_block')} style={{...styles.suspendBtn, background: '#ea580c', flex: 1, justifyContent: 'center'}}><Clock size={14}/> Block Time</button>
+                                            </>
+                                        )}
+                                        {u.account_status !== 'perma_banned' && (
+                                            <button onClick={() => handleUserSecurity(u.id, u.username, 'perma_banned')} style={{...styles.deleteBtn, background: '#7f1d1d', flex: 1, justifyContent: 'center'}}><Ban size={14}/> Perma Ban</button>
+                                        )}
+                                        <button onClick={() => handleUserSecurity(u.id, u.username, 'delete')} style={{...styles.deleteBtn, flex: 1, background: '#0f172a', justifyContent: 'center'}}><UserX size={14}/> Wipe DB</button>
+                                    </div>
+                                )}
                             </div>
                         )})}
                     </div>
+
+                /* 📂 CATEGORIES TAB */
                 ) : activeTab === 'categories' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div style={{...styles.card, border: '2px solid #f59e0b', background: '#fffbeb'}}>
                             <h2 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontSize: '18px'}}><Eye size={22}/> Unstyled Folders (Vendor Created)</h2>
-                            <p style={{color: '#92400e', fontSize: '13px', marginBottom: '20px'}}>These folders were automatically created by vendors. You can either <b>Upload a Logo</b> for them, or ban the shop!</p>
+                            <p style={{color: '#92400e', fontSize: '13px', marginBottom: '20px', lineHeight: '1.4'}}>These folders were automatically created by vendors. You can either <b>Upload a Logo</b> for them, or ban the shop!</p>
                             
                             {unstyledFolders.length === 0 ? (
                                 <div style={{padding: '20px', textAlign: 'center', background: '#fef3c7', borderRadius: '8px', color: '#b45309'}}>No new unstyled folders detected.</div>
@@ -473,9 +485,9 @@ const openSecureDocument = async (e, publicId) => {
                                             <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#0f172a' }}>📁 {catName}</h4>
                                             <div style={{fontSize: '12px', color: '#64748b', marginBottom: '10px'}}>
                                                 <strong>Used by:</strong><br/>
-                                                {dynamicFolders[catName].map((shop, i) => (<span key={i}>- {shop.name}<br/></span>))}
+                                                {dynamicFolders[catName].map((shop, i) => (<span key={i}>{shop.name}<br/></span>))}
                                             </div>
-                                            <button onClick={() => { setNewCatName(catName); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{...styles.approveBtn, width: '100%', padding: '8px', fontSize: '12px', justifyContent: 'center', background: '#d97706'}}>
+                                            <button onClick={() => { setNewCatName(catName); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={{...styles.approveBtn, width: '100%', padding: '10px', fontSize: '12px', justifyContent: 'center', background: '#d97706'}}>
                                                 <ImagePlus size={14} /> Upload HD Logo
                                             </button>
                                         </div>
@@ -503,54 +515,66 @@ const openSecureDocument = async (e, publicId) => {
                                     <label style={styles.catLabel}>Upload HD Photo Banner</label>
                                     <input type="file" accept="image/*" style={styles.catInput} onChange={(e) => setNewCatImage(e.target.files[0])} required />
                                 </div>
-                                <button type="submit" style={styles.approveBtn}>Create & Upload Image</button>
+                                <button type="submit" style={{...styles.approveBtn, justifyContent: 'center', padding: '12px', fontSize: '14px'}}>Create & Upload Image</button>
                             </form>
                         </div>
 
                         <div style={styles.card}>
-                            <h3 style={{ marginTop: 0, color: '#0f172a', fontSize: '18px' }}>Official Categories with Logos ({categories.length})</h3>
+                            <h3 style={{ marginTop: 0, color: '#0f172a', fontSize: '18px' }}>Official Categories ({categories.length})</h3>
                             {categories.length === 0 ? (
                                 <div style={styles.emptyBox}>No custom categories created yet.</div>
                             ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '15px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '15px' }}>
                                     {categories.map((cat) => (
                                         <div key={cat.id} style={{ border: '1px solid #cbd5e1', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f8fafc' }}>
                                             <img src={cat.hd_image} alt={cat.name} style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #2874f0' }} />
                                             <h4 style={{ margin: '8px 0 2px 0', fontSize: '14px', color: '#0f172a', textAlign: 'center' }}>{cat.name}</h4>
                                             <span style={{ fontSize: '10px', background: '#e0e7ff', color: '#1e3a8a', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold', marginBottom: '10px' }}>{cat.section}</span>
-                                            <button onClick={() => handleDeleteCategory(cat.id, cat.name)} style={{ ...styles.deleteBtn, padding: '6px 12px', fontSize: '12px', width: '100%', justifyContent: 'center' }}><Trash2 size={14} /> Delete</button>
+                                            <button onClick={() => handleDeleteCategory(cat.id, cat.name)} style={{ ...styles.deleteBtn, padding: '8px 12px', fontSize: '12px', width: '100%', justifyContent: 'center' }}><Trash2 size={14} /> Delete</button>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
                     </div>
+
+                /* 🛍️ VENDORS TAB (Pending & Active) */
                 ) : (
-                    <div style={{...styles.card, padding: isMobile ? '15px' : '30px'}}>
+                    <div style={{...styles.card, padding: isMobile ? '15px' : '25px'}}>
                         {displayVendors.length === 0 ? (
                             <div style={styles.emptyBox}>No {activeTab} shops match your search.</div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 {displayVendors.map(vendor => {
                                     const currentTypes = vendor.shop_type ? vendor.shop_type.split(',').map(s => s.trim()) : ['Products'];
-                                    return (
-                                        <div key={vendor.id} style={isMobile ? styles.vendorBoxMobile : styles.vendorBoxDesktop}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                
-                                                <h4 style={{ margin: '0 0 10px 0', fontSize: '20px', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => window.open(`/shop/${vendor.id}`, '_blank')} title="Click to view live shop">
-                                                    {vendor.business_name} <ExternalLink size={18}/>
-                                                </h4>
+                                    
+                                    // 🟢 5-COLOR SYSTEM: Cross-reference security status from users table
+                                    const shopOwnerUser = allUsers.find(u => u.id === vendor.user_id);
+                                    const accountStatus = shopOwnerUser ? shopOwnerUser.account_status : 'active';
+                                    const isOfficialApp = Boolean(String(vendor.user_id) === "1" || vendor.user_email === 'pavanvenkat63@gmail.com');
 
-                                                <div style={{display: 'flex', gap: '8px'}}>
-                                                    <button onClick={() => handleAdminEdit(vendor)} style={styles.iconBtn} title="Edit Shop Info"><Edit size={16}/></button>
-                                                    <span style={{ fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '12px', background: vendor.is_approved ? '#dcfce7' : '#fef9c3', color: vendor.is_approved ? '#166534' : '#a16207' }}>
-                                                        {vendor.is_approved ? 'Live' : 'Pending'}
+                                    return (
+                                        <div key={vendor.id} style={{...styles.vendorBox, padding: isMobile ? '15px' : '20px'}}>
+                                            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '10px', marginBottom: '15px' }}>
+                                                
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                    <h4 style={{ margin: 0, fontSize: '18px', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => window.open(`/shop/${vendor.id}`, '_blank')} title="Click to view live shop">
+                                                        {vendor.business_name} <ExternalLink size={16}/>
+                                                    </h4>
+                                                    {/* 🟢 RENDER THE SMART 5-COLOR BADGE ON ADMIN DASHBOARD */}
+                                                    {activeTab === 'active' && renderAdminBadge(isOfficialApp, vendor.is_verified, accountStatus)}
+                                                </div>
+
+                                                <div style={{display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end'}}>
+                                                    <span style={{ fontSize: '11px', fontWeight: 'bold', padding: '6px 12px', borderRadius: '12px', background: vendor.is_approved ? '#dcfce7' : '#fef9c3', color: vendor.is_approved ? '#166534' : '#a16207', display: 'flex', alignItems: 'center' }}>
+                                                        {vendor.is_approved ? 'Live in App' : 'Pending Review'}
                                                     </span>
+                                                    <button onClick={() => handleAdminEdit(vendor)} style={styles.iconBtn} title="Edit Shop Info"><Edit size={16}/></button>
                                                 </div>
                                             </div>
 
                                             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px', background: '#ffffff', padding: '15px', borderRadius: '10px', border: '1px solid #cbd5e1', marginBottom: '15px' }}>
-                                                <p style={styles.detailText}>👤 <strong>Owner Name:</strong> {vendor.username || vendor.name || 'Unknown'}</p>
+                                                <p style={styles.detailText}>👤 <strong>Owner:</strong> {vendor.username || vendor.name || 'Unknown'}</p>
                                                 <p style={styles.detailText}>📱 <strong>Phone:</strong> {vendor.user_phone || vendor.phone || 'Not Provided'}</p>
                                                 <p style={styles.detailText}>📧 <strong>Email:</strong> {vendor.user_email || vendor.email || 'Not Provided'}</p>
                                                 <p style={styles.detailText}>📍 <strong>Location:</strong> {vendor.location || vendor.user_address || vendor.address || 'Not Provided'}</p>
@@ -558,17 +582,17 @@ const openSecureDocument = async (e, publicId) => {
                                                 <p style={styles.detailText}>🏬 <strong>Shop Type:</strong> {vendor.shop_type || 'Products'}</p>
                                             </div>
                                             
-                                            <div style={{ marginBottom: '15px', padding: '10px', background: 'white', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                                                <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <FolderSync size={12} /> Assign Home Screen Tabs:
+                                            <div style={{ marginBottom: '15px', padding: '15px', background: 'white', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+                                                <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: 'bold', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <FolderSync size={14} /> Assign Home Screen Tabs:
                                                 </p>
-                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                                     {TYPE_OPTIONS.map(type => {
                                                         const isActive = currentTypes.includes(type);
                                                         return (
                                                             <button key={type} onClick={() => handleTypeToggle(vendor, type)}
                                                                 style={{
-                                                                    display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: 'none', transition: '0.2s',
+                                                                    display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: 'none', transition: '0.2s', flex: isMobile ? 1 : 'initial', justifyContent: 'center',
                                                                     background: isActive ? '#16a34a' : '#f1f5f9', color: isActive ? 'white' : '#64748b', boxShadow: isActive ? '0 2px 5px rgba(22,163,74,0.3)' : 'none'
                                                                 }}
                                                             >
@@ -580,29 +604,29 @@ const openSecureDocument = async (e, publicId) => {
                                                 </div>
                                             </div>
                                             
-
-                                   <div style={styles.docBox}>
-    <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
-        <Lock size={14}/> Secure Vault (ID Proofs & Evidence)
-    </span>
-    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        {vendor.id_front_url && <button type="button" onClick={(e) => openSecureDocument(e, vendor.id_front_url)} style={styles.docLink}>Front ID <ExternalLink size={12} /></button>}
-        {vendor.id_back_url && <button type="button" onClick={(e) => openSecureDocument(e, vendor.id_back_url)} style={styles.docLink}>Back ID <ExternalLink size={12} /></button>}
-        {vendor.shop_image && <button type="button" onClick={(e) => openSecureDocument(e, vendor.shop_image)} style={styles.docLink}>Shop Photo <ExternalLink size={12} /></button>}
-        {vendor.business_certificate && <button type="button" onClick={(e) => openSecureDocument(e, vendor.business_certificate)} style={styles.docLink}>Certificate <ExternalLink size={12} /></button>}
-    </div>
-</div>
+                                            <div style={styles.docBox}>
+                                                <span style={{ fontSize: '13px', fontWeight: '900', color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                                                    <Lock size={14}/> Secure Vault (Evidence & IDs)
+                                                </span>
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                    {vendor.id_front_url && <button type="button" onClick={(e) => openSecureDocument(e, vendor.id_front_url)} style={styles.docLink}>Front ID <ExternalLink size={12} /></button>}
+                                                    {vendor.id_back_url && <button type="button" onClick={(e) => openSecureDocument(e, vendor.id_back_url)} style={styles.docLink}>Back ID <ExternalLink size={12} /></button>}
+                                                    {vendor.shop_image && <button type="button" onClick={(e) => openSecureDocument(e, vendor.shop_image)} style={styles.docLink}>Shop Photo <ExternalLink size={12} /></button>}
+                                                    {vendor.business_certificate && <button type="button" onClick={(e) => openSecureDocument(e, vendor.business_certificate)} style={styles.docLink}>Certificate <ExternalLink size={12} /></button>}
+                                                </div>
+                                            </div>
 
                                             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '10px' }}>
                                                 {activeTab === 'pending' ? (
                                                     <>
-                                                        <button onClick={() => handleAction(vendor.id, vendor.business_name, 'approve')} style={{...styles.approveBtn, flex: 1, justifyContent: 'center'}}><CheckCircle size={16}/> Approve Live</button>
+                                                        <button onClick={() => handleAction(vendor.id, vendor.business_name, 'approve')} style={{...styles.approveBtn, flex: 1, justifyContent: 'center'}}><CheckCircle size={16}/> Approve & Go Live</button>
                                                         <button onClick={() => handleAction(vendor.id, vendor.business_name, 'request_changes')} style={{...styles.requestBtn, flex: 1, justifyContent: 'center'}}><MessageSquare size={16}/> Request Changes</button>
                                                         <button onClick={() => handleAction(vendor.id, vendor.business_name, 'delete')} style={{...styles.deleteBtn, flex: 1, justifyContent: 'center'}}><Trash2 size={16}/> Delete Application</button>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <button onClick={() => handleAction(vendor.id, vendor.business_name, 'suspend')} style={{...styles.suspendBtn, flex: 1, justifyContent: 'center'}}><AlertTriangle size={16}/> Suspend</button>
+                                                        {/* 🟢 FIXED: Unlist sets is_approved = false. (Bans are managed in Security tab) */}
+                                                        <button onClick={() => handleAction(vendor.id, vendor.business_name, 'suspend')} style={{...styles.suspendBtn, flex: 1, justifyContent: 'center'}}><AlertTriangle size={16}/> Unlist (Back to Pending)</button>
                                                         <button onClick={() => handleAction(vendor.id, vendor.business_name, 'delete')} style={{...styles.deleteBtn, flex: 1, justifyContent: 'center'}}><Trash2 size={16}/> Delete Shop</button>
                                                     </>
                                                 )}
@@ -625,27 +649,42 @@ const styles = {
     container: { maxWidth: '1000px', margin: '0 auto', paddingBottom: '30px' },
     loading: { textAlign: 'center', padding: '50px', fontSize: '18px', fontWeight: 'bold', color: '#334155' },
     headerBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' },
-    title: { margin: 0, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '20px' },
-    backBtn: { background: 'white', border: '1px solid #cbd5e1', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '13px' },
+    title: { margin: 0, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '20px', fontWeight: '900' },
+    backBtn: { background: 'white', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' },
     errorBox: { textAlign: 'center', padding: '15px', color: '#dc2626', fontWeight: 'bold', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', marginBottom: '20px' },
-    statCard: { flex: 1, minWidth: '100px', padding: '15px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' },
-    tabContainer: { display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '5px' },
-    activeTab: { flex: 1, minWidth: '100px', padding: '12px', background: '#2874f0', color: 'white', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', fontSize: '12px' },
-    inactiveTab: { flex: 1, minWidth: '100px', padding: '12px', background: '#e2e8f0', color: '#475569', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '12px' },
-    card: { background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' },
+    
+    statsContainer: { display: 'flex', gap: '12px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '5px', WebkitOverflowScrolling: 'touch' },
+    statCard: { flex: '1 0 30%', minWidth: '130px', padding: '18px 15px', borderRadius: '14px', display: 'flex', alignItems: 'center', gap: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' },
+    
+    tabContainer: { display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '5px', WebkitOverflowScrolling: 'touch' },
+    activeTab: { flex: 1, minWidth: 'max-content', padding: '12px 20px', background: '#2874f0', color: 'white', fontWeight: '800', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', fontSize: '13px', transition: '0.2s' },
+    inactiveTab: { flex: 1, minWidth: 'max-content', padding: '12px 20px', background: '#e2e8f0', color: '#475569', fontWeight: '800', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px', transition: '0.2s' },
+    
+    card: { background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' },
     emptyBox: { textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b', fontWeight: 'bold' },
-    vendorBoxDesktop: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column' },
-    vendorBoxMobile: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '14px', padding: '15px', display: 'flex', flexDirection: 'column' },
-    detailText: { margin: '0', fontSize: '13px', color: '#475569', padding: '5px 0' },
-    iconBtn: { background: '#e2e8f0', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' },
-    docBox: { background: '#eff6ff', padding: '15px', borderRadius: '12px', border: '1px solid #bfdbfe', marginBottom: '15px' },
-    docLink: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', background: '#ffffff', color: '#2563eb', padding: '6px 10px', borderRadius: '8px', border: '1px solid #bfdbfe', cursor: 'pointer', fontWeight: 'bold' },
-    approveBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#16a34a', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
-    requestBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#8b5cf6', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
-    suspendBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#f59e0b', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
-    deleteBtn: { display: 'flex', alignItems: 'center', gap: '4px', background: '#dc2626', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' },
-    catLabel: { fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '4px', display: 'block' },
-    catInput: { padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', width: '100%', boxSizing: 'border-box', background: '#f8fafc', outline: 'none' }
+    
+    vendorBox: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '16px', display: 'flex', flexDirection: 'column' },
+    detailText: { margin: '0', fontSize: '13.5px', color: '#475569', padding: '6px 0', wordBreak: 'break-word', lineHeight: '1.4' },
+    iconBtn: { background: '#e2e8f0', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' },
+    
+    docBox: { background: '#eff6ff', padding: '18px', borderRadius: '12px', border: '1px solid #bfdbfe', marginBottom: '15px' },
+    docLink: { display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', background: '#ffffff', color: '#2563eb', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bfdbfe', cursor: 'pointer', fontWeight: 'bold' },
+    
+    approveBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#16a34a', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
+    requestBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#8b5cf6', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
+    suspendBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#f59e0b', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
+    deleteBtn: { display: 'flex', alignItems: 'center', gap: '6px', background: '#dc2626', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' },
+    
+    catLabel: { fontSize: '13px', fontWeight: '800', color: '#475569', marginBottom: '6px', display: 'block' },
+    catInput: { padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', width: '100%', boxSizing: 'border-box', background: '#f8fafc', outline: 'none' }
 };
+
+// Add global styles for scrollbars
+const styleSheet = document.createElement("style");
+styleSheet.innerText = `
+  .hide-scroll::-webkit-scrollbar { display: none; }
+  .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+`;
+document.head.appendChild(styleSheet);
 
 export default AdminDashboard;
