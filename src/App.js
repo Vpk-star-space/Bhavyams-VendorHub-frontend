@@ -358,26 +358,31 @@ useEffect(() => {
                                 </div>
                             )}
                            
-                            <Routes>
+                           <Routes>
+                                {/* 🟢 PUBLIC ROUTES */}
                                 <Route path="/" element={<Home />} />
-                                <Route path="/notifications" element={<Notifications />} />
+                                <Route path="/expo" element={<Expo />} />
                                 <Route path="/shop/:id" element={<ShopProfile />} />
                                 <Route path="/product/:id" element={<ProductDetails />} /> 
                                 <Route path="/item/:itemId" element={<ItemDetail />} />
-
                                 <Route path="/welcome" element={<Welcome />} />
-                                <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                                <Route element={<PushDashboard />} path="/admin/push" />
+
+                                {/* 🔒 SECURED USER/VENDOR ROUTES (Must be logged in) */}
+                                <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+                                <Route path="/chat/:conversationId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+                                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                                 <Route path="/dashboard" element={<ProtectedRoute><VendorDashboard /></ProtectedRoute>} />
                                 <Route path="/vendor-dashboard" element={<ProtectedRoute><VendorDashboard /></ProtectedRoute>} />
-                                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                                 <Route path="/register-business" element={<ProtectedRoute><BusinessRegistration /></ProtectedRoute>} />
-                                
                                 <Route path="/manage-catalog/:id" element={<ProtectedRoute><ManageCatalog /></ProtectedRoute>} />
                                 <Route path="/my-orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
                                 <Route path="/vendor/orders" element={<ProtectedRoute><VendorOrders /></ProtectedRoute>} />
-                                <Route element={<Expo />} path="/expo" />
-                                <Route path="/chat/:conversationId" element={<Chat />} />
+                                
+                                {/* 👑 MASTER ADMIN ROUTES */}
+                                <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                                <Route path="/admin/push" element={<AdminRoute><PushDashboard /></AdminRoute>} />
+                                
+                                {/* Fallback for unknown URLs */}
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </div>
