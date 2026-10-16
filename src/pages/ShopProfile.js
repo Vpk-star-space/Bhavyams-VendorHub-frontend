@@ -32,6 +32,105 @@ const getVideoThumbnail = (url) => {
 
 const getFallbackAvatar = (name) => `https://ui-avatars.com/api/?name=${name ? encodeURIComponent(name) : 'User'}&background=random&color=fff&bold=true`;
 
+// 🟢 BILINGUAL TELUGU-TO-ENGLISH CANONICAL MAPPER (Ensures Telugu & English DB sync)
+const TELUGU_TO_EN_MAP = {
+    'కోణంకి': 'konanki',
+    'మార్టూరు': 'martur',
+    'బాపట్ల': 'bapatla',
+    'తిరుపతి': 'tirupati',
+    'ఆంధ్రప్రదేశ్': 'andhra pradesh',
+    'గుంటూరు': 'guntur',
+    'విజయవాడ': 'vijayawada',
+    'ఒంగోలు': 'ongole',
+    'చిరాల': 'chirala',
+    'చీరాల': 'chirala',
+    'ప్రకాశం': 'prakasam'
+};
+
+const normalizeLocationText = (text) => {
+    if (!text) return '';
+    let lower = text.toLowerCase();
+    Object.keys(TELUGU_TO_EN_MAP).forEach(teWord => {
+        if (lower.includes(teWord)) {
+            lower = lower.replace(new RegExp(teWord, 'g'), TELUGU_TO_EN_MAP[teWord]);
+        }
+    });
+    return lower;
+};
+
+// 🟢 PARSE DELIVERY ZONES (Supports full hierarchical strings separated by ' | ' or legacy commas)
+const parseDeliveryZones = (rawAreas) => {
+    if (!rawAreas || rawAreas.trim() === '' || rawAreas.trim().toLowerCase() === 'all') {
+        return [{ full: 'All', primary: 'All', sub: '' }];
+    }
+    if (rawAreas.includes('|')) {
+        return rawAreas.split('|').map(z => z.trim()).filter(Boolean).map(zone => {
+            const parts = zone.split(',').map(p => p.trim()).filter(Boolean);
+            return {
+                full: zone,
+                primary: parts[0] || zone,
+                sub: parts.slice(1, 3).join(', ')
+            };
+        });
+    }
+    // Check if it's a single full Nominatim hierarchy string (e.g. "Konanki, Martur, Bapatla, Andhra Pradesh, India")
+    const commaParts = rawAreas.split(',').map(p => p.trim()).filter(Boolean);
+    const looksLikeSingleHierarchy = commaParts.length >= 3 && (
+        rawAreas.toLowerCase().includes('india') || 
+        rawAreas.toLowerCase().includes('andhra pradesh') || 
+        /\b\d{6}\b/.test(rawAreas)
+    );
+    if (looksLikeSingleHierarchy) {
+        return [{
+            full: rawAreas.trim(),
+            primary: commaParts[0],
+            sub: commaParts.slice(1, 3).join(', ')
+        }];
+    }
+    // Legacy comma-separated short names
+    return commaParts.map(p => ({ full: p, primary: p, sub: '' }));
+};
+
+// 🟢 1ST-WORD PRIORITY + SUB-ADDRESS VERIFICATION ENGINE
+const checkIsDeliverableToUser = (userAddressRaw, rawDeliveryAreas) => {
+    const zones = parseDeliveryZones(rawDeliveryAreas);
+    if (zones.some(z => z.primary.toLowerCase() === 'all' || z.primary.toLowerCase() === 'india' || z.primary.toLowerCase() === 'all india')) {
+        return true;
+    }
+    if (!userAddressRaw) return false;
+
+    const normUserFull = normalizeLocationText(userAddressRaw);
+    const userTokens = normUserFull.split(/[,]+/).map(s => s.trim()).filter(Boolean);
+
+    return zones.some(zone => {
+        const normPrimary = normalizeLocationText(zone.primary);
+        if (!normPrimary) return false;
+
+        // 1. PRIORITY 1: The User's address hierarchy MUST contain the Shop's 1st-word target!
+        // - If shop selected "Konanki, Martur, Bapatla...", normPrimary is "konanki".
+        //   A user in "Martur, Bapatla" does NOT have "konanki" -> FALSE!
+        // - If shop selected "Andhra Pradesh, India", normPrimary is "andhra pradesh".
+        //   A user in "Konanki, Martur, Bapatla, Andhra Pradesh" DOES have "andhra pradesh" -> TRUE!
+        const hasPrimaryMatch = userTokens.some(t => t === normPrimary || t.includes(normPrimary)) || normUserFull.includes(normPrimary);
+        if (!hasPrimaryMatch) return false;
+
+        // 2. PRIORITY 2: Sub-Address Verification (Prevents duplicate village names across different districts)
+        const zoneParts = normalizeLocationText(zone.full)
+            .split(',')
+            .map(s => s.trim())
+            .filter(s => s && s !== 'india' && !/^\d+$/.test(s));
+
+        // If Both Shop Zone and User Address have sub-address context, verify they share at least one sub-region (Mandal/District/State)
+        if (zoneParts.length > 1 && userTokens.length > 1) {
+            const subParts = zoneParts.slice(1);
+            const hasSubContextMatch = subParts.some(sub => normUserFull.includes(sub));
+            return hasSubContextMatch;
+        }
+
+        return true;
+    });
+};
+
 // 🟢 SMART 5-TIER BADGE SYSTEM
 const renderBadge = (isOfficial, isVerified, accountStatus, hasShop = true) => {
     const isVer = isVerified === true || String(isVerified).toLowerCase() === 'true';
@@ -71,7 +170,6 @@ const ShopProfile = () => {
     const [otpMode, setOtpMode] = useState(false);
     const [staffOtp, setStaffOtp] = useState('');
     
-    const [deliveryAreas, setDeliveryAreas] = useState([]);
     const [deliveryRequests, setDeliveryRequests] = useState([]);
     const [hasRequested, setHasRequested] = useState(false);
     const [showRequestsList, setShowRequestsList] = useState(false);
@@ -90,6 +188,8 @@ const ShopProfile = () => {
 
     const userStr = localStorage.getItem('user');
     const currentUser = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
+    const customLocStr = localStorage.getItem('custom_hub_location');
+    const customLocation = customLocStr && customLocStr !== 'undefined' ? JSON.parse(customLocStr) : null;
     const isMasterAdmin = Boolean(currentUser && currentUser.email === 'pavanvenkat63@gmail.com');
 
     useEffect(() => {
@@ -107,9 +207,6 @@ const ShopProfile = () => {
                 setShopData(shopInfo);
                 setProducts(shopRes.data.products || []);
                 setExpoPosts(shopRes.data.expo_posts || []); 
-
-                const fetchedAreas = shopInfo.delivery_areas ? shopInfo.delivery_areas.split(',') : ['All'];
-                setDeliveryAreas(fetchedAreas);
                 setDeliveryRequests(shopRes.data.delivery_requests || []);
 
                 setEditForm({
@@ -146,7 +243,6 @@ const ShopProfile = () => {
         const handleShopUpdate = (updatedShop) => {
             if (String(updatedShop.id) === String(id)) {
                 setShopData(prev => ({ ...prev, ...updatedShop }));
-                setDeliveryAreas(updatedShop.delivery_areas ? updatedShop.delivery_areas.split(',') : ['All']);
             }
         };
 
@@ -170,12 +266,11 @@ const ShopProfile = () => {
         } catch (err) { toast.error("Failed to update verification status."); }
     };
 
-    // 🟢 SENDS VERIFICATION REQUEST DIRECTLY TO MASTER ADMIN
     const handleRequestVerification = async () => {
         try {
             const token = localStorage.getItem('token');
             await axios.post(`${getBackendUrl()}/shops/${id}/request-verification`, {}, { headers: { Authorization: `Bearer ${token}` }});
-            toast.success("🛡️ Request sent! Admin will review your shop soon.");
+            toast.success("🛡️ Request sent! Admin has been notified.");
         } catch (err) {
             toast.error("Failed to send verification request.");
         }
@@ -224,18 +319,20 @@ const ShopProfile = () => {
         } catch (err) { toast.error("Failed to load followers list."); }
     };
 
-    const userArea = currentUser?.address ? currentUser.address.split(',')[0].trim() : null;
-    const isDeliverable = (!currentUser || !userArea) ? true : deliveryAreas.some(area => 
-        userArea.toLowerCase().includes(area.toLowerCase().trim()) || area.toLowerCase().trim() === 'all'
-    );
+    // 🟢 ACTIVE USER HIERARCHY ADDRESS (Checks custom map location first, then user profile address)
+    const activeUserFullAddress = customLocation?.address || currentUser?.address || currentUser?.location || '';
+    const isDeliverable = checkIsDeliverableToUser(activeUserFullAddress, shopData?.delivery_areas);
 
     const handleRequestDelivery = async () => {
-        if (!currentUser) return navigate('/welcome');
+        if (!currentUser) {
+            toast.info("Please login to request delivery to your area!");
+            return navigate('/welcome');
+        }
         try {
             const token = localStorage.getItem('token');
-            const basicUserAddress = currentUser.address || 'Unknown Location';
+            const basicUserAddress = activeUserFullAddress || 'Unknown Location';
             await axios.post(`${getBackendUrl()}/shops/${id}/request-delivery`, { area_name: basicUserAddress }, { headers: { Authorization: `Bearer ${token}` }});
-            toast.success(`🚀 Request sent! We notified the shop owner directly.`);
+            toast.success(`🚀 Delivery request for ${basicUserAddress.split(',')[0]} sent to shop owner!`);
             setHasRequested(true);
         } catch (err) { toast.error("Failed to send request."); }
     };
@@ -281,35 +378,49 @@ const ShopProfile = () => {
 
     const openTeamModal = () => { setShowTeamModal(true); setOtpMode(false); fetchStaff(); };
 
+    // 🟢 MAP SEARCH (Forces English canonical names from Nominatim even if user types in Telugu)
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
-        if (query.length < 3) return setLocResults([]);
+        if (query.length < 2) return setLocResults([]);
         
         setIsSearching(true);
         try {
-            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&accept-language=en&q=${query}`);
-            setLocResults(res.data);
+            const searchQ = normalizeLocationText(query);
+            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=in&accept-language=en&q=${encodeURIComponent(searchQ)}`);
+            setLocResults(res.data || []);
         } catch (e) {} finally { setIsSearching(false); }
     };
 
+    // 🟢 SAVES FULL HIERARCHY (1st Word + Sub-Address Context)
     const selectCustomLocation = (loc) => {
+        const canonicalFull = loc.display_name;
         if (showLocModal === 'location') {
-            setEditForm({ ...editForm, address: loc.display_name });
+            setEditForm({ ...editForm, address: canonicalFull });
         } else if (showLocModal === 'delivery') {
-            const areaName = loc.display_name.split(',')[0].trim();
-            const currentAreas = editForm.delivery_areas ? editForm.delivery_areas.split(',').map(a => a.trim()).filter(Boolean) : [];
-            
-            if (!currentAreas.includes(areaName)) {
-                currentAreas.push(areaName);
-                setEditForm({ ...editForm, delivery_areas: currentAreas.join(', ') });
+            const existingZones = parseDeliveryZones(editForm.delivery_areas)
+                .filter(z => z.primary.toLowerCase() !== 'all')
+                .map(z => z.full);
+
+            const primaryNew = canonicalFull.split(',')[0].trim().toLowerCase();
+            const alreadyExists = existingZones.some(z => z.split(',')[0].trim().toLowerCase() === primaryNew && z.toLowerCase() === canonicalFull.toLowerCase());
+
+            if (!alreadyExists) {
+                const updatedZones = [...existingZones, canonicalFull];
+                setEditForm({ ...editForm, delivery_areas: updatedZones.join(' | ') });
             }
         }
-        setShowLocModal(false); setLocSearch(''); setLocResults([]);
+        setShowLocModal(false);
+        setLocSearch('');
+        setLocResults([]);
     };
 
     const handleUpdateSubmit = async (e) => {
         e.preventDefault();
         setUploadError('');
+
+        if (!editForm.address) {
+            return toast.error("Please select your Shop Location from the search bar.");
+        }
 
         try {
             const BACKEND_URL = getBackendUrl();
@@ -324,7 +435,7 @@ const ShopProfile = () => {
             formData.append('founder_name', editForm.founder_name);
             formData.append('ceo_name', editForm.ceo_name);
             
-            const finalDeliveryAreas = editForm.delivery_areas || 'All';
+            const finalDeliveryAreas = editForm.delivery_areas ? editForm.delivery_areas.trim() : 'All';
             formData.append('delivery_areas', finalDeliveryAreas); 
             
             if (imageFile) formData.append('shop_logo', imageFile);
@@ -333,12 +444,15 @@ const ShopProfile = () => {
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
             });
             
-            setShopData(res.data.shop);
-            setDeliveryAreas(finalDeliveryAreas.split(','));
+            setShopData(prev => ({ ...prev, ...res.data.shop }));
             setShowEditModal(false);
             setImageFile(null);
-            toast.success("✅ Store updated successfully!");
-        } catch (err) { setUploadError("❌ Update failed! Please check your connection."); }
+            toast.success("✅ Store location & delivery zones updated!");
+        } catch (err) { 
+            const backendMsg = err.response?.data?.message || "❌ Update failed! Please check your connection.";
+            setUploadError(backendMsg); 
+            toast.error(backendMsg);
+        }
     };
 
     const handleDownloadCard = async () => {
@@ -425,8 +539,12 @@ const ShopProfile = () => {
     // FORMAT UNLOCK TIME
     let unlockTimeStr = '';
     if (shopData?.account_status === 'temp_block' && shopData?.ban_until) {
-        const date = new Date(shopData.ban_until);
-        unlockTimeStr = date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+        let dStr = String(shopData.ban_until);
+        if (!dStr.endsWith('Z') && !dStr.includes('+')) dStr += 'Z';
+        const date = new Date(dStr);
+        if (!isNaN(date.getTime())) {
+            unlockTimeStr = date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+        }
     }
 
     const getBannerBackground = () => {
@@ -444,6 +562,9 @@ const ShopProfile = () => {
         if (isVer) return { ...styles.businessLogo, border: '4px solid #16a34a', boxShadow: '0 4px 15px rgba(22,163,74,0.4)' };
         return { ...styles.businessLogo, border: '4px solid #3b82f6', boxShadow: '0 4px 15px rgba(59,130,246,0.3)' };
     };
+
+    const parsedShopZones = parseDeliveryZones(shopData.delivery_areas);
+    const formattedDeliveryLabel = parsedShopZones.map(z => z.sub ? `${z.primary} (${z.sub})` : z.primary).join(' • ');
 
     const dbShopType = shopData.shop_type || 'Products'; 
     const shopImageSrc = getOptimizedImage(shopData.shop_logo);
@@ -544,12 +665,16 @@ const ShopProfile = () => {
                         </h2>
                         <span style={{...styles.categoryTag, background: isOfficialApp ? '#fef3c7' : isVer ? '#dcfce7' : '#eff6ff', color: isOfficialApp ? '#b45309' : isVer ? '#15803d' : '#1d4ed8'}}>{shopData.category}</span>
                         
+                        {/* 🟢 ONLY SHOWS PUBLIC SHOP LOCATION SELECTED FROM MAP SEARCH */}
                         {shopData.address && (
-                            <p style={styles.address}><MapPin size={14} /> {shopData.address.split(',')[0].trim()}</p>
+                            <p style={styles.address}>
+                                <MapPin size={14} color="#2563eb" /> 
+                                <span>Shop Location: <strong>{shopData.address.split(',').slice(0, 3).join(', ')}</strong></span>
+                            </p>
                         )}
                         
-                        <p style={{ margin: '5px 0 0 0', color: '#16a34a', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
-                            🚚 Delivers to: {shopData.delivery_areas || 'All Areas'}
+                        <p style={{ margin: '6px 0 0 0', color: '#16a34a', fontSize: '13px', display: 'flex', alignItems: 'flex-start', gap: '5px', fontWeight: '700', lineHeight: '1.4' }}>
+                            <span>🚚 Delivers to: {formattedDeliveryLabel || 'All Areas'}</span>
                         </p>
 
                         {renderLeadership()}
@@ -602,11 +727,11 @@ const ShopProfile = () => {
                                     <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'white' }}>
                                         <p style={{ margin: '0 0 5px 0', fontSize: '11px', color: '#64748b', fontWeight: '600' }}>Customers requested delivery to these areas.</p>
                                         {deliveryRequests.map((req, i) => {
-                                            const basicArea = req.area ? req.area.split(',')[0].trim() : 'Unknown Area';
+                                            const basicArea = req.area ? req.area.split(',').slice(0, 2).join(', ').trim() : 'Unknown Area';
                                             return (
                                                 <div key={i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} color="#64748b" /> {basicArea}</span>
-                                                    <span style={{ background: '#ef4444', color: 'white', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{req.count} {req.count === 1 ? 'Person' : 'People'}</span>
+                                                    <span style={{ background: '#ef4444', color: 'white', padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{req.count} {Number(req.count) === 1 ? 'Person' : 'People'}</span>
                                                 </div>
                                             );
                                         })}
@@ -614,6 +739,18 @@ const ShopProfile = () => {
                                 )}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* 🟢 OUT-OF-AREA DELIVERY REQUEST BANNER FOR CUSTOMERS */}
+                {!isOwner && !isShopSuspended && !isDeliverable && (
+                    <div style={{ marginTop: '15px', background: '#fffbeb', border: '1px solid #fde68a', padding: '12px 15px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: '12.5px', color: '#92400e', fontWeight: '700' }}>
+                            📍 This store delivers only to selected areas. Want delivery in <strong>{activeUserFullAddress ? activeUserFullAddress.split(',')[0] : 'your area'}</strong>?
+                        </div>
+                        <button onClick={handleRequestDelivery} disabled={hasRequested} style={{ background: hasRequested ? '#cbd5e1' : '#d97706', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontWeight: '800', fontSize: '12px', cursor: hasRequested ? 'default' : 'pointer' }}>
+                            {hasRequested ? '✓ Request Sent' : 'Request Delivery'}
+                        </button>
                     </div>
                 )}
 
@@ -706,13 +843,26 @@ const ShopProfile = () => {
                                             </div>
                                             {!isOwner && (
                                                 <div style={styles.listActionBox}>
-                                                    <button disabled={isShopSuspended} style={{...styles.addBtn, cursor: isShopSuspended ? 'not-allowed' : 'pointer', background: isShopSuspended ? '#f1f5f9' : '#eff6ff', color: isShopSuspended ? '#94a3b8' : '#2563eb', border: isShopSuspended ? '1px solid #cbd5e1' : '1px solid #bfdbfe'}} onClick={() => {
-                                                        if (isShopSuspended) return toast.error("This shop is suspended. Orders are disabled.");
-                                                        if (!currentUser) return navigate('/welcome');
-                                                        if (!isDeliverable) { handleRequestDelivery(); toast.error(`Delivery not currently available to your area.`); return; }
-                                                        toast.success("Added to cart!");
-                                                    }}>
-                                                        {dbShopType.includes('Services') ? 'Book' : 'Add +'}
+                                                    <button 
+                                                        disabled={isShopSuspended} 
+                                                        style={{
+                                                            ...styles.addBtn, 
+                                                            cursor: isShopSuspended ? 'not-allowed' : 'pointer', 
+                                                            background: isShopSuspended ? '#f1f5f9' : (!isDeliverable ? '#fffbeb' : '#eff6ff'), 
+                                                            color: isShopSuspended ? '#94a3b8' : (!isDeliverable ? '#d97706' : '#2563eb'), 
+                                                            border: isShopSuspended ? '1px solid #cbd5e1' : (!isDeliverable ? '1px solid #fde68a' : '1px solid #bfdbfe')
+                                                        }} 
+                                                        onClick={() => {
+                                                            if (isShopSuspended) return toast.error("This shop is suspended. Orders are disabled.");
+                                                            if (!currentUser) return navigate('/welcome');
+                                                            if (!isDeliverable) { 
+                                                                handleRequestDelivery(); 
+                                                                return; 
+                                                            }
+                                                            navigate(`/item/${product.id}`);
+                                                        }}
+                                                    >
+                                                        {!isDeliverable ? 'Request' : (dbShopType.includes('Services') ? 'Book' : 'Add +')}
                                                     </button>
                                                 </div>
                                             )}
@@ -825,9 +975,23 @@ const ShopProfile = () => {
                                 <label style={styles.uploadLabel}><Upload size={16}/> Update Brand Logo</label>
                                 <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} style={{fontSize: '12px', marginTop: '5px'}} />
                             </div>
-                            <div>
-                                <label style={styles.modalLabel}>Business Name</label>
-                                <input style={styles.input} value={editForm.business_name} onChange={e => setEditForm({...editForm, business_name: e.target.value})} required />
+                          <div>
+                                <label style={styles.modalLabel}>
+                                    Business Name {!isMasterAdmin && <span style={{ color: '#dc2626', fontSize: '10px' }}>(🔒 Permanent - Admin Only)</span>}
+                                </label>
+                                <input 
+                                    style={{
+                                        ...styles.input, 
+                                        background: isMasterAdmin ? '#f8fafc' : '#e2e8f0', 
+                                        color: isMasterAdmin ? '#0f172a' : '#64748b',
+                                        cursor: isMasterAdmin ? 'text' : 'not-allowed',
+                                        fontWeight: '700'
+                                    }} 
+                                    value={editForm.business_name} 
+                                    onChange={e => { if (isMasterAdmin) setEditForm({...editForm, business_name: e.target.value}); }} 
+                                    readOnly={!isMasterAdmin}
+                                    required 
+                                />
                             </div>
                             
                             <div style={{ display: 'flex', gap: '10px' }}>
@@ -841,23 +1005,44 @@ const ShopProfile = () => {
                                 </div>
                             </div>
 
+                            {/* 🟢 LOCKED TO MAP SEARCH ONLY (NO MANUAL TYPING) */}
                             <div>
-                                <label style={styles.modalLabel}>Shop Address / Location</label>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <input style={{...styles.input, flex: 1}} value={editForm.address} onChange={e => setEditForm({...editForm, address: e.target.value})} placeholder="Enter public business location..." required />
-                                    <button type="button" onClick={() => setShowLocModal('location')} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '0 15px', cursor: 'pointer', color: '#2563eb' }}><MapPin size={18} /></button>
+                                <label style={styles.modalLabel}>Shop Public Location (Search & Select Only)</label>
+                                <div 
+                                    onClick={() => setShowLocModal('location')} 
+                                    style={{...styles.input, background: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', border: '1.5px solid #bfdbfe'}}
+                                >
+                                    <span style={{ fontSize: '13px', color: editForm.address ? '#0f172a' : '#94a3b8', fontWeight: editForm.address ? '700' : '500' }}>
+                                        {editForm.address || 'Click to search & select shop location...'}
+                                    </span>
+                                    <MapPin size={18} color="#2563eb" style={{ flexShrink: 0 }} />
                                 </div>
                             </div>
+
+                            {/* 🟢 DELIVERY ZONES (1st-Word + Sub-Address Chips) */}
                             <div>
-                                <label style={styles.modalLabel}>Delivery Areas</label>
-                                <div style={{...styles.input, background: '#ffffff', cursor: 'pointer', minHeight: '48px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px'}} onClick={() => setShowLocModal('delivery')}>
-                                    {editForm.delivery_areas ? editForm.delivery_areas.split(',').map((area, idx) => (
-                                        <span key={idx} style={{ background: '#dcfce7', color: '#166534', padding: '6px 12px', borderRadius: '15px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            {area.trim()} <X size={14} onClick={(e) => { e.stopPropagation(); const newAreas = editForm.delivery_areas.split(',').map(a=>a.trim()).filter(a => a !== area.trim()); setEditForm({...editForm, delivery_areas: newAreas.join(', ')}); }} />
+                                <label style={styles.modalLabel}>Delivery Areas (Search Village, Mandal, District, State, or India)</label>
+                                <div 
+                                    style={{...styles.input, background: '#ffffff', cursor: 'pointer', minHeight: '52px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', border: '1.5px solid #86efac'}} 
+                                    onClick={() => setShowLocModal('delivery')}
+                                >
+                                    {editForm.delivery_areas ? parseDeliveryZones(editForm.delivery_areas).map((zone, idx) => (
+                                        <span key={idx} style={{ background: '#dcfce7', color: '#166534', padding: '6px 10px', borderRadius: '12px', fontSize: '11.5px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid #86efac' }}>
+                                            <span>
+                                                {zone.primary} {zone.sub && <span style={{ fontSize: '10px', opacity: 0.8, fontWeight: '600' }}>({zone.sub})</span>}
+                                            </span>
+                                            <X size={14} onClick={(e) => { 
+                                                e.stopPropagation(); 
+                                                const remaining = parseDeliveryZones(editForm.delivery_areas)
+                                                    .filter((_, i) => i !== idx)
+                                                    .map(z => z.full);
+                                                setEditForm({...editForm, delivery_areas: remaining.join(' | ')}); 
+                                            }} />
                                         </span>
-                                    )) : <span style={{color: '#94a3b8', fontSize: '14px'}}>Click to add delivery areas (Leave blank for 'All')</span>}
+                                    )) : <span style={{color: '#64748b', fontSize: '13px', fontWeight: '600'}}>🚚 Click to search & add delivery areas (Default: All India)</span>}
                                 </div>
                             </div>
+
                             <div>
                                 <label style={styles.modalLabel}>Category / Industry</label>
                                 <input list="category-suggestions" style={styles.input} value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})} required placeholder="Click to select, or type..." />
@@ -883,26 +1068,56 @@ const ShopProfile = () => {
                 </div>
             )}
 
+            {/* 🟢 MAP SEARCH MODAL WITH QUICK STATE/INDIA PRESETS */}
             {showLocModal && (
                 <div style={styles.overlay}>
                     <div className="touch-scale" style={styles.locModal}>
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
-                            <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>{showLocModal === 'location' ? 'Search Shop Location' : 'Search Delivery Area'}</h3>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'}}>
+                            <h3 style={{margin: 0, fontSize: '17px', color: '#0f172a', fontWeight: '900'}}>
+                                {showLocModal === 'location' ? '📍 Select Shop Location' : '🚚 Add Delivery Area'}
+                            </h3>
                             <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => { setShowLocModal(false); setLocSearch(''); setLocResults([]); }} />
                         </div>
-                        <div style={{position: 'relative', marginTop: '15px'}}>
+
+                        {showLocModal === 'delivery' && (
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                                <button type="button" onClick={() => selectCustomLocation({ display_name: 'Andhra Pradesh, India' })} style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '6px 12px', borderRadius: '16px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}>
+                                    + Entire Andhra Pradesh
+                                </button>
+                                <button type="button" onClick={() => selectCustomLocation({ display_name: 'India' })} style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', padding: '6px 12px', borderRadius: '16px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}>
+                                    + All India
+                                </button>
+                            </div>
+                        )}
+
+                        <div style={{position: 'relative', marginTop: '8px'}}>
                             <Search size={18} color="#94a3b8" style={{position: 'absolute', left: '12px', top: '14px'}} />
-                            <input type="text" placeholder="Type area, city, or pincode..." style={styles.locInput} value={locSearch} onChange={(e) => handleLocationSearch(e.target.value)} autoFocus />
+                            <input 
+                                type="text" 
+                                placeholder="Search village, mandal, district, or pincode..." 
+                                style={styles.locInput} 
+                                value={locSearch} 
+                                onChange={(e) => handleLocationSearch(e.target.value)} 
+                                autoFocus 
+                            />
                             {isSearching && <Loader size={16} className="spin" color="#2563eb" style={{position: 'absolute', right: '12px', top: '14px'}} />}
                         </div>
                         {locResults.length > 0 && (
                             <div style={styles.locResultsBox}>
-                                {locResults.map((loc, i) => (
-                                    <div key={i} className="touch-scale" style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
-                                        <MapPin size={16} color="#2563eb" style={{flexShrink: 0}} />
-                                        <span style={{fontSize: '13px', color: '#334155'}}>{loc.display_name}</span>
-                                    </div>
-                                ))}
+                                {locResults.map((loc, i) => {
+                                    const parts = loc.display_name.split(',').map(p => p.trim());
+                                    const primary = parts[0];
+                                    const sub = parts.slice(1).join(', ');
+                                    return (
+                                        <div key={i} className="touch-scale" style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
+                                            <MapPin size={16} color="#2563eb" style={{flexShrink: 0, marginTop: '2px'}} />
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{fontSize: '14px', fontWeight: '800', color: '#0f172a'}}>{primary}</span>
+                                                <span style={{fontSize: '11.5px', color: '#64748b'}}>{sub}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -999,14 +1214,14 @@ const styles = {
     addBtn: { background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '6px 16px', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' },
     overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 },
     modal: { background: 'white', padding: '25px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', maxHeight: '90vh', overflowY: 'auto' },
-    modalLabel: { fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' },
+    modalLabel: { fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '4px', display: 'block' },
     input: { padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '14px', width: '100%', boxSizing: 'border-box', background: '#f8fafc', marginBottom: '10px', outline: 'none' },
     uploadBox: { background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', marginBottom: '10px' },
     uploadLabel: { fontSize: '12px', fontWeight: 'bold', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '5px' },
     saveBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: '#16a34a', color: 'white', border: 'none', padding: '14px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', width: '100%', marginTop: '10px', fontSize: '15px' },
     locModal: { background: 'white', padding: '25px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' },
     locInput: { padding: '14px 14px 14px 40px', borderRadius: '12px', border: '2px solid #2563eb', fontSize: '14px', width: '100%', boxSizing: 'border-box', outline: 'none' },
-    locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
+    locResultsBox: { marginTop: '15px', maxHeight: '220px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
     locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' }
 };
 

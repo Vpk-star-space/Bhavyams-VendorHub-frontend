@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ArrowLeft,Grid, ChevronRight } from 'lucide-react'; 
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ArrowLeft, Grid, ChevronRight, Globe, Plus, Edit3, Trash2, BadgeCheck, Megaphone, Bot, ExternalLink } from 'lucide-react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify'; 
 import ProductCard from '../components/ProductCard';
-import { AppContext } from '../context/AppContext'; 
+import { AppContext, socket } from '../context/AppContext'; 
 import AppPermissions from '../components/AppPermissions';
 
 const getBackendUrl = () => {
@@ -14,66 +14,284 @@ const getBackendUrl = () => {
 
 const getOptimizedImage = (url) => {
     if (!url) return null;
-    if (url.includes('cloudinary.com') && !url.includes('q_auto')) {
+    if (url.includes('cloudinary.com') && !url.includes('q_auto') && !url.endsWith('.gif')) {
         return url.replace('/upload/', '/upload/q_auto,f_auto,w_600/');
     }
     return url; 
 };
 
+// 🟢 BILINGUAL TELUGU-TO-ENGLISH CANONICAL MAPPER (Ensures 100% Telugu & English Sync)
+const TELUGU_TO_EN_MAP = {
+    'కోణంకి': 'konanki',
+    'మార్టూరు': 'martur',
+    'బాపట్ల': 'bapatla',
+    'తిరుపతి': 'tirupati',
+    'ఆంధ్రప్రదేశ్': 'andhra pradesh',
+    'గుంటూరు': 'guntur',
+    'విజయవాడ': 'vijayawada',
+    'ఒంగోలు': 'ongole',
+    'చీరాల': 'chirala',
+    'చిరాల': 'chirala',
+    'ప్రకాశం': 'prakasam',
+    'ఇండియా': 'india',
+    'భారతదేశం': 'india'
+};
+
+const normalizeLocationText = (text) => {
+    if (!text) return '';
+    let lower = String(text).toLowerCase();
+    Object.keys(TELUGU_TO_EN_MAP).forEach(teWord => {
+        if (lower.includes(teWord)) {
+            lower = lower.replace(new RegExp(teWord, 'g'), TELUGU_TO_EN_MAP[teWord]);
+        }
+    });
+    return lower;
+};
+
+// 🟢 PARSE DELIVERY ZONES (Supports full hierarchical strings separated by ' | ' or commas)
+const parseDeliveryZones = (rawAreas) => {
+    if (!rawAreas || rawAreas.trim() === '' || rawAreas.trim().toLowerCase() === 'all') {
+        return [{ full: 'All India', primary: 'All', sub: '' }];
+    }
+    if (rawAreas.includes('|')) {
+        return rawAreas.split('|').map(z => z.trim()).filter(Boolean).map(zone => {
+            const parts = zone.split(',').map(p => p.trim()).filter(Boolean);
+            return { full: zone, primary: parts[0] || zone, sub: parts.slice(1, 3).join(', ') };
+        });
+    }
+    const commaParts = rawAreas.split(',').map(p => p.trim()).filter(Boolean);
+    const looksLikeSingleHierarchy = commaParts.length >= 3 && (
+        rawAreas.toLowerCase().includes('india') ||
+        rawAreas.toLowerCase().includes('andhra pradesh') ||
+        /\b\d{6}\b/.test(rawAreas)
+    );
+    if (looksLikeSingleHierarchy) {
+        return [{ full: rawAreas.trim(), primary: commaParts[0], sub: commaParts.slice(1, 3).join(', ') }];
+    }
+    return commaParts.map(p => ({ full: p, primary: p, sub: '' }));
+};
+
+// 🟢 1ST-WORD PRIORITY + SUB-ADDRESS DELIVERY MATCHER
+const doesShopDeliverToSelectedArea = (selectedAreaRaw, rawDeliveryAreas) => {
+    const zones = parseDeliveryZones(rawDeliveryAreas);
+    if (zones.some(z => ['all', 'india', 'all india'].includes(z.primary.toLowerCase()))) {
+        return true;
+    }
+    if (!selectedAreaRaw) return false;
+
+    const normUserFull = normalizeLocationText(selectedAreaRaw);
+    const userTokens = normUserFull.split(/[,]+/).map(s => s.trim()).filter(Boolean);
+
+    return zones.some(zone => {
+        const normPrimary = normalizeLocationText(zone.primary);
+        if (!normPrimary) return false;
+
+        // 1. PRIORITY 1: The searched area hierarchy MUST contain the Shop's 1st-word target
+        const hasPrimaryMatch = userTokens.some(t => t === normPrimary || t.includes(normPrimary)) || normUserFull.includes(normPrimary);
+        if (!hasPrimaryMatch) return false;
+
+        // 2. PRIORITY 2: Sub-Address Verification (Prevents duplicate village names in different districts)
+        const zoneParts = normalizeLocationText(zone.full)
+            .split(',')
+            .map(s => s.trim())
+            .filter(s => s && s !== 'india' && !/^\d+$/.test(s));
+
+        if (zoneParts.length > 1 && userTokens.length > 1) {
+            const subParts = zoneParts.slice(1);
+            return subParts.some(sub => normUserFull.includes(sub));
+        }
+
+        return true;
+    });
+};
+
+// 🟢 DEFAULT FLIPKART-STYLE AMBIENT BANNERS (Used if Admin hasn't created custom ones yet)
+const DEFAULT_BANNERS = [
+    {
+        id: 'default-1',
+        title_en: 'Subhams Hub Official Store',
+        title_te: 'సుభమ్స్ హబ్ అధికారిక స్టోర్',
+        subtitle_en: 'Verified local shopping, services & direct bookings at zero commission.',
+        subtitle_te: 'వెరిఫైడ్ లోకల్ షాపింగ్, సర్వీసులు & డైరెక్ట్ బుకింగ్స్.',
+        badge_text: '🌟 OFFICIAL GOLD',
+        media_url: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=900&q=80',
+        action_url: '/shop/1',
+        ambient_color: '#1e1b4b',
+        accent_color: '#facc15'
+    },
+    {
+        id: 'default-2',
+        title_en: 'Explore Subhams Expo Live Feed',
+        title_te: 'సుభమ్స్ ఎక్స్‌పో లైవ్ ఫీడ్ చూడండి',
+        subtitle_en: 'Watch real product videos, latest shop offers & local updates.',
+        subtitle_te: 'నిజమైన ఉత్పత్తి వీడియోలు, తాజా షాప్ ఆఫర్లు & అప్‌డేట్‌లు.',
+        badge_text: '🔥 LIVE EXPO',
+        media_url: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=900&q=80',
+        action_url: '/expo',
+        ambient_color: '#064e3b',
+        accent_color: '#34d399'
+    },
+    {
+        id: 'default-3',
+        title_en: 'Launch Your Digital Showroom',
+        title_te: 'మీ వ్యాపారాన్ని ఆన్‌లైన్‌లో నమోదు చేయండి',
+        subtitle_en: 'Get your Green Verified Badge and reach customers across your delivery zones.',
+        subtitle_te: 'గ్రీన్ వెరిఫైడ్ బ్యాడ్జ్ పొందండి మరియు మీ డెలివరీ ప్రాంతాలకు చేరుకోండి.',
+        badge_text: '🚀 FOR BUSINESSES',
+        media_url: 'https://images.unsplash.com/photo-1556740738-b6a63e27c4df?auto=format&fit=crop&w=900&q=80',
+        action_url: '/register-business',
+        ambient_color: '#3b0764',
+        accent_color: '#c084fc'
+    }
+];
+
+const DEFAULT_SMART_PILL = {
+    pill_title_en: 'Ask Subhams AI & Check Offers!',
+    pill_title_te: 'సుభమ్స్ AI & ఆఫర్లు చూడండి!',
+    cta_en: 'Open',
+    cta_te: 'తెరువు',
+    action_url: '/expo',
+    admin_note_en: 'Welcome to Subhams Hub! You can search any village, mandal, or state at the top to see which verified shops deliver there.',
+    admin_note_te: 'సుభమ్స్ హబ్‌కు స్వాగతం! పైన ఉన్న ఏరియా బటన్ ద్వారా ఏ ఊరికైనా డెలివరీ చేసే షాపులను సులభంగా చూడవచ్చు.',
+    is_active: true
+};
+
 const homeTranslations = {
     en: { 
-        syncing: "Syncing Market...", searchFor: "Search shops & items...", searchResults: "Search Results for", 
-        topTrending: "🔥 Top Trending Shops", subhamsExpo: "🌟 Subhams Expo", browse: "Browse", 
-        sellers: "Sellers", open: "Open", closed: "Closed", localArea: "Shops In Your Area", 
-        home: "Home", dashboard: "Dashboard", shopOrders: "Shop", orders: "Orders", 
-        expo: "Expo", profile: "Profile", admin: "Admin", explore: "Explore Subhams Hub",
-        officialShop: "Subhams Store", usefulApps: "Subhams Ecosystem", pmms: "Subhams PMMS", 
-        agent: "Subhams Agent", network: "Subhams Network" 
+        syncing: "Syncing Market...",
+        searchFor: "Search shops, categories & items...",
+        searchResults: "Search Results for", 
+        topTrending: "🔥 Top Trending Shops",
+        subhamsExpo: "🌟 Subhams Expo",
+        browse: "Browse", 
+        sellers: "Sellers",
+        open: "Open",
+        closed: "Closed",
+        localArea: "🚚 Delivery Available in",
+        localAreaSub: "Showing shops that deliver to your selected area (No personal address required)",
+        changeArea: "Change Area",
+        home: "Home",
+        dashboard: "Dashboard",
+        shopOrders: "Shop",
+        orders: "Orders", 
+        expo: "Expo",
+        profile: "Profile",
+        admin: "Admin",
+        explore: "Explore Subhams Hub",
+        officialShop: "Subhams Store",
+        usefulApps: "Subhams Ecosystem",
+        pmms: "Subhams PMMS", 
+        agent: "Subhams Agent",
+        network: "Subhams Network",
+        viewAll: "View All",
+        showLess: "Show Less",
+        checkAreaModalTitle: "🚚 Check Delivery Area",
+        checkAreaModalSub: "Search any village, mandal, district, or state to discover shops delivering there. (Not your private home address)",
+        manageBanners: "Manage Banners & AI Pill",
+        tabNames: {
+            Expo: "Expo",
+            Trending: "Trending",
+            Shopping: "Shopping",
+            Services: "Services",
+            Business: "Business"
+        }
     },
     te: { 
-        syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...", searchFor: "దుకాణాలు, వస్తువుల కోసం వెతకండి...", searchResults: "దీని కోసం శోధన ఫలితాలు", 
-        topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు", subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌‌పో", browse: "బ్రౌజ్ చేయండి", 
-        sellers: "విక్రేతలు", open: "తెరిచి ఉంది", closed: "మూసివేయబడింది", localArea: "మీ ప్రాంతంలోని షాపులు", 
-        home: "హోమ్", dashboard: "డాష్‌బోర్డ్", shopOrders: "షాప్", orders: "ఆర్డర్‌లు", 
-        expo: "ఎక్స్‌పో", profile: "ప్రొఫైల్", admin: "అడ్మిన్", explore: "సుభమ్స్ హబ్ అన్వేషించండి", 
-        usefulApps: "సుభమ్స్ హబ్ ఎకోసిస్టమ్", officialShop: "సుభమ్స్ స్టోర్", pmms: "సుభమ్స్ PMMS", 
-        agent: "సుభమ్స్ ఏజెంట్", network: "సుభమ్స్ నెట్‌‌వర్క్" 
+        syncing: "మార్కెట్‌ను సింక్ చేస్తోంది...",
+        searchFor: "దుకాణాలు, వస్తువుల కోసం వెతకండి...",
+        searchResults: "దీని కోసం శోధన ఫలితాలు", 
+        topTrending: "🔥 టాప్ ట్రెండింగ్ షాపులు",
+        subhamsExpo: "🌟 సుభమ్స్ ఎక్స్‌‌పో",
+        browse: "బ్రౌజ్ చేయండి", 
+        sellers: "విక్రేతలు",
+        open: "తెరిచి ఉంది",
+        closed: "మూసివేయబడింది",
+        localArea: "🚚 డెలివరీ అందుబాటులో ఉన్న షాపులు:",
+        localAreaSub: "మీరు ఎంచుకున్న ప్రాంతానికి డెలివరీ చేసే షాపులు (వ్యక్తిగత చిరునామా అవసరం లేదు)",
+        changeArea: "ప్రాంతం మార్చండి",
+        home: "హోమ్",
+        dashboard: "డాష్‌బోర్డ్",
+        shopOrders: "షాప్",
+        orders: "ఆర్డర్‌లు", 
+        expo: "ఎక్స్‌పో",
+        profile: "ప్రొఫైల్",
+        admin: "అడ్మిన్",
+        explore: "సుభమ్స్ హబ్ అన్వేషించండి", 
+        usefulApps: "సుభమ్స్ హబ్ ఎకోసిస్టమ్",
+        officialShop: "సుభమ్స్ స్టోర్",
+        pmms: "సుభమ్స్ PMMS", 
+        agent: "సుభమ్స్ ఏజెంట్",
+        network: "సుభమ్స్ నెట్‌‌వర్క్",
+        viewAll: "అన్నీ చూడండి",
+        showLess: "తగ్గించు",
+        checkAreaModalTitle: "🚚 డెలివరీ ప్రాంతాన్ని తనిఖీ చేయండి",
+        checkAreaModalSub: "ఏ గ్రామం, మండలం, జిల్లా లేదా రాష్ట్రానికైనా డెలివరీ చేసే షాపులను చూడటానికి ఇక్కడ వెతకండి.",
+        manageBanners: "బ్యానర్లు & AI పిల్",
+        tabNames: {
+            Expo: "ఎక్స్‌పో",
+            Trending: "ట్రెండింగ్",
+            Shopping: "షాపింగ్",
+            Services: "సర్వీసులు",
+            Business: "వ్యాపారం"
+        }
     }
 };
 
 const categoryTranslations = {
     'Vegetables': 'కూరగాయలు', 'Fruits': 'పండ్లు', 'Groceries': 'కిరాణా', 'Electronics': 'ఎలక్ట్రానిక్స్',
-    'Clothing': 'బట్టలు', 'Food': 'ఆహారం', 'Meat': 'మాంసం', 'Fish': 'చేపలు', 'Services': 'సేవలు'
+    'Clothing': 'బట్టలు', 'Clothing & Fashion': 'బట్టలు & ఫ్యాషన్', 'Food': 'ఆహారం', 'Catering & Food': 'కేటరింగ్ & ఆహారం',
+    'Meat': 'మాంసం', 'Fish': 'చేపలు', 'Services': 'సేవలు', 'Tailoring': 'టైలరింగ్', 'AC Repair': 'AC రిపేర్',
+    'Plumbing': 'ప్లంబింగ్', 'Saloon & Beauty': 'సెలూన్ & బ్యూటీ', 'Hardware': 'హార్డ్‌వేర్', 'Mobile Repair': 'మొబైల్ రిపేర్'
 };
 
-const locationAliases = {
-    'konanki': ['konanki', 'కోణంకి', 'kona'], 'martur': ['martur', 'మార్టూరు'],
-    'bapatla': ['bapatla', 'బాపట్ల'], 'tirupati': ['tirupati', 'తిరుపతి']
+// Canonical keys so switching between English & Telugu never breaks the active tab!
+const CANONICAL_TABS = ['Expo', 'Trending', 'Shopping', 'Services', 'Business'];
+
+// 🟢 5-TIER BADGE PILL FOR HOME SHOP CARDS
+const renderShopCardBadge = (shop) => {
+    const isOfficial = String(shop.user_id) === "1" || shop.user_email === 'pavanvenkat63@gmail.com' || shop.email === 'pavanvenkat63@gmail.com';
+    const isVer = shop.is_verified === true || String(shop.is_verified).toLowerCase() === 'true';
+    const status = shop.account_status || 'active';
+
+    if (status === 'perma_banned') return <span style={{ background: '#0f172a', color: '#fff', fontSize: '9px', padding: '2px 6px', borderRadius: '6px', fontWeight: '900' }}>⬛ Banned</span>;
+    if (status === 'temp_block') return <span style={{ background: '#fef2f2', color: '#dc2626', fontSize: '9px', padding: '2px 6px', borderRadius: '6px', fontWeight: '900', border: '1px solid #fecaca' }}>🟥 Suspended</span>;
+    if (isOfficial) return <BadgeCheck size={14} color="#ffffff" fill="#facc15" style={{ flexShrink: 0 }} />;
+    if (isVer) return <BadgeCheck size={14} color="#ffffff" fill="#10b981" style={{ flexShrink: 0 }} />;
+    return <BadgeCheck size={14} color="#ffffff" fill="#3b82f6" style={{ flexShrink: 0 }} />;
 };
 
 const Home = () => {
-    const { t, language, location: appLocation } = useContext(AppContext);
+    const { t, language, setLanguage, location: appLocation } = useContext(AppContext);
     const navigate = useNavigate();
     const currentRoute = useLocation().pathname;
 
-    const lang = language === 'te' ? 'te' : 'en';
+    const [localLang, setLocalLang] = useState(() => language === 'te' ? 'te' : 'en');
+    useEffect(() => {
+        if (language === 'te' || language === 'en') setLocalLang(language);
+    }, [language]);
+
+    const lang = localLang;
     const ht = homeTranslations[lang];
 
-    const CATEGORIES = [t('Expo') || 'Expo', t('Trending') || 'Trending', t('Shopping') || 'Shopping', t('Services') || 'Services', t('Business') || 'Business'];
+    const toggleLanguage = () => {
+        const next = lang === 'en' ? 'te' : 'en';
+        setLocalLang(next);
+        if (typeof setLanguage === 'function') setLanguage(next);
+    };
 
-    const getCatIcon = (cat) => {
-        if (cat === (t('Expo') || 'Expo')) return { icon: '✨', bg: '#fce7f3', color: '#db2777' };
-        if (cat === (t('Trending') || 'Trending')) return { icon: '🔥', bg: '#fef2f2', color: '#dc2626' };
-        if (cat === (t('Shopping') || 'Shopping')) return { icon: '🛍️', bg: '#eff6ff', color: '#2563eb' };
-        if (cat === (t('Services') || 'Services')) return { icon: '🧑‍🔧', bg: '#f0fdf4', color: '#16a34a' };
-        if (cat === (t('Business') || 'Business')) return { icon: '📈', bg: '#fef3c7', color: '#d97706' };
-        return { icon: '🏪', bg: '#f1f5f9', color: '#64748b' };
+    const getCatIcon = (catKey) => {
+        if (catKey === 'Expo') return { icon: '✨', bg: '#fce7f3', color: '#db2777', ambient: '#4a044e' };
+        if (catKey === 'Trending') return { icon: '🔥', bg: '#fef2f2', color: '#dc2626', ambient: '#1e1b4b' };
+        if (catKey === 'Shopping') return { icon: '🛍️', bg: '#eff6ff', color: '#2563eb', ambient: '#1e3a8a' };
+        if (catKey === 'Services') return { icon: '🧑‍🔧', bg: '#f0fdf4', color: '#16a34a', ambient: '#064e3b' };
+        if (catKey === 'Business') return { icon: '📈', bg: '#fef3c7', color: '#d97706', ambient: '#78350f' };
+        return { icon: '🏪', bg: '#f1f5f9', color: '#64748b', ambient: '#0f172a' };
     };
 
     const tc = (word) => {
         if (!word) return '';
         if (lang === 'te') {
-            return word.split(',').map(w => categoryTranslations[w.trim()] || t(w.trim())).join(', ');
+            return word.split(',').map(w => categoryTranslations[w.trim()] || (typeof t === 'function' ? t(w.trim()) : w.trim())).join(', ');
         }
         return word;
     };
@@ -87,17 +305,52 @@ const Home = () => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024); 
     const [searchQuery, setSearchQuery] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[1]); 
+
+    // 🟢 CANONICAL TAB KEY ('Trending' by default - never breaks on language switch!)
+    const [selectedCategory, setSelectedCategory] = useState('Trending'); 
+    const [showAllLocalShops, setShowAllLocalShops] = useState(false);
+    const [showAllTrending, setShowAllTrending] = useState(false);
 
     const [localUserStr, setLocalUserStr] = useState(localStorage.getItem('user'));
     const localUser = localUserStr && localUserStr !== 'undefined' ? JSON.parse(localUserStr) : null;
     
-    const [customLocation, setCustomLocation] = useState(() => JSON.parse(localStorage.getItem('custom_hub_location')));
+    const [customLocation, setCustomLocation] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('custom_hub_location')); } catch (e) { return null; }
+    });
     const [showLocModal, setShowLocModal] = useState(false);
     const [locSearch, setLocSearch] = useState('');
     const [locResults, setLocResults] = useState([]);
 
     const [unreadNotifs, setUnreadNotifs] = useState(0); 
+
+    // 🎨 AMBIENT HERO BANNERS & FLOATING EXPANDING PILL STATE
+    const [banners, setBanners] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('subhams_home_banners'));
+            return Array.isArray(saved) && saved.length > 0 ? saved : DEFAULT_BANNERS;
+        } catch (e) { return DEFAULT_BANNERS; }
+    });
+    const [activeBannerIdx, setActiveBannerIdx] = useState(0);
+    const [smartPill, setSmartPill] = useState(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('subhams_smart_pill'));
+            return saved || DEFAULT_SMART_PILL;
+        } catch (e) { return DEFAULT_SMART_PILL; }
+    });
+
+    // 🟢 JIOSAAVN-STYLE FLOATING PILL AUTO-EXPAND / COLLAPSE STATE
+    const [isPillExpanded, setIsPillExpanded] = useState(false);
+    const [showAssistantModal, setShowAssistantModal] = useState(false);
+    const [assistantQuery, setAssistantQuery] = useState('');
+
+    // 🎨 ADMIN BANNER STUDIO MODAL STATE
+    const [showBannerAdminModal, setShowBannerAdminModal] = useState(false);
+    const [editingBannerId, setEditingBannerId] = useState(null);
+    const [bannerForm, setBannerForm] = useState({
+        title_en: '', title_te: '', subtitle_en: '', subtitle_te: '',
+        badge_text: 'SPECIAL OFFER', media_url: '', action_url: '/expo',
+        ambient_color: '#1e3a8a', accent_color: '#facc15'
+    });
 
     useEffect(() => {
         const checkUser = () => {
@@ -108,16 +361,13 @@ const Home = () => {
         return () => window.removeEventListener('storage', checkUser);
     }, [localUserStr]);
 
-    // 🟢 FETCH UNREAD NOTIFICATIONS COUNT
+    // Fetch Unread Notifications Count
     useEffect(() => {
         if (localUser?.id) {
             const token = localStorage.getItem('token');
             if (token) {
                 axios.get(`${getBackendUrl()}/notifications/my-notifications`, { headers: { Authorization: `Bearer ${token}` } })
-                .then(res => {
-                    const count = res.data.unreadCount || 0;
-                    setUnreadNotifs(count);
-                }).catch(() => {});
+                .then(res => setUnreadNotifs(res.data.unreadCount || 0)).catch(() => {});
             }
         }
     }, [localUser?.id]);
@@ -142,6 +392,53 @@ const Home = () => {
         const handleResize = () => setIsMobile(window.innerWidth < 1024);
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Fetch Banners & Smart Pill from Backend (with graceful local fallback)
+    const fetchHomeMarketing = async () => {
+        try {
+            const res = await axios.get(`${getBackendUrl()}/admin/home-banners`);
+            if (res.data?.banners && res.data.banners.length > 0) {
+                setBanners(res.data.banners);
+                localStorage.setItem('subhams_home_banners', JSON.stringify(res.data.banners));
+            }
+            if (res.data?.smartPill) {
+                setSmartPill(res.data.smartPill);
+                localStorage.setItem('subhams_smart_pill', JSON.stringify(res.data.smartPill));
+            }
+        } catch (e) {}
+    };
+
+    useEffect(() => {
+        fetchHomeMarketing();
+        socket.on('home_marketing_updated', fetchHomeMarketing);
+        return () => socket.off('home_marketing_updated', fetchHomeMarketing);
+    }, []);
+
+    // Auto-slide Top Hero Banner every 4.5 seconds
+    useEffect(() => {
+        if (banners.length <= 1) return;
+        const timer = setInterval(() => {
+            setActiveBannerIdx(prev => (prev + 1) % banners.length);
+        }, 4500);
+        return () => clearInterval(timer);
+    }, [banners.length]);
+
+    // 🟢 AUTO-EXPAND & COLLAPSE FLOATING PILL (Every 9 seconds opens for 4.5 seconds, just like the video!)
+    useEffect(() => {
+        const initialTimer = setTimeout(() => setIsPillExpanded(true), 2000);
+        const collapseTimer = setTimeout(() => setIsPillExpanded(false), 6500);
+
+        const cycleInterval = setInterval(() => {
+            setIsPillExpanded(true);
+            setTimeout(() => setIsPillExpanded(false), 4500);
+        }, 10000);
+
+        return () => {
+            clearTimeout(initialTimer);
+            clearTimeout(collapseTimer);
+            clearInterval(cycleInterval);
+        };
     }, []);
 
     const activeLat = customLocation?.lat || appLocation?.lat || 0;
@@ -175,21 +472,117 @@ const Home = () => {
         return () => { isMounted = false; };
     }, [activeLat, activeLng]);
 
+    // 🟢 MAP SEARCH (Converts Telugu input to English query so DB matching is 100% consistent)
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
-        if (query.length < 3) return setLocResults([]);
+        if (query.trim().length < 2) return setLocResults([]);
         try {
-            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&accept-language=en&q=${query}`);
-            setLocResults(res.data);
-        } catch (e) { console.log(e); }
+            const normalizedQ = normalizeLocationText(query.trim());
+            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=in&accept-language=en&q=${encodeURIComponent(normalizedQ)}`);
+            setLocResults(res.data || []);
+        } catch (e) {}
     };
 
     const selectCustomLocation = (loc) => {
-        const customLoc = { lat: loc.lat, lng: loc.lon, address: loc.display_name };
+        const customLoc = { lat: loc.lat || 0, lng: loc.lon || 0, address: loc.display_name };
         localStorage.setItem('custom_hub_location', JSON.stringify(customLoc));
         setCustomLocation(customLoc);
         setShowLocModal(false);
-        toast.success(`Location set to ${loc.display_name.split(',')[0]}`);
+        setLocSearch('');
+        setLocResults([]);
+        toast.success(`🚚 Showing shops delivering to ${loc.display_name.split(',')[0]}`);
+    };
+
+    // 📸 ADMIN BANNER IMAGE / GIF UPLOADER (Compresses static images, keeps GIF animation intact)
+    const handleBannerMediaUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (ev) => {
+            if (file.type === 'image/gif') {
+                setBannerForm(prev => ({ ...prev, media_url: ev.target.result }));
+                toast.success("🎞️ Animated GIF attached!");
+                return;
+            }
+            const img = new Image();
+            img.src = ev.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const maxW = 900;
+                const scale = Math.min(1, maxW / img.width);
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                setBannerForm(prev => ({ ...prev, media_url: canvas.toDataURL('image/jpeg', 0.78) }));
+                toast.success("🖼️ Banner photo optimized & attached!");
+            };
+        };
+    };
+
+    const handleSaveBanner = async (e) => {
+        e.preventDefault();
+        if (!bannerForm.title_en.trim()) return toast.error("Please enter a banner title.");
+        const token = localStorage.getItem('token');
+
+        try {
+            if (editingBannerId && !String(editingBannerId).startsWith('default-')) {
+                await axios.put(`${getBackendUrl()}/admin/home-banners/${editingBannerId}`, bannerForm, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                toast.success("✅ Banner updated!");
+            } else {
+                await axios.post(`${getBackendUrl()}/admin/home-banners`, bannerForm, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                toast.success("🎉 New banner published!");
+            }
+            fetchHomeMarketing();
+        } catch (err) {
+            // Local fallback so Admin changes work immediately even before backend deploy
+            let updated;
+            if (editingBannerId) {
+                updated = banners.map(b => b.id === editingBannerId ? { ...b, ...bannerForm } : b);
+            } else {
+                updated = [{ ...bannerForm, id: Date.now() }, ...banners];
+            }
+            setBanners(updated);
+            localStorage.setItem('subhams_home_banners', JSON.stringify(updated));
+            toast.success("✅ Banner saved!");
+        }
+        setEditingBannerId(null);
+        setBannerForm({ title_en: '', title_te: '', subtitle_en: '', subtitle_te: '', badge_text: 'SPECIAL OFFER', media_url: '', action_url: '/expo', ambient_color: '#1e3a8a', accent_color: '#facc15' });
+    };
+
+    const handleDeleteBanner = async (bannerId) => {
+        if (!window.confirm("Delete this banner slide?")) return;
+        const token = localStorage.getItem('token');
+        try {
+            if (!String(bannerId).startsWith('default-')) {
+                await axios.delete(`${getBackendUrl()}/admin/home-banners/${bannerId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            }
+        } catch (e) {}
+        const remaining = banners.filter(b => b.id !== bannerId);
+        const finalBanners = remaining.length > 0 ? remaining : DEFAULT_BANNERS;
+        setBanners(finalBanners);
+        setActiveBannerIdx(0);
+        localStorage.setItem('subhams_home_banners', JSON.stringify(finalBanners));
+        toast.info("🗑️ Banner removed.");
+    };
+
+    const handleSaveSmartPill = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem('token');
+        try {
+            await axios.put(`${getBackendUrl()}/admin/home-smart-pill`, smartPill, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (e) {}
+        localStorage.setItem('subhams_smart_pill', JSON.stringify(smartPill));
+        toast.success("✨ Floating Smart Pill & Greeting updated!");
     };
 
     const [touchStart, setTouchStart] = useState(null);
@@ -207,12 +600,12 @@ const Home = () => {
         const distanceX = touchStart - touchEndX;
         const distanceY = Math.abs(touchStartY - touchEndY);
         
-        if (Math.abs(distanceX) > 60 && Math.abs(distanceX) > distanceY * 1.5) {
-            const currentIndex = CATEGORIES.indexOf(selectedCategory);
-            if (distanceX > 0 && currentIndex < CATEGORIES.length - 1) {
-                handleCategoryClick(CATEGORIES[currentIndex + 1]);
+        if (Math.abs(distanceX) > 65 && Math.abs(distanceX) > distanceY * 1.6) {
+            const currentIndex = CANONICAL_TABS.indexOf(selectedCategory);
+            if (distanceX > 0 && currentIndex < CANONICAL_TABS.length - 1) {
+                handleCategoryClick(CANONICAL_TABS[currentIndex + 1]);
             } else if (distanceX < 0 && currentIndex > 0) {
-                handleCategoryClick(CATEGORIES[currentIndex - 1]);
+                handleCategoryClick(CANONICAL_TABS[currentIndex - 1]);
             }
         }
         setTouchStart(null);
@@ -224,53 +617,38 @@ const Home = () => {
         navigate('/welcome');
     };
 
-    const handleCategoryClick = (cat) => {
-        if (cat === (t('Business') || 'Business')) { 
+    const handleCategoryClick = (catKey) => {
+        if (catKey === 'Business') { 
             if (!localUser) return requireLogin('register a business');
             navigate('/register-business'); 
             return; 
         }
-        if (cat === (t('Expo') || 'Expo')) {
+        if (catKey === 'Expo') {
             navigate('/expo');
             return;
         }
 
-        setSelectedCategory(cat); 
+        setSelectedCategory(catKey); 
         setSelectedSubCategory(null); 
         setSearchQuery(''); 
         setShowSuggestions(false);
     };
 
-    // 🟢 LOCATION PRIVACY: Only show 'delivery_areas'. Do not leak raw 'shop.address' to the public feed!
+    // 🟢 FORMAT DELIVERY TAG CLEANLY (Shows 1st word of each zone)
     const getDistanceTag = (shop) => {
-        const areas = shop.delivery_areas || 'All Areas';
-        return `🚚 Delivers: ${areas.length > 15 ? areas.substring(0, 15) + '...' : areas}`; 
+        const zones = parseDeliveryZones(shop.delivery_areas);
+        const shortList = zones.map(z => z.primary).join(', ');
+        return `🚚 ${shortList.length > 18 ? shortList.substring(0, 18) + '...' : shortList}`; 
     };
 
-    // 🟢 FIXED: Delivery Areas Logic -> Shops only show if they deliver to the selected area
-    const nearbyShops = activeShops.filter(shop => {
-        if (isAdmin) return true; 
-        
-        const searchAddrRaw = (customLocation?.address || localUser?.address || localUser?.location || '').toLowerCase();
-        const deliveryAreas = (shop.delivery_areas || 'all').toLowerCase();
-        
-        if (deliveryAreas.includes('all')) return true;
-
-        if (searchAddrRaw && deliveryAreas) {
-            const uParts = searchAddrRaw.split(/[\s,]+/); 
-            if (uParts.some(part => part.length >= 4 && deliveryAreas.includes(part))) return true;
-            
-            let isMatch = false;
-            Object.keys(locationAliases).forEach(key => {
-                const aliases = locationAliases[key];
-                const searchHasAlias = aliases.some(alias => searchAddrRaw.includes(alias));
-                const shopDeliversToAlias = aliases.some(alias => deliveryAreas.includes(alias));
-                if (searchHasAlias && shopDeliversToAlias) isMatch = true;
-            });
-            if (isMatch) return true;
-        }
-        return false;
+    // 🟢 1ST-WORD + SUB-ADDRESS DELIVERY FILTER FOR SELECTED AREA
+    const selectedExplorerArea = customLocation?.address || localUser?.address || localUser?.location || '';
+    const deliverableShops = activeShops.filter(shop => {
+        if (!selectedExplorerArea) return true;
+        return doesShopDeliverToSelectedArea(selectedExplorerArea, shop.delivery_areas);
     });
+
+    const trendingShops = activeShops.filter(shop => (shop.shop_type || 'Products').includes('Trending'));
 
     const officialHubShop = activeShops.find(s => 
         String(s.user_id) === "1" || 
@@ -292,7 +670,7 @@ const Home = () => {
             type: 'category', name: f.name, count: f.count, section: f.section
         })),
         ...activeShops.filter(s => s.business_name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.category || '').toLowerCase().includes(searchQuery.toLowerCase())).map(s => ({
-            type: 'shop', name: s.business_name, id: s.id, img: s.shop_logo || s.shop_image, lat: s.lat, lng: s.lng
+            type: 'shop', name: s.business_name, id: s.id, img: s.shop_logo || s.shop_image
         }))
     ].slice(0, 6);
 
@@ -302,8 +680,8 @@ const Home = () => {
         if (suggestion.type === 'shop') {
             navigate(`/shop/${suggestion.id}`);
         } else if (suggestion.type === 'category') {
-            const uiCategory = suggestion.section === 'Products' ? CATEGORIES[2] : CATEGORIES[3];
-            setSelectedCategory(uiCategory);
+            const targetTab = suggestion.section === 'Products' ? 'Shopping' : 'Services';
+            setSelectedCategory(targetTab);
             setSelectedSubCategory(suggestion.name);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -316,13 +694,23 @@ const Home = () => {
         return !safeSearch || pName.includes(safeSearch) || pCategory.includes(safeSearch);
     });
 
-    const currentTabEnglish = selectedCategory === (t('Services') || 'Services') ? 'Services' : (selectedCategory === (t('Shopping') || 'Shopping') ? 'Products' : selectedCategory);
-    const activeLocationName = customLocation ? customLocation.address.split(',')[0] : (localUser?.address ? localUser.address.split(',')[0] : "Set Loc");
+    const currentTabEnglish = selectedCategory === 'Services' ? 'Services' : (selectedCategory === 'Shopping' ? 'Products' : selectedCategory);
+    const activeLocationName = selectedExplorerArea ? selectedExplorerArea.split(',')[0].trim() : (lang === 'te' ? 'ప్రాంతం ఎంచుకోండి' : 'Check Area');
+
+    // 🎨 AMBIENT COLOR REFLECTION ENGINE
+    const currentBanner = banners[activeBannerIdx % Math.max(1, banners.length)] || DEFAULT_BANNERS[0];
+    const activeAmbientColor = selectedCategory === 'Trending'
+        ? (currentBanner.ambient_color || '#1e1b4b')
+        : getCatIcon(selectedCategory).ambient;
+    const activeAccentColor = currentBanner.accent_color || '#facc15';
 
     return (
-        <div style={styles.page}>
+        <div style={{
+            ...styles.page,
+            background: `radial-gradient(circle at 50% 0%, ${activeAmbientColor}28 0%, #f8fafc 42%, #f8fafc 100%)`,
+            transition: 'background 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
             {localUser?.id && <AppPermissions/>}
-
             {loading && <div className="top-progress-bar"></div>}
 
             <style>
@@ -333,24 +721,14 @@ const Home = () => {
                         100% { left: 100%; right: -90%; }
                     }
                     .top-progress-bar {
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 3px;
-                        background: transparent;
-                        z-index: 10000;
-                        overflow: hidden;
+                        position: fixed; top: 0; left: 0; width: 100%; height: 3px;
+                        background: transparent; z-index: 10000; overflow: hidden;
                     }
                     .top-progress-bar::before {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        bottom: 0;
+                        content: ''; position: absolute; top: 0; bottom: 0;
                         background: #facc15;
                         animation: topProgressBarAnim 1.5s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;
                     }
-
                     @keyframes logo-shine {
                         0% { background-position: -200% center; }
                         100% { background-position: 200% center; }
@@ -364,59 +742,47 @@ const Home = () => {
                         -webkit-text-fill-color: transparent;
                         animation: logo-shine 3s linear infinite;
                     }
-                    @keyframes running-text {
-                        0%   { transform: translateX(0%); }
-                        100% { transform: translateX(-100%); }
-                    }
-                    .scroll-container {
-                        width: 100%;
-                        overflow: hidden;
-                        white-space: nowrap;
-                        box-sizing: border-box;
-                        position: relative;
-                    }
-                    .scroll-text {
-                        display: inline-block;
-                        padding-left: 100%;
-                        animation: running-text 8s linear infinite;
-                    }
                     .touch-scale {
-                        transition: transform 0.15s cubic-bezier(0.25, 0.8, 0.25, 1);
+                        transition: transform 0.18s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.18s ease;
                     }
                     @media (hover: hover) {
                         .touch-scale:hover {
-                            transform: scale(1.03) translateY(-2px);
-                            box-shadow: 0 10px 20px rgba(0,0,0,0.08);
-                            z-index: 10;
+                            transform: translateY(-2px);
+                            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
                         }
                     }
-                    .touch-scale:active {
-                        transform: scale(0.96);
-                    }
+                    .touch-scale:active { transform: scale(0.96); }
                     .hide-scroll::-webkit-scrollbar { display: none; }
                     .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-                    .swipe-content { transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
-                    
                     @keyframes fadeUp {
-                        from { opacity: 0; transform: translateY(15px); }
+                        from { opacity: 0; transform: translateY(12px); }
                         to { opacity: 1; transform: translateY(0); }
                     }
-                    .fade-up-card {
-                        animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-                    }
+                    .fade-up-card { animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
                 `}
             </style>
 
+            {/* 🎨 DYNAMIC AMBIENT REFLECTION HEADER */}
             <div style={styles.headerStack}>
-                <div style={styles.headerTopRow}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
-                        <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                            <span className="animated-logo" style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '-0.5px' }}>SUBHAMS</span>
-                            <span style={{ fontSize: '13px', color: '#ffffff', fontWeight: '800', letterSpacing: '1px' }}>HUB</span>
+                <div style={{
+                    ...styles.headerTopRow,
+                    background: `linear-gradient(135deg, #090d16 0%, ${activeAmbientColor} 100%)`,
+                    transition: 'background 0.8s ease'
+                }}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer'}} onClick={() => {setSearchQuery(''); setSelectedCategory('Trending'); setSelectedSubCategory(null); window.scrollTo(0,0);}}>
+                        <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+                            <span className="animated-logo" style={{ fontSize: '23px', fontWeight: '900', letterSpacing: '-0.5px' }}>SUBHAMS</span>
+                            <span style={{ fontSize: '12px', background: 'rgba(250, 204, 21, 0.2)', color: '#facc15', padding: '2px 7px', borderRadius: '6px', fontWeight: '900', letterSpacing: '1px', border: '1px solid rgba(250,204,21,0.35)' }}>HUB</span>
                         </h1>
                     </div>
                     
-                    <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+                    <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                        {/* 🌐 1-TAP TELUGU / ENGLISH LANGUAGE TOGGLE */}
+                        <button onClick={toggleLanguage} style={styles.langToggleBtn} title="Switch Language">
+                            <Globe size={14} color="#facc15" />
+                            <span>{lang === 'en' ? 'తెలుగు' : 'EN'}</span>
+                        </button>
+
                         <button onClick={() => navigate('/notifications')} style={{...styles.bellBtn, position: 'relative'}}>
                             🔔
                             {unreadNotifs > 0 && <span style={styles.topBellBadge}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</span>}
@@ -424,21 +790,32 @@ const Home = () => {
 
                         {isAdmin ? (
                             <button onClick={() => navigate('/admin')} style={styles.adminBtn}>
-                                <ShieldCheck size={18} /> {isMobile ? "" : ht.admin}
+                                <ShieldCheck size={16} /> {isMobile ? "" : ht.admin}
                             </button>
                         ) : !localUser ? (
                             <button onClick={() => navigate('/welcome')} style={styles.loginHeaderBtn}>
-                                <User size={16} /> Login
+                                <User size={15} /> Login
                             </button>
                         ) : null}
                     </div>
                 </div>
                 
-                <div style={styles.locationSearchRow}>
-                    <div className="touch-scale" style={styles.locationPill} onClick={() => setShowLocModal(true)}>
+                {/* 🚚 DELIVERY AREA EXPLORER + GLOBAL SEARCH BAR */}
+                <div style={{
+                    ...styles.locationSearchRow,
+                    background: `linear-gradient(135deg, #090d16 0%, ${activeAmbientColor} 100%)`,
+                    transition: 'background 0.8s ease'
+                }}>
+                    <div className="touch-scale" style={styles.locationPill} onClick={() => setShowLocModal(true)} title="Check which shops deliver to any area">
                         <MapPin size={14} color="#facc15" style={{flexShrink: 0}} />
-                        <span style={{maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{activeLocationName}</span>
-                        <span style={{opacity: 0.7, fontSize: '10px'}}>▾</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.1 }}>
+                            <span style={{ fontSize: '9px', color: '#cbd5e1', fontWeight: '700', textTransform: 'uppercase' }}>
+                                {lang === 'te' ? 'డెలివరీ ఏరియా' : 'Delivery Area'}
+                            </span>
+                            <span style={{maxWidth: '88px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12.5px', fontWeight: '900', color: '#ffffff'}}>
+                                {activeLocationName} ▾
+                            </span>
+                        </div>
                     </div>
 
                     <div style={{ flex: 1, position: 'relative' }}>
@@ -451,9 +828,13 @@ const Home = () => {
                             onFocus={() => setShowSuggestions(true)}
                             onBlur={() => setTimeout(() => setShowSuggestions(false), 250)}
                         />
-                        <div style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: '#f8fafc', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Search size={14} color="#0f172a" />
-                        </div>
+                        {searchQuery ? (
+                            <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '26px', height: '26px', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+                        ) : (
+                            <div style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: '#eff6ff', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Search size={14} color="#2563eb" />
+                            </div>
+                        )}
                         
                         {showSuggestions && searchSuggestions.length > 0 && (
                             <div style={styles.suggestionsBox}>
@@ -482,22 +863,19 @@ const Home = () => {
                     </div>
                 </div>
 
+                {/* CATEGORY STRIP */}
                 <div style={styles.headerCatStrip} className="hide-scroll">
                     <div style={styles.catContent}>
-                        {CATEGORIES.map(cat => {
-                            const isActive = selectedCategory === cat;
+                        {CANONICAL_TABS.map(catKey => {
+                            const isActive = selectedCategory === catKey;
+                            const { icon } = getCatIcon(catKey);
                             return (
-                                <span key={cat} onClick={() => handleCategoryClick(cat)}
+                                <span key={catKey} onClick={() => handleCategoryClick(catKey)}
                                     style={{ 
                                         ...styles.catItem, 
                                         ...(isActive ? styles.catItemActive : styles.catItemInactive)
                                     }}>
-                                    {cat === CATEGORIES[1] ? '🔥 ' : ''}
-                                    {cat === CATEGORIES[0] ? '🌟 ' : ''}
-                                    {cat === CATEGORIES[2] ? '🛍️ ' : ''}
-                                    {cat === CATEGORIES[3] ? '🧑‍🔧 ' : ''}
-                                    {cat === CATEGORIES[4] ? '📈 ' : ''}
-                                    {cat}
+                                    {icon} {ht.tabNames[catKey]}
                                 </span>
                             );
                         })}
@@ -505,60 +883,28 @@ const Home = () => {
                 </div>
             </div>
 
+            {/* SECURITY WARNING RIBBON */}
             {localUser?.account_status === 'warned' && (
-                <div style={{ background: '#fef2f2', borderBottom: '2px solid #ef4444', padding: '10px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'sticky', top: '150px', zIndex: 99, overflow: 'hidden' }}>
-                    <div className="warning-text" style={{ fontSize: '13px', fontWeight: 'bold', color: '#b91c1c', textAlign: 'center', padding: '0 15px' }}>
+                <div style={{ background: '#fef2f2', borderBottom: '2px solid #ef4444', padding: '10px 15px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#b91c1c' }}>
                         🛡️ SUBHAMS HUB SECURITY WARNING: {localUser.ban_reason || 'Please adhere to our community guidelines.'}
-                    </div>
+                    </span>
                 </div>
             )}
 
-            {showLocModal && (
-                <div style={styles.overlay}>
-                    <div className="touch-scale" style={styles.locModal}>
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
-                            <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>Search Delivery Area</h3>
-                            <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLocModal(false)} />
-                        </div>
-
-                        <div style={{position: 'relative', marginTop: '15px'}}>
-                            <input 
-                                type="text" 
-                                placeholder="Type your area, city, or pincode (e.g. konanki)..." 
-                                style={styles.locInput} 
-                                value={locSearch} 
-                                onChange={(e) => handleLocationSearch(e.target.value)} 
-                                autoFocus
-                            />
-                        </div>
-
-                        {locResults.length > 0 && (
-                            <div style={styles.locResultsBox}>
-                                {locResults.map((loc, i) => (
-                                    <div key={i} className="touch-scale" style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
-                                        <MapPin size={16} color="#4f46e5" style={{flexShrink: 0}} />
-                                        <span style={{fontSize: '13px', color: '#334155'}}>{loc.display_name}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
+            {/* MAIN CONTENT CONTAINER WITH GENEROUS BREATHING SPACE */}
             <div 
                 onTouchStart={onTouchStart} 
                 onTouchEnd={onTouchEnd} 
-                className="swipe-content"
-                style={{ maxWidth: '1000px', margin: '0 auto', padding: '15px 10px', width: '100%', boxSizing: 'border-box', minHeight: '70vh' }}
+                style={{ maxWidth: '1040px', margin: '0 auto', padding: isMobile ? '14px 12px' : '22px 16px', width: '100%', boxSizing: 'border-box', minHeight: '75vh', display: 'flex', flexDirection: 'column', gap: '20px' }}
             >
                 {searchQuery && !showSuggestions ? (
-                    <div style={{padding: '10px 5px'}}>
-                        <h2 style={{ fontSize: '20px', marginBottom: '15px', color: '#1e293b' }}>{ht.searchResults} "{searchQuery}"</h2>
+                    <div style={{padding: '10px 4px'}}>
+                        <h2 style={{ fontSize: '19px', marginBottom: '15px', color: '#0f172a', fontWeight: '900' }}>{ht.searchResults} "{searchQuery}"</h2>
                         {filteredProducts.length > 0 ? (
                             <div style={styles.desktopProductGrid}>
                                 {filteredProducts.map((product, i) => (
-                                    <div key={product.id} className="fade-up-card" style={{ animationDelay: `${i * 0.05}s` }}>
+                                    <div key={product.id} className="fade-up-card" style={{ animationDelay: `${i * 0.04}s` }}>
                                         <ProductCard product={product} t={t} />
                                     </div>
                                 ))}
@@ -571,219 +917,305 @@ const Home = () => {
                     </div>
                 ) : (
                     <>
-                        {selectedCategory === CATEGORIES[1] && (
+                        {selectedCategory === 'Trending' && (
                             <>
+                                {/* ========================================================= */}
+                                {/* 🎨 1. FLIPKART-STYLE TOP AMBIENT HERO BANNER CAROUSEL */}
+                                {/* ========================================================= */}
+                                <div>
+                                    {isAdmin && (
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+                                            <button 
+                                                onClick={() => setShowBannerAdminModal(true)}
+                                                style={{ background: '#0f172a', color: '#facc15', border: '1px solid #334155', padding: '6px 12px', borderRadius: '20px', fontSize: '11.5px', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            >
+                                                <Edit3 size={13} /> 🎨 {ht.manageBanners}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <div 
+                                        onClick={() => {
+                                            const url = currentBanner.action_url || '/expo';
+                                            if (url.startsWith('http')) window.open(url, '_blank');
+                                            else navigate(url);
+                                        }}
+                                        className="touch-scale"
+                                        style={{
+                                            position: 'relative',
+                                            borderRadius: '22px',
+                                            overflow: 'hidden',
+                                            minHeight: isMobile ? '168px' : '210px',
+                                            background: `linear-gradient(135deg, ${currentBanner.ambient_color || '#1e1b4b'} 0%, #090d16 100%)`,
+                                            boxShadow: `0 16px 36px -8px ${currentBanner.ambient_color || '#1e1b4b'}66`,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: isMobile ? '18px 18px 28px 18px' : '28px 36px',
+                                            boxSizing: 'border-box',
+                                            border: '1px solid rgba(255,255,255,0.12)',
+                                            transition: 'all 0.6s ease'
+                                        }}
+                                    >
+                                        {/* Left Text Column */}
+                                        <div style={{ zIndex: 2, maxWidth: currentBanner.media_url ? '60%' : '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            <span style={{
+                                                alignSelf: 'flex-start',
+                                                background: activeAccentColor,
+                                                color: '#0f172a',
+                                                fontSize: '10px',
+                                                fontWeight: '900',
+                                                padding: '4px 10px',
+                                                borderRadius: '20px',
+                                                letterSpacing: '0.6px',
+                                                textTransform: 'uppercase'
+                                            }}>
+                                                {currentBanner.badge_text || 'FEATURED'}
+                                            </span>
+                                            <h2 style={{ margin: 0, color: '#ffffff', fontSize: isMobile ? '18px' : '26px', fontWeight: '900', lineHeight: 1.2, textShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+                                                {lang === 'te' ? (currentBanner.title_te || currentBanner.title_en) : currentBanner.title_en}
+                                            </h2>
+                                            <p style={{ margin: 0, color: '#e2e8f0', fontSize: isMobile ? '12px' : '14px', fontWeight: '600', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                                {lang === 'te' ? (currentBanner.subtitle_te || currentBanner.subtitle_en) : currentBanner.subtitle_en}
+                                            </p>
+                                            <div style={{ marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '5px', color: activeAccentColor, fontSize: '12px', fontWeight: '900' }}>
+                                                <span>{lang === 'te' ? 'ఇప్పుడే చూడండి' : 'Explore Now'}</span>
+                                                <ChevronRight size={15} />
+                                            </div>
+                                        </div>
+
+                                        {/* Right Photo / Animated GIF Showcase */}
+                                        {currentBanner.media_url && (
+                                            <div style={{ width: isMobile ? '115px' : '185px', height: isMobile ? '115px' : '155px', borderRadius: '16px', overflow: 'hidden', flexShrink: 0, zIndex: 2, border: '2px solid rgba(255,255,255,0.2)', boxShadow: '0 8px 20px rgba(0,0,0,0.35)', background: '#0f172a' }}>
+                                                <img 
+                                                    src={getOptimizedImage(currentBanner.media_url)} 
+                                                    alt="Promo Banner" 
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Slide Indicator Dots */}
+                                        {banners.length > 1 && (
+                                            <div style={{ position: 'absolute', bottom: '10px', left: '18px', display: 'flex', gap: '6px', zIndex: 3 }} onClick={(e) => e.stopPropagation()}>
+                                                {banners.map((b, idx) => (
+                                                    <div 
+                                                        key={b.id || idx} 
+                                                        onClick={() => setActiveBannerIdx(idx)}
+                                                        style={{
+                                                            height: '6px',
+                                                            width: activeBannerIdx === idx ? '22px' : '6px',
+                                                            borderRadius: '6px',
+                                                            background: activeBannerIdx === idx ? activeAccentColor : 'rgba(255,255,255,0.35)',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.3s ease'
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* ========================================================= */}
+                                {/* 🚚 2. SHOPS DELIVERING TO SELECTED AREA (SPACIOUS & CLEAR) */}
+                                {/* ========================================================= */}
                                 <div style={styles.sectionBlock}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '0 5px' }}>
-                                        <h2 style={{ fontSize: '18px', margin: 0, color: '#0f172a', fontWeight: '900', letterSpacing: '-0.5px' }}>📍 {ht.localArea}</h2>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', gap: '8px', flexWrap: 'wrap' }}>
+                                        <div>
+                                            <h2 style={{ fontSize: '17px', margin: 0, color: '#0f172a', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                {ht.localArea} <span style={{ color: '#2563eb', textDecoration: 'underline', cursor: 'pointer' }} onClick={() => setShowLocModal(true)}>{selectedExplorerArea ? activeLocationName : 'All Areas'}</span>
+                                            </h2>
+                                            <p style={{ margin: '3px 0 0 0', fontSize: '11.5px', color: '#64748b', fontWeight: '600' }}>
+                                                {ht.localAreaSub}
+                                            </p>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <button onClick={() => setShowLocModal(true)} style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '6px 12px', borderRadius: '16px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <MapPin size={12}/> {ht.changeArea}
+                                            </button>
+                                            {deliverableShops.length > 4 && (
+                                                <button onClick={() => setShowAllLocalShops(!showAllLocalShops)} style={{ background: '#f1f5f9', color: '#0f172a', border: 'none', padding: '6px 12px', borderRadius: '16px', fontSize: '11.5px', fontWeight: '800', cursor: 'pointer' }}>
+                                                    {showAllLocalShops ? ht.showLess : `${ht.viewAll} (${deliverableShops.length})`}
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                     
-                                    {!customLocation && !localUser?.address ? (
-                                        <div className="touch-scale" style={{ padding: '16px 20px', background: 'linear-gradient(135deg, #e0e7ff, #eff6ff)', borderRadius: '16px', color: '#1e3a8a', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', border: '1px solid #bfdbfe', margin: '0 5px' }} onClick={() => setShowLocModal(true)}>
-                                            <MapPin size={20} color="#4f46e5"/> <span>Set Location to discover shops delivering to you!</span> <ChevronRight size={18} style={{ marginLeft: 'auto' }} />
-                                        </div>
-                                    ) : nearbyShops.length > 0 ? (
-                                        <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '15px', overflowX: 'auto', paddingBottom: '10px', paddingLeft: '5px', paddingRight: '5px', WebkitOverflowScrolling: 'touch' }} className="hide-scroll">
-                                            {nearbyShops.map((shop, i) => (
-                                                <div key={shop.id} className="touch-scale fade-up-card" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '80px', flexShrink: 0, cursor: 'pointer', animationDelay: `${i * 0.05}s` }}>
-                                                    <div style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))', marginBottom: '10px' }}>
-                                                        <div style={{ position: 'relative', width: '70px', height: '70px', margin: '0 auto' }}>
-                                                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #4f46e5, #0f172a)', borderRadius: '24px', transform: 'rotate(10deg)' }}></div>
-                                                            <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: '2px', left: '2px', width: '66px', height: '66px', objectFit: 'cover', borderRadius: '20px', background: 'white' }} />
+                                    {deliverableShops.length > 0 ? (
+                                        <div 
+                                            style={showAllLocalShops 
+                                                ? { display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: '14px', marginTop: '14px' }
+                                                : { display: 'flex', flexWrap: 'nowrap', gap: '16px', overflowX: 'auto', paddingBottom: '8px', marginTop: '14px', WebkitOverflowScrolling: 'touch' }
+                                            } 
+                                            className="hide-scroll"
+                                        >
+                                            {deliverableShops.map((shop, i) => (
+                                                <div key={shop.id} className="touch-scale fade-up-card" onClick={() => navigate(`/shop/${shop.id}`)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: showAllLocalShops ? '100%' : '88px', flexShrink: 0, cursor: 'pointer', animationDelay: `${i * 0.04}s` }}>
+                                                    <div style={{ position: 'relative', width: '72px', height: '72px', marginBottom: '8px' }}>
+                                                        <div style={{ position: 'absolute', inset: 0, background: shop.is_verified ? 'linear-gradient(135deg, #16a34a, #059669)' : 'linear-gradient(135deg, #2563eb, #1e1b4b)', borderRadius: '22px', transform: 'rotate(6deg)' }}></div>
+                                                        <img src={getOptimizedImage(shop.shop_logo) || 'https://via.placeholder.com/150'} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: '2px', left: '2px', width: '68px', height: '68px', objectFit: 'cover', borderRadius: '20px', background: 'white', border: '2px solid white' }} />
+                                                        <div style={{ position: 'absolute', bottom: '-3px', right: '-3px' }}>
+                                                            {renderShopCardBadge(shop)}
                                                         </div>
                                                     </div>
-                                                    <div className="scroll-container">
-                                                        <span className={shop.business_name.length > 10 ? "scroll-text" : ""} style={{ fontSize: '11px', fontWeight: '900', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                            {shop.business_name}
-                                                            {shop.is_verified && <ShieldCheck size={12} color="#10b981" />}
-                                                        </span>
-                                                    </div>
+                                                    <span style={{ fontSize: '11.5px', fontWeight: '900', color: '#0f172a', textAlign: 'center', maxWidth: '86px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {shop.business_name}
+                                                    </span>
+                                                    <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: '700', textAlign: 'center', maxWidth: '86px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {tc(shop.category)}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
                                     ) : (
-                                        <div style={{ padding: '20px', background: 'white', borderRadius: '16px', border: '1px dashed #cbd5e1', textAlign: 'center', margin: '0 5px' }}>
-                                            <p style={{fontSize: '13px', color: '#64748b', margin: 0, fontWeight: '600'}}>No shops currently deliver to {activeLocationName}.</p>
+                                        <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '14px', border: '1px dashed #cbd5e1', textAlign: 'center', marginTop: '10px' }}>
+                                            <p style={{fontSize: '13px', color: '#64748b', margin: '0 0 8px 0', fontWeight: '700'}}>
+                                                No shops have listed direct delivery to <strong>{activeLocationName}</strong> yet.
+                                            </p>
+                                            <button onClick={() => { localStorage.removeItem('custom_hub_location'); setCustomLocation(null); }} style={{ background: '#2563eb', color: 'white', border: 'none', padding: '7px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>
+                                                Show All India Shops
+                                            </button>
                                         </div>
                                     )}
                                 </div>
 
+                                {/* ========================================================= */}
+                                {/* 🔥 3. TOP TRENDING SHOPS (MOVED UP FOR BETTER VISIBILITY) */}
+                                {/* ========================================================= */}
                                 <div style={styles.sectionBlock}>
-                                    <h2 style={styles.sectionTitle}>{ht.explore}</h2>
-                                    <div style={styles.upiGrid}>
-                                        <div 
-                                            onClick={() => {
-                                                if (officialHubShop) navigate(`/shop/${officialHubShop.id}`);
-                                                else navigate('/shop/1');
-                                            }} 
-                                            className="touch-scale" 
-                                            style={styles.miniAppItem}
-                                        >
-                                            <div style={{...styles.miniAppIconBox, background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', color: '#d97706', border: '1px solid #fde68a'}}>
-                                                🏬
-                                            </div>
-                                            <span style={styles.miniAppText}>{ht.officialShop}</span>
-                                        </div>
-
-                                        {CATEGORIES.filter(c => c !== CATEGORIES[1]).map(cat => {
-                                            const { icon, bg, color } = getCatIcon(cat);
-                                            return (
-                                                <div key={cat} onClick={() => handleCategoryClick(cat)} className="touch-scale" style={styles.miniAppItem}>
-                                                    <div style={{...styles.miniAppIconBox, background: bg, color: color, border: '1px solid #e2e8f0'}}>
-                                                        {icon}
-                                                    </div>
-                                                    <span style={styles.miniAppText}>{cat}</span>
-                                                </div>
-                                            );
-                                        })}
-                                        <div onClick={() => localUser ? navigate('/my-orders') : requireLogin('view your orders')} className="touch-scale" style={styles.miniAppItem}>
-                                            <div style={{...styles.miniAppIconBox, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0'}}>
-                                                <Package size={24} />
-                                            </div>
-                                            <span style={styles.miniAppText}>{ht.orders}</span>
-                                        </div>
-
-                                        <div onClick={() => localUser ? navigate('/profile') : requireLogin('view your profile')} className="touch-scale" style={styles.miniAppItem}>
-                                            <div style={{...styles.miniAppIconBox, background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1'}}>
-                                                <User size={24} />
-                                            </div>
-                                            <span style={styles.miniAppText}>{ht.profile}</span>
-                                        </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                                        <h2 style={{ fontSize: '18px', margin: 0, color: '#0f172a', fontWeight: '900' }}>
+                                            {ht.topTrending}
+                                        </h2>
+                                        {trendingShops.length > 6 && (
+                                            <button onClick={() => setShowAllTrending(!showAllTrending)} style={{ background: '#eff6ff', color: '#2563eb', border: 'none', padding: '6px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' }}>
+                                                {showAllTrending ? ht.showLess : `${ht.viewAll} (${trendingShops.length})`}
+                                            </button>
+                                        )}
                                     </div>
-                                </div>
-
-                                <div style={styles.sectionBlock}>
-                                    <h2 style={{...styles.sectionTitle, display: 'flex', alignItems: 'center', gap: '6px'}}>
-                                        <Grid size={18} color="#4f46e5" /> {ht.usefulApps}
-                                    </h2>
-                                    <div style={styles.upiGrid}>
-                                        <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
-                                            <div style={{...styles.miniAppIconBox, background: '#eff6ff', color: '#4f46e5', border: '1px solid #e0e7ff'}}>💰</div>
-                                            <span style={styles.miniAppText}>{ht.pmms}</span>
-                                        </div>
-
-                                        <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
-                                            <div style={{...styles.miniAppIconBox, background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a'}}>🖨️</div>
-                                            <span style={styles.miniAppText}>{ht.agent}</span>
-                                        </div>
-
-                                        <div onClick={() => window.open('https://subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
-                                            <div style={{...styles.miniAppIconBox, background: '#fce7f3', color: '#db2777', border: '1px solid #fbcfe8'}}>🌐</div>
-                                            <span style={styles.miniAppText}>{ht.network}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{padding: '0 5px'}}>
-                                    <h2 style={{ fontSize: '20px', marginBottom: '15px', color: '#0f172a', fontWeight: '900', letterSpacing: '-0.5px' }}>
-                                        {ht.topTrending}
-                                    </h2>
                                     
-                                    <div style={isMobile ? styles.mobileGrid3 : styles.desktopProductGrid}>
-                                        {activeShops
-                                            .filter(shop => (shop.shop_type || 'Products').includes('Trending'))
-                                            .map((shop, i) => (
-                                                <div key={shop.id} className="touch-scale fade-up-card" onClick={() => navigate(`/shop/${shop.id}`)} style={{...(isMobile ? styles.shopCardMobile : styles.shopCardDesktop), animationDelay: `${i * 0.05}s`}}>
-                                                    <span style={{ position: 'absolute', top: '8px', right: '8px', background: shop.is_online ? 'rgba(22, 163, 74, 0.9)' : 'rgba(220, 38, 38, 0.9)', color: 'white', fontSize: '9px', padding: '3px 8px', borderRadius: '12px', fontWeight: '900', zIndex: 5, backdropFilter: 'blur(4px)' }}>
-                                                        {shop.is_online ? ht.open : ht.closed}
-                                                    </span>
+                                    <div style={isMobile ? styles.mobileGrid2 : styles.desktopProductGrid}>
+                                        {(showAllTrending ? trendingShops : trendingShops.slice(0, isMobile ? 6 : 8)).map((shop, i) => (
+                                            <div key={shop.id} className="touch-scale fade-up-card" onClick={() => navigate(`/shop/${shop.id}`)} style={{...(isMobile ? styles.shopCardMobile : styles.shopCardDesktop), animationDelay: `${i * 0.04}s`}}>
+                                                <span style={{ position: 'absolute', top: '10px', right: '10px', background: shop.is_online ? 'rgba(22, 163, 74, 0.92)' : 'rgba(220, 38, 38, 0.92)', color: 'white', fontSize: '9.5px', padding: '3px 8px', borderRadius: '12px', fontWeight: '900', zIndex: 5 }}>
+                                                    {shop.is_online ? ht.open : ht.closed}
+                                                </span>
 
-                                                    <div style={{ position: 'relative', width: '100%', paddingTop: '100%', overflow: 'hidden', borderRadius: '12px', marginBottom: '10px', background: '#f1f5f9' }}>
-                                                        {shop.shop_logo ? (
-                                                            <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                        ) : (
-                                                            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                <Store size={isMobile ? 24 : 36} color="#cbd5e1"/>
-                                                            </div>
-                                                        )}
-                                                        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '40%', background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)' }}></div>
-                                                    </div>
-                                                    
-                                                    <div className="scroll-container" style={{ margin: '0 0 4px 0' }}>
-                                                        <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '13px' : '16px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            {shop.business_name}
-                                                            {shop.is_verified && <ShieldCheck size={14} color="#10b981" />}
-                                                        </h4>
-                                                    </div>
-
-                                                    <p style={{ margin: '0 0 6px 0', color: '#4f46e5', fontSize: isMobile ? '10px' : '13px', fontWeight: '800', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                                        {tc(shop.category)}
-                                                    </p>
-                                                    
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: isMobile ? '9px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', background: '#f1f5f9', padding: '4px 8px', borderRadius: '8px' }}>
-                                                        <MapPin size={isMobile ? 12 : 14} color="#ef4444" /> {getDistanceTag(shop)}
-                                                    </div>
+                                                <div style={{ position: 'relative', width: '100%', paddingTop: '82%', overflow: 'hidden', borderRadius: '14px', marginBottom: '10px', background: '#f1f5f9' }}>
+                                                    {shop.shop_logo ? (
+                                                        <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    ) : (
+                                                        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            <Store size={32} color="#cbd5e1"/>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ))}
+                                                
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
+                                                    <h4 style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '14px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                                                        {shop.business_name}
+                                                    </h4>
+                                                    {renderShopCardBadge(shop)}
+                                                </div>
+
+                                                <p style={{ margin: '0 0 8px 0', color: '#2563eb', fontSize: '11.5px', fontWeight: '800', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {tc(shop.category)}
+                                                </p>
+                                                
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10.5px', color: '#475569', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                    {getDistanceTag(shop)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* ========================================================= */}
+                                {/* 🧭 4. QUICK EXPLORE & SUBHAMS ECOSYSTEM */}
+                                {/* ========================================================= */}
+                                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr', gap: '16px' }}>
+                                    <div style={{...styles.sectionBlock, margin: 0}}>
+                                        <h2 style={styles.sectionTitle}>{ht.explore}</h2>
+                                        <div style={styles.upiGrid}>
+                                            <div 
+                                                onClick={() => navigate(officialHubShop ? `/shop/${officialHubShop.id}` : '/shop/1')} 
+                                                className="touch-scale" 
+                                                style={styles.miniAppItem}
+                                            >
+                                                <div style={{...styles.miniAppIconBox, background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', color: '#d97706', border: '1px solid #fde68a'}}>
+                                                    🏬
+                                                </div>
+                                                <span style={styles.miniAppText}>{ht.officialShop}</span>
+                                            </div>
+
+                                            {CANONICAL_TABS.filter(c => c !== 'Trending').map(catKey => {
+                                                const { icon, bg, color } = getCatIcon(catKey);
+                                                return (
+                                                    <div key={catKey} onClick={() => handleCategoryClick(catKey)} className="touch-scale" style={styles.miniAppItem}>
+                                                        <div style={{...styles.miniAppIconBox, background: bg, color: color, border: '1px solid #e2e8f0'}}>
+                                                            {icon}
+                                                        </div>
+                                                        <span style={styles.miniAppText}>{ht.tabNames[catKey]}</span>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            <div onClick={() => localUser ? navigate('/my-orders') : requireLogin('view your orders')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0'}}>
+                                                    <Package size={22} />
+                                                </div>
+                                                <span style={styles.miniAppText}>{ht.orders}</span>
+                                            </div>
+
+                                            <div onClick={() => localUser ? navigate('/profile') : requireLogin('view your profile')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1'}}>
+                                                    <User size={22} />
+                                                </div>
+                                                <span style={styles.miniAppText}>{ht.profile}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style={{...styles.sectionBlock, margin: 0}}>
+                                        <h2 style={{...styles.sectionTitle, display: 'flex', alignItems: 'center', gap: '6px'}}>
+                                            <Grid size={17} color="#4f46e5" /> {ht.usefulApps}
+                                        </h2>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', padding: '5px' }}>
+                                            <div onClick={() => window.open('https://pmms.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#eff6ff', color: '#4f46e5', border: '1px solid #e0e7ff'}}>💰</div>
+                                                <span style={styles.miniAppText}>{ht.pmms}</span>
+                                            </div>
+                                            <div onClick={() => window.open('https://agent.subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a'}}>🖨️</div>
+                                                <span style={styles.miniAppText}>{ht.agent}</span>
+                                            </div>
+                                            <div onClick={() => window.open('https://subhamsnetworks.in', '_blank')} className="touch-scale" style={styles.miniAppItem}>
+                                                <div style={{...styles.miniAppIconBox, background: '#fce7f3', color: '#db2777', border: '1px solid #fbcfe8'}}>🌐</div>
+                                                <span style={styles.miniAppText}>{ht.network}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </>
                         )}
 
-                        {selectedCategory === CATEGORIES[0] && (
-                            <>
-                                <div style={{padding: '0 5px'}}>
-                                    <h2 style={{ fontSize: '20px', marginBottom: '15px', color: '#0f172a', fontWeight: '900', letterSpacing: '-0.5px' }}>
-                                        {ht.subhamsExpo}
-                                    </h2>
-                                    
-                                    <div style={isMobile ? styles.mobileGrid3 : styles.desktopProductGrid}>
-                                        {activeShops
-                                            .filter(shop => {
-                                                const dbType = shop.shop_type || 'Products'; 
-                                                return dbType.includes('Expo') || dbType.includes('Promotions');
-                                            })
-                                            .map((shop, i) => (
-                                                <div key={shop.id} className="touch-scale fade-up-card" onClick={() => navigate(`/shop/${shop.id}`)} style={{...(isMobile ? styles.shopCardMobile : styles.shopCardDesktop), animationDelay: `${i * 0.05}s`}}>
-                                                    <span style={{ position: 'absolute', top: '8px', right: '8px', background: shop.is_online ? 'rgba(22, 163, 74, 0.9)' : 'rgba(220, 38, 38, 0.9)', color: 'white', fontSize: '9px', padding: '3px 8px', borderRadius: '12px', fontWeight: '900', zIndex: 5, backdropFilter: 'blur(4px)' }}>
-                                                        {shop.is_online ? ht.open : ht.closed}
-                                                    </span>
-
-                                                    <div style={{ position: 'relative', width: '100%', paddingTop: '100%', overflow: 'hidden', borderRadius: '12px', marginBottom: '10px', background: '#f1f5f9' }}>
-                                                        {shop.shop_logo ? (
-                                                            <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                        ) : (
-                                                            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                <Store size={isMobile ? 24 : 36} color="#cbd5e1"/>
-                                                            </div>
-                                                        )}
-                                                        <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '40%', background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)' }}></div>
-                                                    </div>
-                                                    
-                                                    <div className="scroll-container" style={{ margin: '0 0 4px 0' }}>
-                                                        <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '13px' : '16px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            {shop.business_name}
-                                                            {shop.is_verified && <ShieldCheck size={14} color="#10b981" />}
-                                                        </h4>
-                                                    </div>
-
-                                                    <p style={{ margin: '0 0 6px 0', color: '#4f46e5', fontSize: isMobile ? '10px' : '13px', fontWeight: '800', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                                        {tc(shop.category)}
-                                                    </p>
-                                                    
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: isMobile ? '9px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', background: '#f1f5f9', padding: '4px 8px', borderRadius: '8px' }}>
-                                                        <MapPin size={isMobile ? 12 : 14} color="#ef4444" /> {getDistanceTag(shop)}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
-                        {(selectedCategory === CATEGORIES[2] || selectedCategory === CATEGORIES[3]) && (
-                            <div style={{padding: '0 5px'}}>
+                        {/* 🛍️ SHOPPING & 🧑‍🔧 SERVICES TABS */}
+                        {(selectedCategory === 'Shopping' || selectedCategory === 'Services') && (
+                            <div style={styles.sectionBlock}>
                                 {!selectedSubCategory ? (
                                     <>
-                                        <h2 style={{ fontSize: '20px', marginBottom: '15px', color: '#0f172a', fontWeight: '900', letterSpacing: '-0.5px' }}>
-                                            {ht.browse} {selectedCategory}
+                                        <h2 style={{ fontSize: '19px', marginBottom: '16px', color: '#0f172a', fontWeight: '900' }}>
+                                            {ht.browse} {ht.tabNames[selectedCategory]}
                                         </h2>
                                         
                                         {(() => {
                                             const adminCatForTab = adminCategories.filter(c => c.section && c.section.toLowerCase() === currentTabEnglish.toLowerCase());
                                             const allCategoryNames = [...adminCatForTab.map(c => c.name)];
 
-                                            if (allCategoryNames.length === 0) return <div style={{padding: '20px', background: 'white', borderRadius: '16px', border: '1px dashed #cbd5e1', textAlign: 'center', color: '#64748b', fontWeight: '600'}}>Categories will appear once created by the Admin.</div>;
+                                            if (allCategoryNames.length === 0) return <div style={{padding: '24px', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', textAlign: 'center', color: '#64748b', fontWeight: '700'}}>Categories will appear once created by the Admin.</div>;
 
                                             return (
                                                 <div style={isMobile ? styles.mobileGrid4 : styles.desktopFolderGrid}>
@@ -792,11 +1224,11 @@ const Home = () => {
                                                         const imgSrc = adminCat ? adminCat.hd_image : 'https://via.placeholder.com/150/e2e8f0/64748b?text=' + catName.substring(0, 3);
 
                                                         return (
-                                                            <div key={index} className="touch-scale fade-up-card" onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: isMobile ? '100%' : '100px', cursor: 'pointer', animationDelay: `${index * 0.05}s` }}>
-                                                                <div style={{ background: 'white', padding: '6px', borderRadius: '24px', boxShadow: '0 4px 10px rgba(0,0,0,0.06)' }}>
-                                                                    <img src={getOptimizedImage(imgSrc)} alt={catName} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: isMobile ? '65px' : '85px', height: isMobile ? '65px' : '85px', borderRadius: '20px', objectFit: 'cover', background: '#f8fafc' }} />
+                                                            <div key={index} className="touch-scale fade-up-card" onClick={() => setSelectedSubCategory(catName)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: isMobile ? '100%' : '100px', cursor: 'pointer', animationDelay: `${index * 0.04}s` }}>
+                                                                <div style={{ background: '#f8fafc', padding: '6px', borderRadius: '22px', border: '1px solid #e2e8f0' }}>
+                                                                    <img src={getOptimizedImage(imgSrc)} alt={catName} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: isMobile ? '65px' : '85px', height: isMobile ? '65px' : '85px', borderRadius: '18px', objectFit: 'cover', background: 'white' }} />
                                                                 </div>
-                                                                <span style={{ fontSize: isMobile ? '11px' : '14px', marginTop: '8px', fontWeight: '800', color: '#1e293b', textAlign: 'center', lineHeight: '1.2' }}>{tc(catName)}</span>
+                                                                <span style={{ fontSize: isMobile ? '11.5px' : '13.5px', marginTop: '8px', fontWeight: '800', color: '#0f172a', textAlign: 'center', lineHeight: '1.2' }}>{tc(catName)}</span>
                                                             </div>
                                                         );
                                                     })}
@@ -806,16 +1238,16 @@ const Home = () => {
                                     </>
                                 ) : (
                                     <>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-                                            <button className="touch-scale" onClick={() => setSelectedSubCategory(null)} style={{ background: 'white', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '12px', cursor: 'pointer', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+                                            <button className="touch-scale" onClick={() => setSelectedSubCategory(null)} style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '12px', cursor: 'pointer', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                                                 <ArrowLeft size={16} /> Back
                                             </button>
-                                            <h2 style={{ fontSize: '20px', margin: 0, color: '#1e293b', fontWeight: '900', letterSpacing: '-0.5px' }}>
+                                            <h2 style={{ fontSize: '19px', margin: 0, color: '#0f172a', fontWeight: '900' }}>
                                                 {tc(selectedSubCategory)} {ht.sellers}
                                             </h2>
                                         </div>
 
-                                        <div style={isMobile ? styles.mobileGrid3 : styles.desktopProductGrid}>
+                                        <div style={isMobile ? styles.mobileGrid2 : styles.desktopProductGrid}>
                                             {activeShops
                                                 .filter(shop => {
                                                     const dbType = shop.shop_type || 'Products'; 
@@ -823,39 +1255,37 @@ const Home = () => {
                                                     const targetCat = selectedSubCategory.toLowerCase().trim();
                                                     const shopCats = (shop.category || '').toLowerCase().split(',').map(c => c.trim());
                                                     const matchesCategory = shopCats.some(c => c === targetCat || c.includes(targetCat) || targetCat.includes(c));
-
                                                     return matchesTab && matchesCategory;
                                                 })
                                                 .map((shop, i) => (
-                                                    <div key={shop.id} className="touch-scale fade-up-card" onClick={() => navigate(`/shop/${shop.id}`)} style={{...(isMobile ? styles.shopCardMobile : styles.shopCardDesktop), animationDelay: `${i * 0.05}s`}}>
-                                                        <span style={{ position: 'absolute', top: '8px', right: '8px', background: shop.is_online ? 'rgba(22, 163, 74, 0.9)' : 'rgba(220, 38, 38, 0.9)', color: 'white', fontSize: '9px', padding: '3px 8px', borderRadius: '12px', fontWeight: '900', zIndex: 5, backdropFilter: 'blur(4px)' }}>
+                                                    <div key={shop.id} className="touch-scale fade-up-card" onClick={() => navigate(`/shop/${shop.id}`)} style={{...(isMobile ? styles.shopCardMobile : styles.shopCardDesktop), animationDelay: `${i * 0.04}s`}}>
+                                                        <span style={{ position: 'absolute', top: '10px', right: '10px', background: shop.is_online ? 'rgba(22, 163, 74, 0.9)' : 'rgba(220, 38, 38, 0.9)', color: 'white', fontSize: '9.5px', padding: '3px 8px', borderRadius: '12px', fontWeight: '900', zIndex: 5 }}>
                                                             {shop.is_online ? ht.open : ht.closed}
                                                         </span>
 
-                                                        <div style={{ position: 'relative', width: '100%', paddingTop: '100%', overflow: 'hidden', borderRadius: '12px', marginBottom: '10px', background: '#f1f5f9' }}>
+                                                        <div style={{ position: 'relative', width: '100%', paddingTop: '82%', overflow: 'hidden', borderRadius: '14px', marginBottom: '10px', background: '#f1f5f9' }}>
                                                             {shop.shop_logo ? (
                                                                 <img src={getOptimizedImage(shop.shop_logo)} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                                                             ) : (
                                                                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                    <Store size={isMobile ? 24 : 36} color="#cbd5e1"/>
+                                                                    <Store size={32} color="#cbd5e1"/>
                                                                 </div>
                                                             )}
-                                                            <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '40%', background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)' }}></div>
                                                         </div>
                                                         
-                                                        <div className="scroll-container" style={{ margin: '0 0 4px 0' }}>
-                                                            <h4 className={shop.business_name.length > 11 && isMobile ? "scroll-text" : ""} style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '13px' : '16px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
+                                                            <h4 style={{ margin: 0, color: '#0f172a', fontSize: isMobile ? '14px' : '16px', fontWeight: '900', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
                                                                 {shop.business_name}
-                                                                {shop.is_verified && <ShieldCheck size={14} color="#10b981" />}
                                                             </h4>
+                                                            {renderShopCardBadge(shop)}
                                                         </div>
 
-                                                        <p style={{ margin: '0 0 6px 0', color: '#4f46e5', fontSize: isMobile ? '10px' : '13px', fontWeight: '800', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                        <p style={{ margin: '0 0 8px 0', color: '#2563eb', fontSize: '11.5px', fontWeight: '800', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                             {tc(shop.category)}
                                                         </p>
                                                         
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: isMobile ? '9px' : '12px', color: '#64748b', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', background: '#f1f5f9', padding: '4px 8px', borderRadius: '8px' }}>
-                                                            <MapPin size={isMobile ? 12 : 14} color="#ef4444" /> {getDistanceTag(shop)}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10.5px', color: '#475569', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', background: '#f8fafc', padding: '5px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                            {getDistanceTag(shop)}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -868,8 +1298,310 @@ const Home = () => {
                 )}
             </div>
 
+            {/* ===================================================================== */}
+            {/* ✨ JIOSAAVN-STYLE AUTO-EXPANDING FLOATING SMART PILL (BOTTOM RIGHT) */}
+            {/* ===================================================================== */}
+            {smartPill?.is_active !== false && (
+                <div 
+                    style={{
+                        position: 'fixed',
+                        bottom: '84px',
+                        right: '16px',
+                        zIndex: 950,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end'
+                    }}
+                >
+                    <div
+                        onClick={() => setShowAssistantModal(true)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            background: isPillExpanded ? 'linear-gradient(135deg, #facc15 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)',
+                            color: isPillExpanded ? '#0f172a' : '#ffffff',
+                            borderRadius: '40px',
+                            padding: isPillExpanded ? '6px 8px 6px 16px' : '0px',
+                            width: isPillExpanded ? (isMobile ? '290px' : '330px') : '54px',
+                            height: '54px',
+                            boxShadow: '0 10px 28px rgba(15, 23, 42, 0.32)',
+                            border: isPillExpanded ? '2px solid #fde047' : '2px solid #facc15',
+                            cursor: 'pointer',
+                            overflow: 'hidden',
+                            transition: 'all 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
+                            justifyContent: isPillExpanded ? 'space-between' : 'center',
+                            boxSizing: 'border-box'
+                        }}
+                    >
+                        {isPillExpanded ? (
+                            <>
+                                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingRight: '8px' }}>
+                                    <span style={{ fontSize: '9.5px', fontWeight: '900', color: '#78350f', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                        ✨ SUBHAMS SMART HUB
+                                    </span>
+                                    <span style={{ fontSize: '12.5px', fontWeight: '900', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {lang === 'te' ? (smartPill.pill_title_te || smartPill.pill_title_en) : smartPill.pill_title_en}
+                                    </span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                    <span style={{ background: '#db2777', color: '#ffffff', padding: '7px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '900', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(219,39,119,0.4)' }}>
+                                        {lang === 'te' ? (smartPill.cta_te || 'తెరువు') : (smartPill.cta_en || 'Claim / Ask')}
+                                    </span>
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', position: 'relative' }}>
+                                <Bot size={24} color="#facc15" />
+                                <span style={{ position: 'absolute', top: '8px', right: '8px', width: '9px', height: '9px', background: '#22c55e', borderRadius: '50%', border: '2px solid #0f172a' }}></span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ===================================================================== */}
+            {/* 🤖 SUBHAMS SMART HUB ASSISTANT & ADMIN GREETING MODAL */}
+            {/* ===================================================================== */}
+            {showAssistantModal && (
+                <div style={styles.overlay} onClick={() => setShowAssistantModal(false)}>
+                    <div style={{...styles.locModal, maxWidth: '430px'}} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '12px', background: 'linear-gradient(135deg, #0f172a, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Bot size={20} color="#facc15" />
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '900', color: '#0f172a' }}>Subhams Smart Hub</h3>
+                                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: '800' }}>● Live Assistant & Admin Notes</span>
+                                </div>
+                            </div>
+                            <X size={20} style={{ cursor: 'pointer', color: '#64748b' }} onClick={() => setShowAssistantModal(false)} />
+                        </div>
+
+                        {/* Admin Greeting / Announcement Note */}
+                        <div style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '1px solid #fde68a', padding: '12px 14px', borderRadius: '14px', marginBottom: '14px' }}>
+                            <div style={{ fontSize: '10.5px', fontWeight: '900', color: '#b45309', textTransform: 'uppercase', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <Megaphone size={13} /> Official Note & Offer
+                            </div>
+                            <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#78350f', fontWeight: '700', lineHeight: 1.45 }}>
+                                {lang === 'te' ? (smartPill.admin_note_te || smartPill.admin_note_en) : smartPill.admin_note_en}
+                            </p>
+                            <button 
+                                onClick={() => {
+                                    setShowAssistantModal(false);
+                                    const target = smartPill.action_url || '/expo';
+                                    if (target.startsWith('http')) window.open(target, '_blank');
+                                    else navigate(target);
+                                }}
+                                style={{ background: '#0f172a', color: '#facc15', border: 'none', padding: '8px 14px', borderRadius: '10px', fontSize: '12px', fontWeight: '900', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            >
+                                {lang === 'te' ? (smartPill.pill_title_te || smartPill.pill_title_en) : smartPill.pill_title_en} <ExternalLink size={13} />
+                            </button>
+                        </div>
+
+                        {/* Quick Smart Actions */}
+                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#475569', marginBottom: '8px' }}>
+                            {lang === 'te' ? 'త్వరిత సహాయం:' : 'Quick Actions:'}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                            <button onClick={() => { setShowAssistantModal(false); setShowLocModal(true); }} style={styles.assistantQuickBtn}>
+                                🚚 {lang === 'te' ? 'డెలివరీ ఏరియా చెక్' : 'Check Delivery Area'}
+                            </button>
+                            <button onClick={() => { setShowAssistantModal(false); navigate('/expo'); }} style={styles.assistantQuickBtn}>
+                                🌟 {lang === 'te' ? 'లైవ్ ఎక్స్‌పో ఫీడ్' : 'Watch Expo Videos'}
+                            </button>
+                            <button onClick={() => { setShowAssistantModal(false); navigate(officialHubShop ? `/shop/${officialHubShop.id}` : '/shop/1'); }} style={styles.assistantQuickBtn}>
+                                🏬 {lang === 'te' ? 'సుభమ్స్ అధికారిక స్టోర్' : 'Official Subhams Store'}
+                            </button>
+                            <button onClick={() => { setShowAssistantModal(false); localUser ? navigate('/register-business') : requireLogin('register a shop'); }} style={styles.assistantQuickBtn}>
+                                📈 {lang === 'te' ? 'షాప్ రిజిస్టర్ చేయండి' : 'Register Your Shop'}
+                            </button>
+                        </div>
+
+                        {/* Instant Shop/Category Finder inside Assistant */}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <input 
+                                type="text" 
+                                placeholder={lang === 'te' ? 'షాప్ లేదా వస్తువు పేరు టైప్ చేయండి...' : 'Ask or search any shop/service...'}
+                                value={assistantQuery}
+                                onChange={e => setAssistantQuery(e.target.value)}
+                                style={{...styles.locInput, padding: '11px 14px', fontSize: '13.5px', flex: 1}}
+                            />
+                            <button 
+                                onClick={() => {
+                                    if (!assistantQuery.trim()) return;
+                                    setSearchQuery(assistantQuery.trim());
+                                    setShowAssistantModal(false);
+                                }}
+                                style={{ background: '#2563eb', color: 'white', border: 'none', padding: '0 16px', borderRadius: '12px', fontWeight: '900', cursor: 'pointer' }}
+                            >
+                                Go
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ===================================================================== */}
+            {/* 🚚 DELIVERY AREA EXPLORER MODAL (CLEAR NON-PERSONAL ADDRESS UX) */}
+            {/* ===================================================================== */}
+            {showLocModal && (
+                <div style={styles.overlay} onClick={() => setShowLocModal(false)}>
+                    <div className="touch-scale" style={styles.locModal} onClick={e => e.stopPropagation()}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px'}}>
+                            <h3 style={{margin: 0, fontSize: '17px', color: '#0f172a', fontWeight: '900'}}>{ht.checkAreaModalTitle}</h3>
+                            <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLocModal(false)} />
+                        </div>
+                        <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#475569', lineHeight: 1.4, fontWeight: '600' }}>
+                            {ht.checkAreaModalSub}
+                        </p>
+
+                        {/* Quick Area Presets */}
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                            {[
+                                { label: '🌍 All India', val: 'India' },
+                                { label: '📍 Andhra Pradesh', val: 'Andhra Pradesh, India' },
+                                { label: '📍 Konanki', val: 'Konanki, Martur, Bapatla, Andhra Pradesh, 523260, India' },
+                                { label: '📍 Martur', val: 'Martur, Bapatla, Andhra Pradesh, India' },
+                                { label: '📍 Bapatla', val: 'Bapatla, Andhra Pradesh, India' }
+                            ].map((preset, idx) => (
+                                <button 
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => selectCustomLocation({ display_name: preset.val, lat: 0, lon: 0 })}
+                                    style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '5px 10px', borderRadius: '14px', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}
+                                >
+                                    {preset.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div style={{position: 'relative'}}>
+                            <input 
+                                type="text" 
+                                placeholder="Search any village, town, district, or pincode..." 
+                                style={styles.locInput} 
+                                value={locSearch} 
+                                onChange={(e) => handleLocationSearch(e.target.value)} 
+                                autoFocus
+                            />
+                        </div>
+
+                        {locResults.length > 0 && (
+                            <div style={styles.locResultsBox}>
+                                {locResults.map((loc, i) => {
+                                    const parts = loc.display_name.split(',').map(p => p.trim());
+                                    return (
+                                        <div key={i} className="touch-scale" style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
+                                            <MapPin size={16} color="#2563eb" style={{flexShrink: 0, marginTop: '2px'}} />
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{fontSize: '13.5px', fontWeight: '900', color: '#0f172a'}}>{parts[0]}</span>
+                                                <span style={{fontSize: '11px', color: '#64748b'}}>{parts.slice(1).join(', ')}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ===================================================================== */}
+            {/* 🎨 MASTER ADMIN BANNER & SMART PILL STUDIO MODAL */}
+            {/* ===================================================================== */}
+            {showBannerAdminModal && isAdmin && (
+                <div style={styles.overlay} onClick={() => setShowBannerAdminModal(false)}>
+                    <div style={{...styles.locModal, maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto'}} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
+                            <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '900', color: '#0f172a' }}>🎨 Home Banner & Smart Pill Studio</h3>
+                            <X size={20} style={{ cursor: 'pointer', color: '#64748b' }} onClick={() => setShowBannerAdminModal(false)} />
+                        </div>
+
+                        {/* Add / Edit Banner Form */}
+                        <form onSubmit={handleSaveBanner} style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #cbd5e1', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <h4 style={{ margin: 0, fontSize: '13.5px', color: '#1e3a8a', fontWeight: '900' }}>
+                                {editingBannerId ? '✏️ Edit Banner Slide' : '➕ Add New Flipkart-Style Banner (Photo or GIF)'}
+                            </h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                <input type="text" placeholder="English Title *" value={bannerForm.title_en} onChange={e => setBannerForm({...bannerForm, title_en: e.target.value})} style={styles.studioInput} required />
+                                <input type="text" placeholder="Telugu Title" value={bannerForm.title_te} onChange={e => setBannerForm({...bannerForm, title_te: e.target.value})} style={styles.studioInput} />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                <input type="text" placeholder="English Subtitle" value={bannerForm.subtitle_en} onChange={e => setBannerForm({...bannerForm, subtitle_en: e.target.value})} style={styles.studioInput} />
+                                <input type="text" placeholder="Telugu Subtitle" value={bannerForm.subtitle_te} onChange={e => setBannerForm({...bannerForm, subtitle_te: e.target.value})} style={styles.studioInput} />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                <input type="text" placeholder="Badge (e.g. MEGA OFFER)" value={bannerForm.badge_text} onChange={e => setBannerForm({...bannerForm, badge_text: e.target.value})} style={styles.studioInput} />
+                                <input type="text" placeholder="Click URL (e.g. /shop/1 or /expo)" value={bannerForm.action_url} onChange={e => setBannerForm({...bannerForm, action_url: e.target.value})} style={styles.studioInput} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                <label style={{ fontSize: '12px', fontWeight: '800', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    Ambient Color:
+                                    <input type="color" value={bannerForm.ambient_color} onChange={e => setBannerForm({...bannerForm, ambient_color: e.target.value})} style={{ width: '36px', height: '28px', border: 'none', cursor: 'pointer' }} />
+                                </label>
+                                <label style={{ fontSize: '12px', fontWeight: '800', color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    Badge Color:
+                                    <input type="color" value={bannerForm.accent_color} onChange={e => setBannerForm({...bannerForm, accent_color: e.target.value})} style={{ width: '36px', height: '28px', border: 'none', cursor: 'pointer' }} />
+                                </label>
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '11.5px', fontWeight: '800', color: '#475569', display: 'block', marginBottom: '4px' }}>Upload Banner Photo / Animated GIF (or paste URL below):</label>
+                                <input type="file" accept="image/*,image/gif" onChange={handleBannerMediaUpload} style={{ fontSize: '12px', marginBottom: '6px' }} />
+                                <input type="text" placeholder="Or paste Photo/GIF URL (https://...)" value={bannerForm.media_url && !bannerForm.media_url.startsWith('data:') ? bannerForm.media_url : ''} onChange={e => setBannerForm({...bannerForm, media_url: e.target.value})} style={styles.studioInput} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button type="submit" style={{ background: '#16a34a', color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', flex: 1 }}>
+                                    {editingBannerId ? 'Update Slide' : 'Add Slide'}
+                                </button>
+                                {editingBannerId && (
+                                    <button type="button" onClick={() => { setEditingBannerId(null); setBannerForm({ title_en: '', title_te: '', subtitle_en: '', subtitle_te: '', badge_text: 'SPECIAL OFFER', media_url: '', action_url: '/expo', ambient_color: '#1e3a8a', accent_color: '#facc15' }); }} style={{ background: '#64748b', color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: '800', fontSize: '13px', cursor: 'pointer' }}>
+                                        Cancel
+                                    </button>
+                                )}
+                            </div>
+                        </form>
+
+                        {/* Existing Banners List (Edit / Delete) */}
+                        <div style={{ marginBottom: '18px' }}>
+                            <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#475569', fontWeight: '900' }}>Current Slides ({banners.length})</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {banners.map(b => (
+                                    <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                                            <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: b.ambient_color || '#1e3a8a', flexShrink: 0 }} />
+                                            <span style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title_en}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                                            <button type="button" onClick={() => { setEditingBannerId(b.id); setBannerForm(b); }} style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '5px 8px', borderRadius: '6px', cursor: 'pointer' }}><Edit3 size={13}/></button>
+                                            <button type="button" onClick={() => handleDeleteBanner(b.id)} style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', padding: '5px 8px', borderRadius: '6px', cursor: 'pointer' }}><Trash2 size={13}/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Floating Smart Pill & Admin Greeting Editor */}
+                        <form onSubmit={handleSaveSmartPill} style={{ background: '#fffbeb', padding: '14px', borderRadius: '14px', border: '1px solid #fde68a', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <h4 style={{ margin: 0, fontSize: '13.5px', color: '#b45309', fontWeight: '900' }}>✨ Floating Expanding Pill & Admin Greeting</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                <input type="text" placeholder="Pill Text (EN)" value={smartPill.pill_title_en || ''} onChange={e => setSmartPill({...smartPill, pill_title_en: e.target.value})} style={styles.studioInput} />
+                                <input type="text" placeholder="Pill Text (TE)" value={smartPill.pill_title_te || ''} onChange={e => setSmartPill({...smartPill, pill_title_te: e.target.value})} style={styles.studioInput} />
+                            </div>
+                            <textarea placeholder="Admin Greeting / Offer Note (EN)" value={smartPill.admin_note_en || ''} onChange={e => setSmartPill({...smartPill, admin_note_en: e.target.value})} style={{...styles.studioInput, minHeight: '55px'}} />
+                            <textarea placeholder="Admin Greeting / Offer Note (TE)" value={smartPill.admin_note_te || ''} onChange={e => setSmartPill({...smartPill, admin_note_te: e.target.value})} style={{...styles.studioInput, minHeight: '55px'}} />
+                            <input type="text" placeholder="Pill Action URL (e.g. /shop/1 or /expo)" value={smartPill.action_url || ''} onChange={e => setSmartPill({...smartPill, action_url: e.target.value})} style={styles.studioInput} />
+                            <button type="submit" style={{ background: '#d97706', color: 'white', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: '900', fontSize: '13px', cursor: 'pointer' }}>
+                                Save Floating Pill & Greeting
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* BOTTOM NAVIGATION */}
             <div style={styles.bottomNavContainer}>
-                <button onClick={() => { navigate('/'); setSelectedCategory(CATEGORIES[1]); setSelectedSubCategory(null); setSearchQuery(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={currentRoute === '/' && selectedCategory === CATEGORIES[1] && !searchQuery && !selectedSubCategory ? styles.bottomNavBtnActive : styles.bottomNavBtn}>
+                <button onClick={() => { navigate('/'); setSelectedCategory('Trending'); setSelectedSubCategory(null); setSearchQuery(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }} style={currentRoute === '/' && selectedCategory === 'Trending' && !searchQuery && !selectedSubCategory ? styles.bottomNavBtnActive : styles.bottomNavBtn}>
                     <HomeIcon size={24} /><span>{ht.home}</span>
                 </button>
                 <button onClick={() => navigate('/expo')} style={currentRoute === '/expo' ? styles.bottomNavBtnActive : styles.bottomNavBtn}>
@@ -894,64 +1626,65 @@ const Home = () => {
                     <User size={24} /><span>{ht.profile}</span>
                 </button>
             </div>
-            <div style={{ height: '70px' }}></div>
+            <div style={{ height: '75px' }}></div>
         </div>
     );
 };
 
 const styles = {
-    page: { background: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' },
+    page: { minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' },
     
-    // 🟢 PREMIUM NIGHT-MODE TOP HEADER
-    headerStack: { display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' },
-    headerTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 15px 10px 15px', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', width: '100%', boxSizing: 'border-box' },
-    locationSearchRow: { display: 'flex', alignItems: 'center', gap: '10px', padding: '0 15px 15px 15px', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', width: '100%', boxSizing: 'border-box' },
+    headerStack: { display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' },
+    headerTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px 8px 15px', width: '100%', boxSizing: 'border-box' },
+    locationSearchRow: { display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 15px 14px 15px', width: '100%', boxSizing: 'border-box' },
     
+    langToggleBtn: { background: 'rgba(255,255,255,0.12)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 10px', borderRadius: '18px', fontWeight: '800', fontSize: '11.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' },
     adminBtn: { background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '6px 14px', borderRadius: '20px', fontWeight: '900', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)' },
-    loginHeaderBtn: { background: '#ffffff', color: '#0f172a', border: 'none', padding: '6px 14px', borderRadius: '20px', fontWeight: '900', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 10px rgba(0, 0, 0, 0.2)' },
-    locationPill: { display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: '12px', color: 'white', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)' },
-    searchInputCompact: { width: '100%', padding: '12px 40px 12px 15px', borderRadius: '12px', border: 'none', outline: 'none', fontSize: '14px', background: '#ffffff', fontWeight: '700', transition: '0.2s', boxShadow: '0 4px 15px rgba(0,0,0,0.15)' },
+    loginHeaderBtn: { background: '#ffffff', color: '#0f172a', border: 'none', padding: '6px 14px', borderRadius: '20px', fontWeight: '900', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
+    locationPill: { display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.12)', padding: '7px 12px', borderRadius: '12px', color: 'white', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', flexShrink: 0 },
+    searchInputCompact: { width: '100%', padding: '11px 38px 11px 14px', borderRadius: '12px', border: 'none', outline: 'none', fontSize: '13.5px', background: '#ffffff', fontWeight: '700', boxShadow: '0 4px 15px rgba(0,0,0,0.12)', boxSizing: 'border-box' },
     
     suggestionsBox: { position: 'absolute', top: '110%', left: 0, right: 0, background: 'white', borderRadius: '16px', boxShadow: '0 15px 35px rgba(0,0,0,0.2)', border: '1px solid #cbd5e1', zIndex: 150, overflow: 'hidden' },
-    suggestionItem: { padding: '14px 15px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', transition: '0.2s', background: 'white' },
+    suggestionItem: { padding: '12px 15px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: 'white' },
     
-    // 🟢 PREMIUM PILL CATEGORIES
-    headerCatStrip: { background: '#ffffff', borderBottom: '1px solid #e2e8f0', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 5px' },
-    catContent: { display: 'flex', gap: '12px', padding: '12px 15px', width: 'max-content', margin: '0 auto' },
-    catItem: { flexShrink: 0, fontSize: '13px', cursor: 'pointer', padding: '8px 16px', borderRadius: '24px', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', border: '1px solid transparent' },
-    catItemActive: { background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontWeight: '900', boxShadow: '0 4px 10px rgba(253, 230, 138, 0.5)' },
-    catItemInactive: { background: '#f1f5f9', color: '#64748b', fontWeight: '700', border: '1px solid #e2e8f0' },
+    headerCatStrip: { background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(10px)', borderBottom: '1px solid #e2e8f0', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
+    catContent: { display: 'flex', gap: '10px', padding: '10px 15px', width: 'max-content', margin: '0 auto' },
+    catItem: { flexShrink: 0, fontSize: '13px', cursor: 'pointer', padding: '8px 16px', borderRadius: '24px', transition: 'all 0.25s ease' },
+    catItemActive: { background: '#0f172a', color: '#facc15', border: '1px solid #0f172a', fontWeight: '900', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.2)' },
+    catItemInactive: { background: '#f1f5f9', color: '#475569', fontWeight: '800', border: '1px solid #e2e8f0' },
     
-    overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 },
-    locModal: { background: 'white', padding: '25px', borderRadius: '24px', maxWidth: '400px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' },
-    locInput: { padding: '16px', borderRadius: '16px', border: '2px solid #e2e8f0', fontSize: '15px', width: '100%', boxSizing: 'border-box', outline: 'none', fontWeight: '600' },
-    locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '16px' },
-    locItem: { padding: '15px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: '600' },
+    overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1100 },
+    locModal: { background: 'white', padding: '22px', borderRadius: '22px', maxWidth: '400px', width: '100%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', boxSizing: 'border-box' },
+    locInput: { padding: '13px 15px', borderRadius: '14px', border: '2px solid #2563eb', fontSize: '14px', width: '100%', boxSizing: 'border-box', outline: 'none', fontWeight: '700' },
+    locResultsBox: { marginTop: '12px', maxHeight: '210px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '14px' },
+    locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' },
     
-    sectionBlock: { padding: '20px 10px', background: 'white', margin: '0 5px 20px 5px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' },
-    sectionTitle: { fontSize: '16px', marginBottom: '15px', color: '#0f172a', fontWeight: '900', paddingLeft: '5px' },
+    sectionBlock: { padding: '18px 16px', background: 'rgba(255, 255, 255, 0.94)', backdropFilter: 'blur(8px)', borderRadius: '22px', boxShadow: '0 6px 20px rgba(15, 23, 42, 0.04)', border: '1px solid #e2e8f0' },
+    sectionTitle: { fontSize: '16px', marginTop: 0, marginBottom: '14px', color: '#0f172a', fontWeight: '900' },
     
-    upiGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: '20px', columnGap: '8px', padding: '5px', justifyItems: 'center' },
-    miniAppItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer', width: '100%' },
-    miniAppIconBox: { width: '58px', height: '58px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' },
+    upiGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: '16px', columnGap: '8px', justifyItems: 'center' },
+    miniAppItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', cursor: 'pointer', width: '100%' },
+    miniAppIconBox: { width: '54px', height: '54px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: '0 4px 10px rgba(0,0,0,0.04)' },
     miniAppText: { fontSize: '11px', fontWeight: '800', color: '#334155', textAlign: 'center', lineHeight: '1.2' },
     
-    mobileGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px', width: '100%' },
+    mobileGrid2: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', width: '100%' },
     mobileGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '10px', width: '100%' },
-    desktopProductGrid: { display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'flex-start' },
+    desktopProductGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '16px', width: '100%' },
     desktopFolderGrid: { display: 'flex', flexDirection: 'row', gap: '20px', flexWrap: 'wrap', justifyContent: 'flex-start', width: '100%' },
     
-    // 🟢 PREMIUM SHOP CARDS
-    shopCardMobile: { background: 'white', borderRadius: '16px', padding: '8px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', position: 'relative', width: '100%', boxSizing: 'border-box' },
-    shopCardDesktop: { width: '240px', background: 'white', borderRadius: '20px', padding: '16px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', position: 'relative' },
+    shopCardMobile: { background: 'white', borderRadius: '16px', padding: '10px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', position: 'relative', width: '100%', boxSizing: 'border-box' },
+    shopCardDesktop: { background: 'white', borderRadius: '18px', padding: '14px', border: '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', position: 'relative', boxSizing: 'border-box' },
     
-    bottomNavContainer: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', zIndex: 1000, boxShadow: '0 -10px 25px rgba(0,0,0,0.05)' },
+    assistantQuickBtn: { background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '10px', fontSize: '12px', fontWeight: '800', color: '#0f172a', cursor: 'pointer', textAlign: 'left' },
+    studioInput: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', width: '100%', boxSizing: 'border-box', outline: 'none', background: 'white' },
+
+    bottomNavContainer: { position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(12px)', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', zIndex: 1000, boxShadow: '0 -10px 25px rgba(0,0,0,0.04)' },
     bottomNavBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '10px', fontWeight: '700', cursor: 'pointer', flex: 1 },
-    bottomNavBtnActive: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#4f46e5', fontSize: '10px', fontWeight: '900', cursor: 'pointer', flex: 1 },
+    bottomNavBtnActive: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#2563eb', fontSize: '10px', fontWeight: '900', cursor: 'pointer', flex: 1 },
     vendorNavBtn: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#ef4444', fontSize: '10px', fontWeight: '700', cursor: 'pointer', flex: 1 },
     vendorNavBtnActive: { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#dc2626', fontSize: '10px', fontWeight: '900', cursor: 'pointer', flex: 1 },
     
-    bellBtn: { background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', padding: '8px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    bellBtn: { background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', padding: '7px', borderRadius: '50%', cursor: 'pointer', fontSize: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
     bottomNavBadge: { position: 'absolute', top: '-4px', right: '-8px', background: '#ef4444', color: '#fff', fontSize: '9px', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px' },
     topBellBadge: { position: 'absolute', top: '-4px', right: '-4px', background: '#ef4444', color: 'white', fontSize: '10px', fontWeight: '900', padding: '2px 6px', borderRadius: '12px', border: '2px solid #0f172a' }
 };
