@@ -2,23 +2,31 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { ShoppingCart } from 'lucide-react';
+import { BACKEND_URL } from '../config/api';
 
 const ProductCard = ({ product, t }) => {
     const navigate = useNavigate();
     const { addToCart } = useCart();
+    const tr = typeof t === 'function' ? t : (s) => s;
+
+    const getImg = (raw) => {
+        if (!raw) return 'https://via.placeholder.com/200?text=Item';
+        if (raw.startsWith('http') || raw.startsWith('data:')) return raw;
+        return `${BACKEND_URL.replace('/api', '')}${raw.startsWith('/') ? '' : '/'}${raw}`;
+    };
 
     const handleCardClick = () => {
-        navigate(`/product/${product.id}`);
+        navigate(`/item/${product.id}`);
     };
 
     const handleAddToCart = (e) => {
-        e.stopPropagation(); // Prevents clicking the card
+        e.stopPropagation();
         addToCart(product);
     };
 
     const handleVendorClick = (e) => {
-        e.stopPropagation(); // Prevents clicking the card
-        navigate(`/shop/${product.vendor_id}`); // 🟢 Redirects to Shop Profile
+        e.stopPropagation();
+        navigate(`/shop/${product.shop_id || product.vendor_id}`);
     };
 
     return (
@@ -28,43 +36,35 @@ const ProductCard = ({ product, t }) => {
                 background: '#fff', 
                 borderRadius: '16px', 
                 overflow: 'hidden', 
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
-                border: '1px solid #f1f5f9',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.04)', 
+                border: '1px solid #e2e8f0',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
                 height: '100%',
                 transition: 'transform 0.2s'
             }}
-            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
-            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
         >
-            {/* Image */}
-            <div style={{ width: '100%', height: '160px', background: '#f8fafc', position: 'relative' }}>
+            <div style={{ width: '100%', height: '155px', background: '#f8fafc', position: 'relative' }}>
                 <img 
-                    src={product.image_url || 'https://via.placeholder.com/200'} 
+                    src={getImg(product.image_url)} 
                     alt={product.name} 
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                 />
                 {product.is_service && (
                     <span style={{ position: 'absolute', top: '10px', right: '10px', background: '#8b5cf6', color: 'white', fontSize: '10px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '12px' }}>
-                        {t("Service")}
+                        {tr("Service")}
                     </span>
                 )}
             </div>
 
-            {/* Details */}
-            <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-                <h4 style={{ margin: '0 0 5px 0', fontSize: '15px', color: '#0f172a', fontWeight: 'bold' }}>
+            <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '14.5px', color: '#0f172a', fontWeight: '800', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {product.name}
                 </h4>
                 
-                {/* 🟢 Clickable Vendor Name */}
                 <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
-                    {t("By")}: <span 
-                        onClick={handleVendorClick} 
-                        style={{ color: '#2563eb', fontWeight: 'bold', textDecoration: 'underline' }}
-                    >
+                    {tr("By")}: <span onClick={handleVendorClick} style={{ color: '#2563eb', fontWeight: '800', textDecoration: 'underline' }}>
                         {product.business_name || "Local Shop"}
                     </span>
                 </div>
@@ -76,19 +76,9 @@ const ProductCard = ({ product, t }) => {
                     
                     <button 
                         onClick={handleAddToCart}
-                        style={{
-                            background: '#eff6ff',
-                            color: '#2563eb',
-                            border: 'none',
-                            padding: '8px',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}
+                        style={{ background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                        <ShoppingCart size={18} />
+                        <ShoppingCart size={17} />
                     </button>
                 </div>
             </div>

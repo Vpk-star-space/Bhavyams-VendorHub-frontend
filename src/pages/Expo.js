@@ -1360,7 +1360,7 @@ const Expo = () => {
                                                         style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                         title="Remove selected music"
                                                     >
-                                                        <X size={15} />
+                                                        <X size={9} />
                                                     </button>
                                                 </div>
                                             )}

@@ -5,11 +5,24 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext'; 
 
-// 🟢 DYNAMIC BACKEND URL (Fixes localhost vs Render 401 errors)
 const getBackendUrl = () => {
-    return process.env.NODE_ENV === 'production' 
-        ? 'https://bhavyams-vendorhub-backend.onrender.com/api' 
-        : 'http://localhost:5000/api';
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    return isLocal ? 'http://localhost:5000/api' : 'https://bhavyams-vendorhub-backend.onrender.com/api';
+};
+
+const TELUGU_TO_EN_MAP = {
+    'కోణంకి': 'konanki', 'మార్టూరు': 'martur', 'బాపట్ల': 'bapatla',
+    'తిరుపతి': 'tirupati', 'ఆంధ్రప్రదేశ్': 'andhra pradesh', 'గుంటూరు': 'guntur',
+    'విజయవాడ': 'vijayawada', 'ఒంగోలు': 'ongole', 'చీరాల': 'chirala', 'ప్రకాశం': 'prakasam'
+};
+
+const normalizeQuery = (q) => {
+    if (!q) return '';
+    let lower = q.toLowerCase();
+    Object.keys(TELUGU_TO_EN_MAP).forEach(te => {
+        if (lower.includes(te)) lower = lower.replace(new RegExp(te, 'g'), TELUGU_TO_EN_MAP[te]);
+    });
+    return lower;
 };
 
 const Profile = () => {
@@ -23,8 +36,8 @@ const Profile = () => {
     const [profileData, setProfileData] = useState({
         username: '',
         email: '', 
-        address: '', 
-        area: '',    
+        doorStreet: '', 
+        areaHierarchy: '',    
         pincode: '', 
         phone: ''
     });
@@ -48,49 +61,31 @@ const Profile = () => {
                 return;
             }
 
-            // 🟢 USE DYNAMIC URL
             const res = await axios.get(`${getBackendUrl()}/auth/me`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             const data = res.data;
-            
-            let parsedAddress = data.address || '';
-            let parsedArea = '';
-            let parsedPincode = '';
-
-            if (parsedAddress.includes('Pincode:')) {
-                const parts = parsedAddress.split(', Pincode:');
-                parsedPincode = parts[1] ? parts[1].trim() : '';
-                
-                const addrParts = parts[0].split(',');
-                if (addrParts.length > 1) {
-                    parsedArea = addrParts.pop().trim();
-                    parsedAddress = addrParts.join(',').trim();
-                } else {
-                    parsedAddress = parts[0].trim();
-                }
-            }
+            let rawAddr = data.address || '';
+            let pinMatch = rawAddr.match(/\b\d{6}\b/);
+            let extractedPin = pinMatch ? pinMatch[0] : '';
+            let cleanAddr = rawAddr.replace(/,\s*Pincode:\s*\d{6}/i, '').trim();
 
             setProfileData({
                 username: data.username || '',
                 email: data.email || '', 
-                address: parsedAddress,
-                area: parsedArea,
-                pincode: parsedPincode,
+                doorStreet: '',
+                areaHierarchy: cleanAddr,
+                pincode: extractedPin,
                 phone: data.phone || ''
             });
 
             localStorage.setItem('user', JSON.stringify(data));
         } catch (err) {
-            // 🟢 SELF-HEALING: If token is dead, wipe it out and force login
             if (err.response && err.response.status === 401) {
-                console.warn("Dead token detected in Profile. Logging out...");
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
                 navigate('/welcome');
-            } else {
-                console.error("Profile Sync Error:", err);
             }
         } finally {
             setLoading(false);
@@ -103,28 +98,27 @@ const Profile = () => {
 
     const handleLocationSearch = async (query) => {
         setLocSearch(query);
-        if (query.length < 3) return setLocResults([]);
+        if (query.trim().length < 2) return setLocResults([]);
         
         setIsSearching(true);
         try {
-            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${query}`);
-            setLocResults(res.data);
-        } catch (e) {
-            console.error("Location search failed", e);
-        } finally {
+            const qNorm = normalizeQuery(query.trim());
+            const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=in&accept-language=en&q=${encodeURIComponent(qNorm)}`);
+            setLocResults(res.data || []);
+        } catch (e) {} finally {
             setIsSearching(false);
         }
     };
 
+    // 🟢 SAVES FULL ENGLISH HIERARCHY (So 1st-word + sub-address matching works!)
     const selectCustomLocation = (loc) => {
         const fullString = loc.display_name;
-        const areaName = fullString.split(',')[0].trim();
         const pincodeMatch = fullString.match(/\b\d{6}\b/);
-        const pin = pincodeMatch ? pincodeMatch[0] : '';
+        const pin = pincodeMatch ? pincodeMatch[0] : profileData.pincode;
 
         setProfileData({ 
             ...profileData, 
-            area: areaName, 
+            areaHierarchy: fullString, 
             pincode: pin 
         });
         
@@ -135,28 +129,36 @@ const Profile = () => {
 
     const handleSave = async () => {
         if (!profileData.username.trim()) return toast.error("Name cannot be empty");
+        if (!profileData.areaHierarchy.trim()) return toast.error("Please select your Area from the Map Search box.");
         
         try {
             const token = localStorage.getItem('token');
-            let finalAddress = profileData.address ? profileData.address.trim() : '';
-            if (profileData.area) finalAddress += (finalAddress ? `, ${profileData.area}` : profileData.area);
-            if (profileData.pincode) finalAddress += `, Pincode: ${profileData.pincode}`;
+            // Keep the Map Search area FIRST so 1st-word priority matching works cleanly
+            let finalAddress = profileData.areaHierarchy.trim();
+            if (profileData.doorStreet.trim()) {
+                finalAddress = `${finalAddress} (${profileData.doorStreet.trim()})`;
+            }
+            if (profileData.pincode && !finalAddress.includes(profileData.pincode)) {
+                finalAddress += `, ${profileData.pincode}`;
+            }
 
             const payload = {
-                username: profileData.username,
-                phone: profileData.phone,
-                address: finalAddress
+                username: profileData.username.trim(),
+                phone: String(profileData.phone || '').replace(/\D/g, '').slice(-10),
+                address: finalAddress,
+                language: language
             };
 
-            // 🟢 USE DYNAMIC URL
             const res = await axios.put(`${getBackendUrl()}/auth/update-profile`, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             if (res.data.user) {
                 localStorage.setItem('user', JSON.stringify(res.data.user));
+                // Sync Home explorer location too
+                localStorage.setItem('custom_hub_location', JSON.stringify({ lat: 0, lng: 0, address: profileData.areaHierarchy.trim() }));
                 setIsEditing(false);
-                toast.success("Profile & Settings updated successfully!");
+                toast.success("✅ Profile & Delivery Area updated!");
                 fetchFreshData(); 
             }
         } catch (err) {
@@ -184,10 +186,10 @@ const Profile = () => {
                 @keyframes spin { 100% { transform: rotate(360deg); } }
             `}</style>
 
-            <div style={{...styles.profileCard, padding: isMobile ? '25px 20px' : '40px'}}>
+            <div style={{...styles.profileCard, padding: isMobile ? '22px 18px' : '36px'}}>
                 <div style={styles.topNav}>
                     <button onClick={() => navigate(-1)} style={styles.backBtn}>
-                        <ArrowLeft size={18}/> {isMobile ? "" : "Back"}
+                        <ArrowLeft size={18}/> Back
                     </button>
                     <button onClick={handleLogout} style={styles.logoutBtn}>
                         <LogOut size={16}/> Logout
@@ -195,56 +197,48 @@ const Profile = () => {
                 </div>
 
                 <div style={styles.header}>
-                    <h2 style={{fontSize: isMobile ? '20px' : '24px', margin: 0, color: '#0f172a'}}>Settings & Profile</h2>
+                    <h2 style={{fontSize: isMobile ? '20px' : '24px', margin: 0, color: '#0f172a', fontWeight: '900'}}>Settings & Profile</h2>
                     <button 
                         onClick={() => {
-                            if(isEditing) fetchFreshData(); 
+                            if (isEditing) fetchFreshData(); 
                             setIsEditing(!isEditing);
                         }} 
                         style={styles.editBtn}
                     >
-                        {isEditing ? "Cancel" : <><Edit2 size={16}/> Edit</>}
+                        {isEditing ? "Cancel" : <><Edit2 size={15}/> Edit Profile</>}
                     </button>
                 </div>
 
                 <div style={styles.field}>
-                    <div style={styles.iconBox}><Globe size={20} color="#2874f0"/></div>
+                    <div style={styles.iconBox}><Globe size={20} color="#2563eb"/></div>
                     <div style={{flex: 1}}>
-                        <label style={styles.label}>App Language</label>
+                        <label style={styles.label}>App Language / భాష</label>
                         <select 
                             value={language} 
-                            onChange={(e) => setLanguage(e.target.value)} 
+                            onChange={(e) => {
+                                setLanguage(e.target.value);
+                                localStorage.setItem('appLanguage', e.target.value);
+                            }} 
                             style={styles.inputActive}
                         >
                             <option value="en">English</option>
                             <option value="te">తెలుగు (Telugu)</option>
                         </select>
-                        <p style={{margin: '4px 0 0 0', fontSize: '11px', color: '#64748b'}}>Changes instantly.</p>
                     </div>
                 </div>
 
                 <div style={styles.divider}></div>
 
                 <div style={styles.field}>
-                    <div style={styles.iconBox}><Mail size={20} color="#2874f0"/></div>
+                    <div style={styles.iconBox}><Mail size={20} color="#2563eb"/></div>
                     <div style={{flex: 1}}>
                         <label style={styles.label}>Registered Google Email</label>
-                        <input 
-                            disabled={true} 
-                            value={profileData.email}
-                            style={{ ...styles.input, color: '#64748b' }} 
-                            placeholder="Loading email..."
-                        />
-                        {isEditing && (
-                            <p style={{margin: '4px 0 0 0', fontSize: '11px', color: '#94a3b8', fontWeight: '500'}}>
-                                Linked to your Google account. Cannot be changed.
-                            </p>
-                        )}
+                        <input disabled={true} value={profileData.email} style={{ ...styles.input, color: '#64748b' }} />
                     </div>
                 </div>
 
                 <div style={styles.field}>
-                    <div style={styles.iconBox}><User size={20} color="#2874f0"/></div>
+                    <div style={styles.iconBox}><User size={20} color="#2563eb"/></div>
                     <div style={{flex: 1}}>
                         <label style={styles.label}>Display Name</label>
                         <input 
@@ -258,52 +252,54 @@ const Profile = () => {
                 </div>
 
                 <div style={styles.field}>
-                    <div style={styles.iconBox}><Phone size={20} color="#2874f0"/></div>
+                    <div style={styles.iconBox}><Phone size={20} color="#2563eb"/></div>
                     <div style={{flex: 1}}>
-                        <label style={styles.label}>Phone Number</label>
+                        <label style={styles.label}>10-Digit Phone Number</label>
                         <input 
                             type="tel"
+                            maxLength={10}
                             disabled={!isEditing}
                             value={profileData.phone}
-                            onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                            onChange={(e) => setProfileData({...profileData, phone: e.target.value.replace(/\D/g, '')})}
                             style={isEditing ? styles.inputActive : styles.input}
-                            placeholder="Add phone number"
+                            placeholder="Add 10-digit phone number"
                         />
                     </div>
                 </div>
 
                 <div style={styles.field}>
-                    <div style={styles.iconBox}><MapPin size={20} color="#2874f0"/></div>
+                    <div style={styles.iconBox}><MapPin size={20} color="#2563eb"/></div>
                     <div style={{flex: 1}}>
-                        <label style={styles.label}>Location / Area</label>
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                            <input 
-                                disabled={!isEditing}
-                                type="text"
-                                readOnly 
-                                placeholder="Click to Search Area" 
-                                style={isEditing ? {...styles.inputActive, flex: 2, cursor: 'pointer'} : {...styles.input, flex: 2}} 
-                                value={profileData.area} 
-                                onClick={() => { if(isEditing) setShowLocModal(true); }}
-                            />
-                            <input 
-                                disabled={!isEditing}
-                                type="text"
-                                maxLength="6"
-                                placeholder="Pincode" 
-                                style={isEditing ? {...styles.inputActive, flex: 1} : {...styles.input, flex: 1}} 
-                                value={profileData.pincode} 
-                                onChange={e => setProfileData({...profileData, pincode: e.target.value})} 
-                            />
+                        <label style={styles.label}>Delivery Area (Map Search Only)</label>
+                        <div 
+                            onClick={() => { if (isEditing) setShowLocModal(true); }}
+                            style={{
+                                ...(isEditing ? styles.inputActive : styles.input),
+                                cursor: isEditing ? 'pointer' : 'default',
+                                marginBottom: '10px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}
+                        >
+                            <span style={{ fontSize: '13.5px', fontWeight: '700', color: profileData.areaHierarchy ? '#0f172a' : '#94a3b8' }}>
+                                {profileData.areaHierarchy || 'Tap Edit & click here to search your village/town...'}
+                            </span>
+                            {isEditing && <Search size={16} color="#2563eb" />}
                         </div>
-                        <label style={styles.label}>Full Street Address</label>
-                        <textarea 
-                            disabled={!isEditing}
-                            value={profileData.address}
-                            onChange={(e) => setProfileData({...profileData, address: e.target.value})}
-                            style={isEditing ? { ...styles.inputActive, height: '80px', resize: 'none' } : styles.input}
-                            placeholder="Type your Door No. & Street manually here..."
-                        />
+
+                        {isEditing && (
+                            <>
+                                <label style={styles.label}>Optional Landmark / Street Note</label>
+                                <input 
+                                    type="text"
+                                    value={profileData.doorStreet}
+                                    onChange={(e) => setProfileData({...profileData, doorStreet: e.target.value})}
+                                    style={styles.inputActive}
+                                    placeholder="Optional: Near Temple / Main Road..."
+                                />
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -317,15 +313,15 @@ const Profile = () => {
             {showLocModal && (
                 <div style={styles.overlay}>
                     <div className="touch-scale" style={styles.locModal}>
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
-                            <h3 style={{margin: 0, fontSize: '18px', color: '#0f172a'}}>Search Location / Pincode</h3>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
+                            <h3 style={{margin: 0, fontSize: '17px', color: '#0f172a', fontWeight: '900'}}>📍 Select Delivery Area</h3>
                             <X size={20} style={{cursor: 'pointer', color: '#64748b'}} onClick={() => setShowLocModal(false)} />
                         </div>
-                        <div style={{position: 'relative', marginTop: '15px'}}>
+                        <div style={{position: 'relative', marginTop: '10px'}}>
                             <Search size={18} color="#94a3b8" style={{position: 'absolute', left: '12px', top: '14px'}} />
                             <input 
                                 type="text" 
-                                placeholder="Type area, city, or pincode..." 
+                                placeholder="Search village, mandal, district, or pincode..." 
                                 style={styles.locInput} 
                                 value={locSearch} 
                                 onChange={(e) => handleLocationSearch(e.target.value)} 
@@ -335,12 +331,18 @@ const Profile = () => {
                         </div>
                         {locResults.length > 0 && (
                             <div style={styles.locResultsBox}>
-                                {locResults.map((loc, i) => (
-                                    <div key={i} className="touch-scale" style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
-                                        <MapPin size={16} color="#2563eb" style={{flexShrink: 0}} />
-                                        <span style={{fontSize: '13px', color: '#334155'}}>{loc.display_name}</span>
-                                    </div>
-                                ))}
+                                {locResults.map((loc, i) => {
+                                    const parts = loc.display_name.split(',').map(p => p.trim());
+                                    return (
+                                        <div key={i} className="touch-scale" style={styles.locItem} onClick={() => selectCustomLocation(loc)}>
+                                            <MapPin size={16} color="#2563eb" style={{flexShrink: 0, marginTop: '2px'}} />
+                                            <div>
+                                                <div style={{fontSize: '13.5px', fontWeight: '800', color: '#0f172a'}}>{parts[0]}</div>
+                                                <div style={{fontSize: '11px', color: '#64748b'}}>{parts.slice(1).join(', ')}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -352,26 +354,26 @@ const Profile = () => {
 };
 
 const styles = {
-    container: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f1f5f9', minHeight: '100vh', fontFamily: 'Inter, sans-serif' },
-    profileCard: { background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '500px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', alignSelf: 'center', marginTop: '20px' },
+    container: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f1f5f9', minHeight: '100vh', fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' },
+    profileCard: { background: '#fff', borderRadius: '18px', width: '100%', maxWidth: '500px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', alignSelf: 'center', marginTop: '10px', boxSizing: 'border-box' },
     topNav: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' },
-    backBtn: { border: 'none', background: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '14px', fontWeight: '600' },
-    logoutBtn: { border: '1px solid #fecaca', background: '#fef2f2', color: '#ef4444', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' },
-    divider: { height: '1px', background: '#e2e8f0', margin: '20px 0 25px 0' },
-    field: { display: 'flex', alignItems: 'flex-start', gap: '15px', marginBottom: '25px' },
+    backBtn: { border: 'none', background: '#f1f5f9', padding: '7px 12px', borderRadius: '8px', color: '#0f172a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: '800' },
+    logoutBtn: { border: '1px solid #fecaca', background: '#fef2f2', color: '#ef4444', borderRadius: '8px', padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800' },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
+    divider: { height: '1px', background: '#e2e8f0', margin: '18px 0 22px 0' },
+    field: { display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '22px' },
     iconBox: { padding: '10px', background: '#eff6ff', borderRadius: '10px' },
-    label: { display: 'block', fontSize: '11px', color: '#94a3b8', marginBottom: '6px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' },
-    input: { border: '1px solid transparent', background: 'transparent', width: '100%', fontSize: '15px', color: '#1e293b', outline: 'none', padding: '5px 0', fontWeight: '500' },
-    inputActive: { border: '1px solid #bfdbfe', borderRadius: '8px', padding: '12px', width: '100%', fontSize: '14px', background: '#f8fafc', boxSizing: 'border-box', color: '#0f172a', fontWeight: '500', outline: 'none' },
-    editBtn: { background: '#eff6ff', color: '#2563eb', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' },
-    saveBtn: { background: '#2563eb', color: '#fff', border: 'none', width: '100%', padding: '16px', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', marginTop: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '0 4px 10px rgba(37, 99, 235, 0.2)' },
+    label: { display: 'block', fontSize: '11px', color: '#64748b', marginBottom: '6px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' },
+    input: { border: '1px solid transparent', background: 'transparent', width: '100%', fontSize: '15px', color: '#0f172a', outline: 'none', padding: '5px 0', fontWeight: '700' },
+    inputActive: { border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '11px 12px', width: '100%', fontSize: '14px', background: '#f8fafc', boxSizing: 'border-box', color: '#0f172a', fontWeight: '700', outline: 'none' },
+    editBtn: { background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: '800', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '5px' },
+    saveBtn: { background: '#2563eb', color: '#fff', border: 'none', width: '100%', padding: '15px', borderRadius: '12px', fontWeight: '900', fontSize: '15px', cursor: 'pointer', marginTop: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)' },
     loader: { textAlign: 'center', padding: '100px', color: '#2563eb', fontWeight: 'bold' },
-    overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 },
-    locModal: { background: 'white', padding: '25px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' },
-    locInput: { padding: '14px 14px 14px 40px', borderRadius: '12px', border: '2px solid #2563eb', fontSize: '14px', width: '100%', boxSizing: 'border-box', outline: 'none' },
-    locResultsBox: { marginTop: '15px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
-    locItem: { padding: '12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' }
+    overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 1000 },
+    locModal: { background: 'white', padding: '22px', borderRadius: '20px', maxWidth: '400px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)', boxSizing: 'border-box' },
+    locInput: { padding: '12px 12px 12px 38px', borderRadius: '12px', border: '2px solid #2563eb', fontSize: '14px', width: '100%', boxSizing: 'border-box', outline: 'none' },
+    locResultsBox: { marginTop: '12px', maxHeight: '210px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px' },
+    locItem: { padding: '10px 12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: '10px' }
 };
 
 export default Profile;

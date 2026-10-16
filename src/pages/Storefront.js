@@ -2,121 +2,85 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Star, ShoppingCart, Zap } from 'lucide-react'; 
 import { toast } from 'react-toastify';
-import { motion } from 'framer-motion'; // 🌟 Added Framer Motion for beautiful animations
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+
+const getBackendUrl = () => {
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    return isLocal ? 'http://localhost:5000/api' : 'https://bhavyams-vendorhub-backend.onrender.com/api';
+};
+
+const getImageUrl = (raw) => {
+    if (!raw) return 'https://via.placeholder.com/200?text=Subhams+Hub';
+    if (raw.startsWith('http') || raw.startsWith('data:')) return raw;
+    return `${getBackendUrl().replace('/api', '')}${raw.startsWith('/') ? '' : '/'}${raw}`;
+};
 
 const Storefront = () => {
     const [products, setProducts] = useState([]);
-
-    // 🛡️ LOGIC IS UNTOUCHED
-    const fetchProducts = async () => {
-        try {
-            const res = await axios.get('https://bhavyams-vendorhub-backend.onrender.com/api/products/with-ratings');
-            setProducts(res.data);
-        } catch (err) {
-            console.error("Storefront error:", err);
-            toast.error("Failed to load products");
-        }
-    };
+    const navigate = useNavigate();
 
     useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const res = await axios.get(`${getBackendUrl()}/products/feed`);
+                setProducts(res.data?.products || []);
+            } catch (err) {
+                console.error("Storefront error:", err);
+                toast.error("Failed to load products");
+            }
+        };
         fetchProducts();
     }, []);
 
-    // 🌟 ANIMATION CONFIGURATIONS
     const containerVariants = {
         hidden: { opacity: 0 },
-        show: {
-            opacity: 1,
-            transition: { staggerChildren: 0.1 } // Makes cards pop in one after another
-        }
+        show: { opacity: 1, transition: { staggerChildren: 0.08 } }
     };
 
     const cardVariants = {
-        hidden: { opacity: 0, y: 30 },
+        hidden: { opacity: 0, y: 24 },
         show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
     };
 
     return (
         <div style={styles.pageContainer}>
-            {/* 🌟 Beautiful Header Header */}
             <div style={styles.headerWrapper}>
-                <motion.h2 
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    style={styles.title}
-                >
-                    Welcome to <span style={styles.brandHighlight}>Subhams-Hub</span>
+                <motion.h2 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} style={styles.title}>
+                    Welcome to <span style={styles.brandHighlight}>Subhams Hub</span>
                 </motion.h2>
-                <motion.p 
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-                    style={styles.subtitle}
-                >
-                    Discover premium products from top vendors.
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} style={styles.subtitle}>
+                    Discover verified local products & services.
                 </motion.p>
             </div>
 
-            {/* 🌟 Animated Grid */}
-            <motion.div 
-                variants={containerVariants} 
-                initial="hidden" 
-                animate="show" 
-                style={styles.productGrid}
-            >
+            <motion.div variants={containerVariants} initial="hidden" animate="show" style={styles.productGrid}>
                 {products.map((product) => (
                     <motion.div 
                         variants={cardVariants}
-                        whileHover={{ y: -8 }} // 🌟 Card floats up slightly when you hover over it
+                        whileHover={{ y: -6 }}
                         key={product.id} 
                         style={styles.card}
+                        onClick={() => navigate(`/item/${product.id}`)}
                     >
-                        {/* Image Wrapper */}
                         <div style={styles.imageWrapper}>
-                            {product.average_rating >= 4.5 && (
-                                <div style={styles.badge}><Zap size={12} style={{marginRight: '2px'}}/> Top Rated</div>
+                            {product.is_verified && (
+                                <div style={styles.badge}><Zap size={12} style={{marginRight: '2px'}}/> Verified</div>
                             )}
-                          <img 
-                                // 🚀 FIX: Point to the live Render Backend!
-                                src={product.image_url ? `https://bhavyams-vendorhub-backend.onrender.com${product.image_url}` : 'https://via.placeholder.com/150'} 
-                                alt={product.name} 
-                                style={styles.image} 
-                            />
+                            <img src={getImageUrl(product.image_url)} alt={product.name} style={styles.image} />
                         </div>
 
-                        {/* Product Info */}
                         <div style={styles.info}>
                             <h3 style={styles.productName}>{product.name}</h3>
-                            
-                            {/* ⭐ RATING UI */}
                             <div style={styles.ratingRow}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                    {[...Array(5)].map((_, i) => {
-                                        const ratingValue = Number(product.average_rating) || 0;
-                                        return (
-                                            <Star 
-                                                key={i} 
-                                                size={14} 
-                                                fill={i < Math.round(ratingValue) ? "#fbbf24" : "none"} 
-                                                color={i < Math.round(ratingValue) ? "#fbbf24" : "#cbd5e1"} 
-                                            />
-                                        );
-                                    })}
-                                </div>
-                                <span style={styles.reviewCount}>
-                                    {product.average_rating > 0 ? Number(product.average_rating).toFixed(1) : "New"} 
-                                    <span style={{color: '#94a3b8', fontSize: '11px', marginLeft:'4px'}}>({product.total_reviews || 0})</span>
-                                </span>
+                                <Star size={14} fill="#fbbf24" color="#fbbf24" />
+                                <span style={styles.reviewCount}>{product.business_name || 'Local Shop'}</span>
                             </div>
 
-                            {/* Price & Action */}
                             <div style={styles.actionRow}>
                                 <p style={styles.price}>₹{product.price}</p>
-                                <motion.button 
-                                    whileHover={{ scale: 1.05 }} 
-                                    whileTap={{ scale: 0.95 }} 
-                                    style={styles.addBtn}
-                                >
-                                    <ShoppingCart size={16} style={{marginRight:'6px'}}/> Add
+                                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} style={styles.addBtn}>
+                                    <ShoppingCart size={16} style={{marginRight:'6px'}}/> View
                                 </motion.button>
                             </div>
                         </div>
@@ -127,127 +91,24 @@ const Storefront = () => {
     );
 };
 
-// 🎨 PREMIUM STYLES DICTIONARY
 const styles = {
-    pageContainer: { 
-        padding: '60px 5%', 
-        background: 'linear-gradient(to bottom right, #f8fafc, #f1f5f9)', 
-        minHeight: '100vh',
-        fontFamily: "'Inter', sans-serif"
-    },
-    headerWrapper: {
-        textAlign: 'center',
-        marginBottom: '50px'
-    },
-    title: { 
-        fontSize: '36px', 
-        fontWeight: '900', 
-        color: '#0f172a',
-        margin: '0 0 10px 0',
-        letterSpacing: '-0.5px'
-    },
-    brandHighlight: {
-        color: '#3b82f6', // Premium Blue
-    },
-    subtitle: {
-        fontSize: '16px',
-        color: '#64748b',
-        margin: 0
-    },
-    productGrid: { 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', 
-        gap: '30px',
-        maxWidth: '1200px',
-        margin: '0 auto'
-    },
-    card: { 
-        background: '#ffffff', 
-        borderRadius: '20px', 
-        overflow: 'hidden', 
-        boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -4px rgba(0,0,0,0.02)', // Soft premium shadow
-        display: 'flex',
-        flexDirection: 'column',
-        border: '1px solid #f1f5f9'
-    },
-    imageWrapper: {
-        position: 'relative',
-        width: '100%',
-        height: '220px',
-        background: '#f8fafc',
-        overflow: 'hidden'
-    },
-    badge: {
-        position: 'absolute',
-        top: '12px',
-        left: '12px',
-        background: '#10b981',
-        color: 'white',
-        padding: '4px 10px',
-        borderRadius: '20px',
-        fontSize: '11px',
-        fontWeight: 'bold',
-        display: 'flex',
-        alignItems: 'center',
-        boxShadow: '0 4px 6px rgba(16, 185, 129, 0.3)',
-        zIndex: 2
-    },
-    image: { 
-        width: '100%', 
-        height: '100%', 
-        objectFit: 'cover',
-        transition: 'transform 0.5s ease'
-    },
-    info: { 
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        flex: 1
-    },
-    productName: { 
-        fontSize: '17px', 
-        fontWeight: '700',
-        margin: '0 0 10px 0', 
-        color: '#1e293b',
-        lineHeight: '1.4'
-    },
-    ratingRow: { 
-        display: 'flex', 
-        alignItems: 'center', 
-        marginBottom: '20px' 
-    },
-    reviewCount: { 
-        fontSize: '13px', 
-        color: '#475569', 
-        marginLeft: '8px',
-        fontWeight: '600'
-    },
-    actionRow: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 'auto' // Pushes this to the bottom of the card
-    },
-    price: { 
-        fontSize: '22px', 
-        fontWeight: '900', 
-        color: '#0f172a', 
-        margin: 0 
-    },
-    addBtn: { 
-        background: '#3b82f6', 
-        color: '#ffffff', 
-        border: 'none', 
-        padding: '10px 16px', 
-        borderRadius: '12px', 
-        cursor: 'pointer', 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        fontWeight: 'bold',
-        fontSize: '14px',
-        boxShadow: '0 4px 6px rgba(59, 130, 246, 0.25)'
-    }
+    pageContainer: { padding: '40px 5%', background: 'linear-gradient(to bottom right, #f8fafc, #f1f5f9)', minHeight: '100vh', fontFamily: "'Inter', sans-serif" },
+    headerWrapper: { textAlign: 'center', marginBottom: '36px' },
+    title: { fontSize: '30px', fontWeight: '900', color: '#0f172a', margin: '0 0 8px 0' },
+    brandHighlight: { color: '#2563eb' },
+    subtitle: { fontSize: '15px', color: '#64748b', margin: 0 },
+    productGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '24px', maxWidth: '1200px', margin: '0 auto' },
+    card: { background: '#ffffff', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', border: '1px solid #f1f5f9', cursor: 'pointer' },
+    imageWrapper: { position: 'relative', width: '100%', height: '200px', background: '#f8fafc', overflow: 'hidden' },
+    badge: { position: 'absolute', top: '12px', left: '12px', background: '#10b981', color: 'white', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', zIndex: 2 },
+    image: { width: '100%', height: '100%', objectFit: 'cover' },
+    info: { padding: '18px', display: 'flex', flexDirection: 'column', flex: 1 },
+    productName: { fontSize: '16px', fontWeight: '800', margin: '0 0 8px 0', color: '#0f172a' },
+    ratingRow: { display: 'flex', alignItems: 'center', marginBottom: '16px' },
+    reviewCount: { fontSize: '12.5px', color: '#475569', marginLeft: '6px', fontWeight: '700' },
+    actionRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' },
+    price: { fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: 0 },
+    addBtn: { background: '#2563eb', color: '#ffffff', border: 'none', padding: '9px 14px', borderRadius: '10px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', fontSize: '13px' }
 };
 
 export default Storefront;

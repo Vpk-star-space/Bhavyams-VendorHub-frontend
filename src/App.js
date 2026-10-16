@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, Navigate, } from 'react-router-dom';
-import { ToastContainer,toast } from 'react-toastify';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import axios from 'axios';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { AppProvider, socket } from './context/AppContext'; 
 import { CartProvider } from './context/CartContext'; 
+import { BACKEND_URL as API_BASE_URL } from './config/api';
 
 import Home from './pages/Home'; 
 import Welcome from './pages/Welcome';
@@ -33,9 +34,6 @@ const AdminRoute = ({ children }) => {
     const isAdmin = (user.role && user.role.toLowerCase() === 'admin') || user.email === 'pavanvenkat63@gmail.com';
     return isAdmin ? children : <Navigate to="/" replace />;
 };
-
-const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const API_BASE_URL = isLocal ? 'http://localhost:5000/api' : 'https://bhavyams-vendorhub-backend.onrender.com/api';
 
 const isMaintenanceMode = false; 
 
@@ -85,22 +83,15 @@ function App() {
     const [isInstallable, setIsInstallable] = useState(false);
     const [timeLeft, setTimeLeft] = useState(''); 
     const [targetDateString, setTargetDateString] = useState('');
-    const [currentTime, setCurrentTime] = useState(new Date()); 
 
     const [currentUser, setCurrentUser] = useState(() => {
-        const str = localStorage.getItem('user');
-        return str && str !== 'undefined' ? JSON.parse(str) : null;
+        try {
+            const str = localStorage.getItem('user');
+            return str && str !== 'undefined' ? JSON.parse(str) : null;
+        } catch (e) { return null; }
     });
 
-    // 🟢 CHECK: Master Admin Account Immunity
     const isMasterAdminImmune = currentUser?.email === 'pavanvenkat63@gmail.com' || String(currentUser?.id) === "1";
-
-    useEffect(() => {
-        if (isMaintenanceMode) {
-            const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-            return () => clearInterval(timer);
-        }
-    }, []);
 
     useEffect(() => {
         const syncStatus = async () => {
@@ -115,7 +106,10 @@ function App() {
                         ...JSON.parse(localStorage.getItem('user') || '{}'), 
                         account_status: res.data.account_status, 
                         ban_reason: res.data.ban_reason, 
-                        ban_until: res.data.ban_until 
+                        ban_until: res.data.ban_until,
+                        can_message: res.data.can_message,
+                        can_call: res.data.can_call,
+                        can_book: res.data.can_book
                     };
                     
                     setCurrentUser(updatedUser);
@@ -124,30 +118,38 @@ function App() {
             }
         };
         syncStatus();
-    }, []); 
+    }, [currentUser?.id]); 
 
-useEffect(() => {
+    // 🟢 REGISTER SOCKET & LISTEN FOR ALL REAL-TIME ALERTS (ADMIN + USER + BROADCAST)
+    useEffect(() => {
         if (!currentUser) return;
-        
-        // 🟢 CATCH LIVE ADMIN NOTIFICATIONS
-        socket.on('admin_realtime_alert', (data) => {
-            if (currentUser.role === 'admin' || currentUser.email === 'pavanvenkat63@gmail.com') {
-                toast.info(`🔔 ${data.title}: ${data.message}`, { autoClose: 8000 });
-            }
-        });
 
-        socket.on('force_logout', (data) => {
+        socket.emit('register_user', currentUser.id);
+
+        const handleAdminAlert = (data) => {
+            if (currentUser.role === 'admin' || currentUser.email === 'pavanvenkat63@gmail.com') {
+                toast.info(`🔔 ${data.title}: ${data.message}`, { autoClose: 7000 });
+            }
+        };
+
+        const handleUserAlert = (data) => {
             if (String(data.userId) === String(currentUser.id)) {
-                
-                // 🛡️ MASTER ADMIN IMMUNITY SHIELD
+                toast.info(`🔔 ${data.title}: ${data.message}`, { autoClose: 6000 });
+            }
+        };
+
+        const handleBroadcastAlert = (data) => {
+            toast.info(`📢 ${data.title}: ${data.message}`, { autoClose: 7000 });
+        };
+
+        const handleForceLogout = (data) => {
+            if (String(data.userId) === String(currentUser.id)) {
                 if (data.action !== 'unblock' && (currentUser.email === 'pavanvenkat63@gmail.com' || String(currentUser.id) === "1")) {
-                    console.log("🛡️ Master Admin Immunity Engaged: Ignored accidental lock action.");
                     return;
                 }
 
                 const updatedUser = { ...currentUser };
-                
-                if (data.action === 'warn') {
+                if (data.action === 'warn' || data.action === 'add_strike') {
                     updatedUser.account_status = 'warned';
                     updatedUser.ban_reason = data.reason;
                 } else if (data.action === 'temp_block') {
@@ -161,6 +163,10 @@ useEffect(() => {
                     updatedUser.account_status = 'active';
                     updatedUser.ban_reason = null;
                     updatedUser.ban_until = null;
+                } else if (data.action === 'toggle_features' && data.features) {
+                    updatedUser.can_message = data.features.can_message;
+                    updatedUser.can_call = data.features.can_call;
+                    updatedUser.can_book = data.features.can_book;
                 } else if (data.action === 'delete') {
                     localStorage.clear();
                     window.location.href = '/welcome';
@@ -169,14 +175,21 @@ useEffect(() => {
                 setCurrentUser(updatedUser);
                 localStorage.setItem('user', JSON.stringify(updatedUser));
             }
-        });
+        };
+
+        socket.on('admin_realtime_alert', handleAdminAlert);
+        socket.on('user_realtime_alert', handleUserAlert);
+        socket.on('broadcast_realtime_alert', handleBroadcastAlert);
+        socket.on('force_logout', handleForceLogout);
 
         return () => {
-            socket.off('force_logout');
-            socket.off('admin_realtime_alert'); // 🟢 cleanup
+            socket.off('admin_realtime_alert', handleAdminAlert);
+            socket.off('user_realtime_alert', handleUserAlert);
+            socket.off('broadcast_realtime_alert', handleBroadcastAlert);
+            socket.off('force_logout', handleForceLogout);
         };
     }, [currentUser]);
-    // 🟢 SUBHAMS HUB TEMPORARY BLOCK TIMER
+
     useEffect(() => {
         if (currentUser?.account_status === 'temp_block' && currentUser?.ban_until) {
             const runTimer = () => {
@@ -212,7 +225,7 @@ useEffect(() => {
                     const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                     const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                     const s = Math.floor((diff % (1000 * 60)) / 1000);
-                    setTimeLeft(`${h > 0 ? h + 'h ' : ''}${m}m${s}s`);
+                    setTimeLeft(`${h > 0 ? h + 'h ' : ''}${m}m ${s}s`);
                 }
             };
 
@@ -223,7 +236,6 @@ useEffect(() => {
     }, [currentUser]); 
 
     useEffect(() => {
-        let isMounted = true;
         axios.get(`${API_BASE_URL}/auth/google-client-id`).catch(() => {});
 
         const handleBeforeInstallPrompt = (e) => {
@@ -232,11 +244,7 @@ useEffect(() => {
             setIsInstallable(true); 
         };
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-        return () => { 
-            isMounted = false; 
-            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        };
+        return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     }, []); 
 
     const handleAppReady = useCallback(() => { setIsAppReady(true); }, []);
@@ -252,17 +260,11 @@ useEffect(() => {
         return (
             <div style={maintenanceStyles.page}>
                 <div style={maintenanceStyles.card}>
-                    <div style={maintenanceStyles.iconWrapper}>
-                        <div style={{ fontSize: '50px' }}>⚙️</div>
-                    </div>
+                    <div style={maintenanceStyles.iconWrapper}><div style={{ fontSize: '50px' }}>⚙️</div></div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '5px' }}>
                         <h1 style={maintenanceStyles.title}>SUBHAMS</h1><span style={maintenanceStyles.hubBadge}>HUB</span>
                     </div>
                     <h2 style={maintenanceStyles.subtitle}>System Maintenance</h2>
-                    <div style={maintenanceStyles.statusBox}>
-                        <span style={maintenanceStyles.pulseIndicator}></span>
-                        <span style={maintenanceStyles.statusText}>Upgrading System...</span>
-                    </div>
                 </div>
             </div>
         );
@@ -272,7 +274,6 @@ useEffect(() => {
         return <PremiumLoader onComplete={handleAppReady} />;
     }
 
-    // 🛡️ IMMUNITY: Bypasses rendering the lock screen if it's the Master Admin account
     if (currentUser && currentUser.account_status && !isMasterAdminImmune) {
         if (currentUser.account_status === 'temp_block') {
             return (
@@ -293,7 +294,7 @@ useEffect(() => {
                         <div style={{...lockStyles.reasonBox, background: '#fff7ed', border: '1px solid #ffedd5'}}>
                             <p style={{...lockStyles.reasonTitle, color: '#c2410c'}}>Scheduled Unlock Notice:</p>
                             <p style={{ margin: '4px 0 0 0', fontSize: '13px', fontWeight: '700', color: '#9a3412', lineHeight: '1.4' }}>
-                                You are on a temporary block. Full access will automatically restore at <strong>{targetDateString || 'Scheduled Time'}</strong>.
+                                Full access will automatically restore at <strong>{targetDateString || 'Scheduled Time'}</strong>.
                             </p>
                         </div>
 
@@ -303,7 +304,6 @@ useEffect(() => {
                                 {timeLeft}
                             </p>
                         </div>
-                        <p style={lockStyles.infoText}>Thank you for your patience while we maintain a safe marketplace.</p>
                     </div>
                 </div>
             );
@@ -323,7 +323,6 @@ useEffect(() => {
                             <p style={{...lockStyles.reasonTitle, color: '#b91c1c'}}>Reason for Ban:</p>
                             <p style={{...lockStyles.reasonText, color: '#991b1b'}}>{currentUser.ban_reason || 'Severe violation of guidelines.'}</p>
                         </div>
-                        <p style={lockStyles.infoText}>Access to Subhams Hub is revoked for this account.</p>
                     </div>
                 </div>
             );
@@ -336,7 +335,7 @@ useEffect(() => {
                 <CartProvider>
                     <Router>
                         <ScrollToTop />
-                        <ToastContainer theme="colored" position="top-center" autoClose={1500} hideProgressBar={true} />
+                        <ToastContainer theme="colored" position="top-center" autoClose={2000} hideProgressBar={true} />
                         <div style={{ minHeight: '100vh', background: '#f8fafc', position: 'relative' }}>
                             
                             {isInstallable && (
@@ -346,28 +345,30 @@ useEffect(() => {
                                     top: 0, zIndex: 999, boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
                                 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <span style={{ fontSize: '28px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>📲</span>
+                                        <span style={{ fontSize: '28px' }}>📲</span>
                                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '0.5px' }}>Install Subhams Hub</span>
+                                            <span style={{ fontSize: '15px', fontWeight: '900' }}>Install Subhams Hub</span>
                                             <span style={{ fontSize: '11px', color: '#bfdbfe', fontWeight: '600' }}>Fast access • No browser needed</span>
                                         </div>
                                     </div>
-                                    <button onClick={handleInstallClick} style={{ background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '900', fontSize: '12px', cursor: 'pointer', boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)' }}>
+                                    <button onClick={handleInstallClick} style={{ background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '8px 18px', borderRadius: '20px', fontWeight: '900', fontSize: '12px', cursor: 'pointer' }}>
                                         INSTALL NOW
                                     </button>
                                 </div>
                             )}
-                           
-                           <Routes>
-                                {/* 🟢 PUBLIC ROUTES */}
+                            
+                            <Routes>
+                                {/* PUBLIC ROUTES */}
                                 <Route path="/" element={<Home />} />
                                 <Route path="/expo" element={<Expo />} />
                                 <Route path="/shop/:id" element={<ShopProfile />} />
                                 <Route path="/product/:id" element={<ProductDetails />} /> 
                                 <Route path="/item/:itemId" element={<ItemDetail />} />
                                 <Route path="/welcome" element={<Welcome />} />
+                                <Route path="/login" element={<Navigate to="/welcome" replace />} />
+                                <Route path="/cart" element={<Navigate to="/my-orders" replace />} />
 
-                                {/* 🔒 SECURED USER/VENDOR ROUTES (Must be logged in) */}
+                                {/* SECURED USER/VENDOR ROUTES */}
                                 <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
                                 <Route path="/chat/:conversationId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
                                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
@@ -378,11 +379,10 @@ useEffect(() => {
                                 <Route path="/my-orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
                                 <Route path="/vendor/orders" element={<ProtectedRoute><VendorOrders /></ProtectedRoute>} />
                                 
-                                {/* 👑 MASTER ADMIN ROUTES */}
+                                {/* MASTER ADMIN ROUTES */}
                                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                                 <Route path="/admin/push" element={<AdminRoute><PushDashboard /></AdminRoute>} />
                                 
-                                {/* Fallback for unknown URLs */}
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </div>
@@ -399,10 +399,7 @@ const maintenanceStyles = {
     iconWrapper: { background: 'linear-gradient(135deg, #e2e8f0, #f1f5f9)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto' },
     title: { margin: 0, fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '1px' },
     hubBadge: { fontSize: '11px', background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', padding: '4px 8px', borderRadius: '6px', fontWeight: '900', letterSpacing: '2px' },
-    subtitle: { color: '#2563eb', fontSize: '18px', fontWeight: '800', margin: '0 0 20px 0' },
-    statusBox: { background: '#fef3c7', border: '1px solid #fde68a', padding: '10px 15px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' },
-    pulseIndicator: { width: '10px', height: '10px', background: '#f59e0b', borderRadius: '50%' },
-    statusText: { color: '#b45309', fontSize: '13px', fontWeight: '700' }
+    subtitle: { color: '#2563eb', fontSize: '18px', fontWeight: '800', margin: '0 0 20px 0' }
 };
 
 const lockStyles = {
@@ -413,8 +410,7 @@ const lockStyles = {
     subtitle: { color: '#475569', fontSize: '13px', margin: '0 0 20px 0', lineHeight: '1.5', padding: '0 20px' },
     reasonBox: { padding: '15px', borderRadius: '12px', textAlign: 'left', margin: '0 20px' },
     reasonTitle: { margin: '0 0 5px 0', fontSize: '12px', fontWeight: '900', textTransform: 'uppercase' },
-    reasonText: { margin: 0, fontSize: '13px', fontWeight: '600' },
-    infoText: { fontSize: '12px', color: '#64748b', marginTop: '20px', fontWeight: '500', padding: '0 20px' }
+    reasonText: { margin: 0, fontSize: '13px', fontWeight: '600' }
 };
 
 const sStyles = {
