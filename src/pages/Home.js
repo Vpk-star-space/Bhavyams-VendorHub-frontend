@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
 import axios from 'axios';
-import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ArrowLeft, Grid, ChevronRight, Globe, Edit3, Trash2, BadgeCheck, Megaphone, Bot, ExternalLink } from 'lucide-react';
+import { Search, User, X, MapPin, Package, Home as HomeIcon, Store, LayoutDashboard, ShieldCheck, Sparkles, Folder, ArrowLeft, Grid, ShoppingBag, Wrench, TrendingUp, ChevronRight, Globe, Edit3, Trash2, BadgeCheck, Megaphone, Bot, ExternalLink } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import ProductCard from '../components/ProductCard';
@@ -231,8 +231,8 @@ const ShopCard = ({ shop, ht, tc, onClick, imgH = 84, style }) => (
     </div>
 );
 
-const AreaChip = ({ shop, tc, onClick }) => (
-    <div onClick={onClick} className="touch-scale" style={S.areaChip}>
+const AreaChip = ({ shop, tc, onClick, fill }) => (
+    <div onClick={onClick} className="touch-scale" style={fill ? { ...S.areaChip, minWidth: 0, maxWidth: 'none', width: '100%', boxSizing: 'border-box' } : S.areaChip}>
         <div style={{ position: 'relative', width: 42, height: 42, flexShrink: 0 }}>
             <img src={getOptimizedImage(shop.shop_logo) || PLACEHOLDER} alt={shop.business_name} crossOrigin="anonymous" referrerPolicy="no-referrer" style={{ width: 42, height: 42, borderRadius: 10, objectFit: 'cover', border: '1px solid #e2e8f0', background: '#fff' }} />
             <span style={{ position: 'absolute', bottom: -2, right: -2, width: 10, height: 10, borderRadius: '50%', background: shop.is_online ? '#22c55e' : '#ef4444', border: '2px solid #fff' }} />
@@ -249,6 +249,58 @@ const AreaChip = ({ shop, tc, onClick }) => (
 );
 
 // ======================================================================
+// Shops row: 1-2 shops stay fixed on screen. 3+ shops glide slowly and can be moved by touch.
+const ShopRow = ({ items, renderItem }) => {
+    const ref = useRef(null);
+    const paused = useRef(false);
+    const timer = useRef(null);
+    const many = items.length >= 3;
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!many || !el) return undefined;
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+        let raf;
+        let last = performance.now();
+        let pos = el.scrollLeft;
+        let dir = 1;
+        let holdUntil = last + 1500;
+        const tick = (now) => {
+            const dt = Math.min(now - last, 50);
+            last = now;
+            const max = el.scrollWidth - el.clientWidth;
+            if (paused.current) {
+                pos = el.scrollLeft;
+            } else if (max > 0 && now > holdUntil) {
+                pos += dir * dt * 0.03;
+                if (pos >= max) { pos = max; dir = -1; holdUntil = now + 1500; }
+                else if (pos <= 0) { pos = 0; dir = 1; holdUntil = now + 1500; }
+                el.scrollLeft = pos;
+            }
+            raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => { cancelAnimationFrame(raf); clearTimeout(timer.current); };
+    }, [many, items.length]);
+
+    const hold = () => { paused.current = true; clearTimeout(timer.current); };
+    const release = () => {
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => { paused.current = false; }, 2500);
+    };
+
+    if (!many) {
+        return <div style={{ ...S.staticRow, gridTemplateColumns: `repeat(${Math.max(1, items.length)}, minmax(0, 1fr))` }}>{items.map(item => renderItem(item, true))}</div>;
+    }
+    return (
+        <div ref={ref} data-noswipe="1" className="hide-scroll" style={S.hScroll}
+            onTouchStart={hold} onTouchEnd={release} onTouchCancel={release}
+            onMouseEnter={hold} onMouseLeave={release} onWheel={() => { hold(); release(); }}>
+            {items.map(item => renderItem(item, false))}
+        </div>
+    );
+};
+
 const Home = () => {
     const { t, language, setLanguage, location: appLocation } = useContext(AppContext);
     const navigate = useNavigate();
@@ -309,6 +361,10 @@ const Home = () => {
     const [showBannerAdminModal, setShowBannerAdminModal] = useState(false);
     const [editingBannerId, setEditingBannerId] = useState(null);
     const [bannerForm, setBannerForm] = useState(EMPTY_BANNER_FORM);
+    const [tabDir, setTabDir] = useState('fwd');
+    const swipeStart = useRef(null);
+    const bannerStart = useRef(null);
+    const stripRef = useRef(null);
 
     useEffect(() => {
         const checkUser = () => {
@@ -544,6 +600,7 @@ const Home = () => {
             return navigate('/register-business');
         }
         if (catKey === 'Expo') return navigate('/expo');
+        setTabDir(CANONICAL_TABS.indexOf(catKey) >= CANONICAL_TABS.indexOf(selectedCategory) ? 'fwd' : 'back');
         setSelectedCategory(catKey);
         setSelectedSubCategory(null);
         setSearchQuery('');
@@ -557,6 +614,45 @@ const Home = () => {
         setSearchQuery('');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
+
+    // ---------- Swipe between tabs (Expo ‹ Trending › Shopping › Services › Business) ----------
+    const anyModalOpen = showLocModal || showAssistantModal || showBannerAdminModal;
+    const onSwipeStart = (e) => {
+        if (anyModalOpen || searchQuery || e.touches.length !== 1 || (e.target.closest && e.target.closest('[data-noswipe]'))) {
+            swipeStart.current = null;
+            return;
+        }
+        swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+    const onSwipeEnd = (e) => {
+        const s = swipeStart.current;
+        swipeStart.current = null;
+        if (!s) return;
+        const dx = e.changedTouches[0].clientX - s.x;
+        const dy = e.changedTouches[0].clientY - s.y;
+        if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+        const next = CANONICAL_TABS[CANONICAL_TABS.indexOf(selectedCategory) + (dx < 0 ? 1 : -1)];
+        if (!next) return;
+        if (navigator.vibrate) navigator.vibrate(8);
+        handleCategoryClick(next);
+    };
+
+    // Banner: swipe left/right to change slide
+    const onBannerStart = (e) => { bannerStart.current = e.touches[0].clientX; };
+    const onBannerEnd = (e) => {
+        if (bannerStart.current === null) return;
+        const dx = e.changedTouches[0].clientX - bannerStart.current;
+        bannerStart.current = null;
+        if (Math.abs(dx) < 40 || banners.length < 2) return;
+        setActiveBannerIdx(i => (i + (dx < 0 ? 1 : -1) + banners.length) % banners.length);
+    };
+
+    // Keep the active tab centered in the top strip
+    useEffect(() => {
+        const strip = stripRef.current;
+        const el = strip && strip.querySelector(`[data-tab="${selectedCategory}"]`);
+        if (el) strip.scrollTo({ left: el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' });
+    }, [selectedCategory]);
 
     // ---------- Derived data ----------
     const selectedExplorerArea = customLocation?.address || localUser?.address || localUser?.location || '';
@@ -616,7 +712,7 @@ const Home = () => {
     const onHome = currentRoute === '/' && selectedCategory === 'Trending' && !searchQuery && !selectedSubCategory;
 
     return (
-        <div style={{ ...S.page, background: `radial-gradient(circle at 50% 0%, ${ambient}22 0%, #f8fafc 36%, #f8fafc 100%)`, transition: 'background .8s cubic-bezier(.4,0,.2,1)' }}>
+        <div onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd} style={{ ...S.page, background: `radial-gradient(circle at 50% 0%, ${ambient}22 0%, #f8fafc 36%, #f8fafc 100%)`, transition: 'background .8s cubic-bezier(.4,0,.2,1)' }}>
             {localUser?.id && <AppPermissions />}
             {loading && <div className="top-progress-bar"></div>}
 
@@ -630,10 +726,15 @@ const Home = () => {
                 .touch-scale:active { transform: scale(.96); }
                 .hide-scroll::-webkit-scrollbar { display: none; }
                 .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+                @keyframes tabInFwd { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+                @keyframes tabInBack { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+                .tab-fwd { animation: tabInFwd .28s cubic-bezier(.22,1,.36,1); }
+                .tab-back { animation: tabInBack .28s cubic-bezier(.22,1,.36,1); }
+                @media (prefers-reduced-motion: reduce) { .tab-fwd, .tab-back { animation: none; } }
             `}</style>
 
             {/* ================= HEADER ================= */}
-            <div style={{ ...S.headerStack, background: `linear-gradient(135deg, #090d16 0%, ${ambient} 100%)` }}>
+            <div data-noswipe="1" style={{ ...S.headerStack, background: `linear-gradient(135deg, #090d16 0%, ${ambient} 100%)` }}>
                 <div style={S.headerTop}>
                     <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => { goHome(); setSelectedSubCategory(null); }}>
                         <h1 style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: 4 }}>
@@ -695,10 +796,10 @@ const Home = () => {
                     </div>
                 </div>
 
-                <div style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderTop: '1px solid rgba(255,255,255,.08)' }} className="hide-scroll">
-                    <div style={{ display: 'flex', gap: 8, padding: '6px 12px', width: 'max-content', margin: '0 auto' }}>
+                <div ref={stripRef} style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderTop: '1px solid rgba(255,255,255,.08)' }} className="hide-scroll">
+                    <div style={{ display: 'flex', gap: 8, padding: '6px 12px', width: 'max-content', margin: '0 auto', position: 'relative' }}>
                         {CANONICAL_TABS.map(key => (
-                            <span key={key} onClick={() => handleCategoryClick(key)} style={{ ...S.tab, ...(selectedCategory === key ? S.tabOn : S.tabOff) }}>
+                            <span key={key} data-tab={key} onClick={() => handleCategoryClick(key)} style={{ ...S.tab, ...(selectedCategory === key ? S.tabOn : S.tabOff) }}>
                                 {TAB_STYLE[key].icon} {ht.tabNames[key]}
                             </span>
                         ))}
@@ -715,7 +816,7 @@ const Home = () => {
             )}
 
             {/* ================= MAIN CONTENT ================= */}
-            <div style={{ maxWidth: 980, margin: '0 auto', padding: isMobile ? '10px' : '12px 16px', width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div key={selectedCategory} className={tabDir === 'fwd' ? 'tab-fwd' : 'tab-back'} style={{ maxWidth: 980, margin: '0 auto', padding: isMobile ? '10px' : '12px 16px', width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {searchQuery && !showSuggestions ? (
                     <div style={{ padding: 4 }}>
                         <h2 style={{ fontSize: 16, marginBottom: 10, color: '#0f172a', fontWeight: 900 }}>{ht.searchResults} "{searchQuery}"</h2>
@@ -735,7 +836,7 @@ const Home = () => {
                             <>
                                 {/* 1. HERO BANNER */}
                                 <div>
-                                    <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', height: isMobile ? 138 : 156, border: '2px solid rgba(250,204,21,.65)', boxShadow: '0 8px 22px rgba(15,23,42,.14)', background: '#090d16' }}>
+                                    <div data-noswipe="1" onTouchStart={onBannerStart} onTouchEnd={onBannerEnd} style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', height: isMobile ? 138 : 156, border: '2px solid rgba(250,204,21,.65)', boxShadow: '0 8px 22px rgba(15,23,42,.14)', background: '#090d16' }}>
                                         <div style={{ display: 'flex', height: '100%', width: '100%', transform: `translateX(-${(activeBannerIdx % Math.max(1, banners.length)) * 100}%)`, transition: 'transform .5s cubic-bezier(.22,1,.36,1)' }}>
                                             {banners.map((b, idx) => {
                                                 const bTitle = lang === 'te' ? (b.title_te || b.title_en) : b.title_en;
@@ -774,6 +875,24 @@ const Home = () => {
                                     </div>
                                 </div>
 
+                                {/* QUICK MENU */}
+                                <div style={{ ...S.section, padding: '12px 6px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>
+                                        {[
+                                            { key: 'shop', Icon: ShoppingBag, label: ht.tabNames.Shopping, c: '#2563eb', bg: '#eff6ff', go: () => handleCategoryClick('Shopping') },
+                                            { key: 'svc', Icon: Wrench, label: ht.tabNames.Services, c: '#16a34a', bg: '#f0fdf4', go: () => handleCategoryClick('Services') },
+                                            { key: 'biz', Icon: TrendingUp, label: ht.tabNames.Business, c: '#d97706', bg: '#fffbeb', go: () => handleCategoryClick('Business') },
+                                            { key: 'ord', Icon: Package, label: ht.orders, c: '#7c3aed', bg: '#f5f3ff', go: () => (localUser ? navigate('/my-orders') : requireLogin('view your orders')) },
+                                            { key: 'pro', Icon: User, label: ht.profile, c: '#475569', bg: '#f1f5f9', go: () => (localUser ? navigate('/profile') : requireLogin('view your profile')) }
+                                        ].map(({ key, Icon, label, c, bg, go }) => (
+                                            <div key={key} onClick={go} className="touch-scale" style={S.qItem}>
+                                                <div style={{ ...S.qIcon, background: bg, color: c, border: `1px solid ${c}22` }}><Icon size={20} /></div>
+                                                <span style={S.appText}>{label}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 {/* 2. DELIVERING TO (pick any area) */}
                                 <div style={S.section}>
                                     <div style={S.secHead}>
@@ -790,8 +909,8 @@ const Home = () => {
                                             <button type="button" onClick={resetLocation} style={{ background: '#2563eb', color: 'white', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>Reset</button>
                                         </div>
                                     ) : (
-                                        <div style={S.hScroll} className="hide-scroll">
-                                            {deliverableShops.map(shop => <AreaChip key={shop.id} shop={shop} tc={tc} onClick={() => navigate(`/shop/${shop.id}`)} />)}
+                                        <div>
+                                            <ShopRow items={deliverableShops} renderItem={(shop, fill) => <AreaChip key={shop.id} shop={shop} tc={tc} fill={fill} onClick={() => navigate(`/shop/${shop.id}`)} />} />
                                         </div>
                                     )}
                                 </div>
@@ -812,9 +931,10 @@ const Home = () => {
                                             {isAdmin ? "No shops are marked 'Trending' yet. Admin Dashboard → Edit a shop → tick '🔥 Trending'." : "Featured trending shops will appear here soon."}
                                         </div>
                                     ) : (
-                                        <div style={showGridMode ? (isMobile ? S.grid2 : S.productGrid) : S.hScroll} className="hide-scroll">
-                                            {trendingShops.map(shop => (
-                                                <ShopCard key={shop.id} shop={shop} ht={ht} tc={tc} onClick={() => navigate(`/shop/${shop.id}`)} style={showGridMode ? { width: '100%' } : undefined} />
+                                        <div style={showGridMode ? (isMobile ? S.grid2 : S.productGrid) : undefined}>
+                                            {!showGridMode && <ShopRow items={trendingShops} renderItem={(shop, fill) => <ShopCard key={shop.id} shop={shop} ht={ht} tc={tc} onClick={() => navigate(`/shop/${shop.id}`)} style={fill ? { width: '100%' } : undefined} />} />}
+                                            {showGridMode && trendingShops.map(shop => (
+                                                <ShopCard key={shop.id} shop={shop} ht={ht} tc={tc} onClick={() => navigate(`/shop/${shop.id}`)} style={{ width: '100%' }} />
                                             ))}
                                         </div>
                                     )}
@@ -1117,6 +1237,9 @@ const navBtn = (active, vendor) => ({
 });
 
 const S = {
+    staticRow: { display: 'grid', gap: 10 },
+    qItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, cursor: 'pointer', minWidth: 0 },
+    qIcon: { width: 46, height: 46, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' },
     page: { minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' },
     headerStack: { display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 14px rgba(0,0,0,.12)', transition: 'background .8s ease' },
     headerTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px 4px', width: '100%', boxSizing: 'border-box' },
