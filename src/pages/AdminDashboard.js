@@ -5,7 +5,7 @@ import { io } from 'socket.io-client';
 import { ShieldCheck, ExternalLink, ArrowLeft, AlertTriangle, Trash2, CheckCircle, FolderSync, PlusCircle, Eye, ImagePlus, MessageSquare, Lock, Edit, UserX, Unlock, Clock, Ban, Search, Users, Store, User, BellRing, BadgeCheck } from 'lucide-react';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
-
+import { Mail } from 'lucide-react'; // Add this to your lucide-react imports
 // 🟢 SMART 5-TIER BADGE RENDERER FOR ADMIN
 const renderAdminBadge = (isOfficial, isVerified, accountStatus) => {
     const isVer = isVerified === true || String(isVerified).toLowerCase() === 'true';
@@ -384,20 +384,133 @@ const AdminDashboard = () => {
 
                     {errorMsg && <div style={styles.errorBox}>❌ {errorMsg}</div>}
 
-                    {/* CRM PORTAL BANNER */}
-                    <div style={{ background: 'linear-gradient(135deg, #0f172a, #1e3a8a)', borderRadius: '16px', padding: isMobile ? '16px' : '22px', marginBottom: '18px', color: 'white', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', gap: '14px', boxShadow: '0 10px 25px rgba(15, 23, 42, 0.2)' }}>
-                        <div>
-                            <h3 style={{ margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: isMobile ? '16px' : '18px', fontWeight: '900' }}>
-                                <BellRing size={20} color="#facc15" /> Push & Engagement CRM
-                            </h3>
-                            <p style={{ margin: 0, fontSize: '12.5px', color: '#cbd5e1', lineHeight: '1.4' }}>
-                                Send banner broadcasts with click links, manage bilingual auto-triggers, and view delivery logs.
-                            </p>
-                        </div>
-                        <button onClick={() => navigate('/admin/push')} style={{ background: 'linear-gradient(135deg, #facc15, #f59e0b)', color: '#713f12', border: 'none', padding: '12px 20px', borderRadius: '10px', fontWeight: '900', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', flexShrink: 0 }}>
-                            Open Push CRM <ExternalLink size={15} />
-                        </button>
-                    </div>
+{/* CRM PORTAL BANNER */}
+<div
+    style={{
+        background: 'linear-gradient(135deg, #0f172a, #1e3a8a)',
+        borderRadius: '12px',
+        padding: isMobile ? '10px 12px' : '14px 16px',
+        marginBottom: '12px',
+        color: 'white',
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        justifyContent: 'space-between',
+        alignItems: isMobile ? 'stretch' : 'center',
+        gap: '10px',
+        boxShadow: '0 5px 15px rgba(15, 23, 42, 0.15)'
+    }}
+>
+    <div>
+        <h3
+            style={{
+                margin: '0 0 3px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: isMobile ? '13px' : '15px',
+                fontWeight: '800'
+            }}
+        >
+            <BellRing size={16} color="#facc15" />
+            Push & Engagement CRM
+        </h3>
+
+        <p
+            style={{
+                margin: 0,
+                fontSize: isMobile ? '10px' : '11px',
+                color: '#cbd5e1',
+                lineHeight: '1.4'
+            }}
+        >
+            Send banner broadcasts, manage auto-triggers, and view delivery logs.
+        </p>
+    </div>
+
+    <button
+        onClick={() => navigate('/admin/push')}
+        style={{
+            background: 'linear-gradient(135deg, #facc15, #f59e0b)',
+            color: '#713f12',
+            border: 'none',
+            padding: isMobile ? '8px 10px' : '8px 12px',
+            borderRadius: '7px',
+            fontWeight: '800',
+            fontSize: isMobile ? '11px' : '12px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            justifyContent: 'center',
+            flexShrink: 0,
+            alignSelf: isMobile ? 'flex-start' : 'center'
+        }}
+    >
+        Open Push CRM <ExternalLink size={13} />
+    </button>
+</div>
+
+{/* PREMIUM EMAIL BLASTER BUTTON */}
+<div
+    onClick={() => navigate('/admin/email-blaster')}
+    style={{
+        background: 'linear-gradient(135deg, #0f172a, #1e3a8a)',
+        borderRadius: '12px',
+        padding: isMobile ? '10px 12px' : '12px 16px',
+        marginBottom: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '10px',
+        cursor: 'pointer',
+        boxShadow: '0 5px 15px rgba(15, 23, 42, 0.15)'
+    }}
+>
+    <div
+        style={{
+            background: 'rgba(250, 204, 21, 0.12)',
+            padding: isMobile ? '7px' : '8px',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+        }}
+    >
+        <Mail size={isMobile ? 17 : 19} color="#facc15" />
+    </div>
+
+    <div style={{ flex: 1, minWidth: 0 }}>
+        <h3
+            style={{
+                margin: 0,
+                fontSize: isMobile ? '12px' : '14px',
+                fontWeight: '800',
+                color: '#f8fafc'
+            }}
+        >
+            Premium Email Blast
+        </h3>
+
+        <p
+            style={{
+                margin: '3px 0 0 0',
+                fontSize: isMobile ? '10px' : '11px',
+                color: '#cbd5e1',
+                fontWeight: '600'
+            }}
+        >
+            Multi-Brand Manual Emails
+        </p>
+    </div>
+
+    <ExternalLink
+        size={14}
+        color="#facc15"
+        style={{ flexShrink: 0 }}
+    />
+</div>
+
 
                     {/* 🟢 MOBILE-COMFORTABLE 2x2 STATS GRID */}
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '18px' }}>

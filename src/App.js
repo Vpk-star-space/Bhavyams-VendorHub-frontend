@@ -27,6 +27,7 @@ import Expo from './pages/Expo';
 import Chat from './pages/Chat';
 import PushDashboard from './pages/PushDashboard';
 import Notifications from './pages/Notifications';
+import PremiumEmailBlaster from './pages/PremiumEmailBlaster'; // Adjust path if it's in components
 
 const AdminRoute = ({ children }) => {
     const userStr = localStorage.getItem('user');
@@ -382,7 +383,10 @@ function App() {
                                 {/* MASTER ADMIN ROUTES */}
                                 <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                                 <Route path="/admin/push" element={<AdminRoute><PushDashboard /></AdminRoute>} />
-                                
+                                <Route 
+    path="/admin/email-blaster" 
+    element={<PremiumEmailBlaster />} 
+/>
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </div>
