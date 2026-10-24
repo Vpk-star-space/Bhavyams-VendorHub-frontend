@@ -11,6 +11,9 @@ const getBackendUrl = () => {
         : 'http://localhost:5000/api';
 };
 
+// Messaging is temporarily disabled. Set to true when ready to relaunch.
+const CHAT_FEATURES_AVAILABLE = false;
+
 const Chat = () => {
     const { conversationId } = useParams();
     const navigate = useNavigate();
@@ -28,6 +31,16 @@ const Chat = () => {
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
+useEffect(() => {
+    if (!CHAT_FEATURES_AVAILABLE) {
+        setLoading(false);
+        return;
+    }
+
+    if (!currentUser) return navigate('/welcome');
+
+    // Keep all your existing code below unchanged.
+
 
     useEffect(() => {
         if (!currentUser) return navigate('/welcome');
@@ -88,6 +101,69 @@ const Chat = () => {
             message_text: tempMsg.message_text
         });
     };
+
+if (!CHAT_FEATURES_AVAILABLE) {
+    return (
+        <div style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            background: '#f8fafc',
+            fontFamily: 'Inter, sans-serif',
+            textAlign: 'center'
+        }}>
+            <div style={{
+                maxWidth: '380px',
+                padding: '32px 24px',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '20px',
+                boxShadow: '0 8px 30px rgba(15, 23, 42, 0.06)'
+            }}>
+                <div style={{ fontSize: '40px', marginBottom: '16px' }}>
+                    🚧
+                </div>
+
+                <h2 style={{
+                    color: '#0f172a',
+                    fontSize: '22px',
+                    margin: '0 0 12px'
+                }}>
+                    Messaging Unavailable
+                </h2>
+
+                <p style={{
+                    color: '#64748b',
+                    fontSize: '14px',
+                    lineHeight: '1.7',
+                    margin: '0 0 24px'
+                }}>
+                    Messaging and calling are temporarily unavailable.
+                    Thank you for your understanding.
+                </p>
+
+                <button
+                    onClick={() => navigate(-1)}
+                    style={{
+                        width: '100%',
+                        padding: '12px 20px',
+                        background: '#1e293b',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                    }}
+                >
+                    Go Back
+                </button>
+            </div>
+        </div>
+    );
+}
 
     if (loading) return <div style={styles.loadingBox}><Loader className="spin" /> Loading secure chat...</div>;
 
