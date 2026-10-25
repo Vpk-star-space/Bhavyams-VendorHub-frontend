@@ -254,7 +254,7 @@ const ShopRow = ({ items, renderItem }) => {
     const ref = useRef(null);
     const paused = useRef(false);
     const timer = useRef(null);
-    const many = items.length >= 3;
+    const many = items.length >= 4;
 
     useEffect(() => {
         const el = ref.current;
