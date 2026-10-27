@@ -447,15 +447,20 @@ const Home = () => {
             setLoading(true);
             try {
                 const API = getBackendUrl();
-                const [resFeed, resShops, resCats] = await Promise.allSettled([
+                const [resFeed, resShops] = await Promise.allSettled([
                     axios.get(`${API}/products/feed?lat=${activeLat}&lng=${activeLng}`),
-                    axios.get(`${API}/shops/active/all`),
-                    axios.get(`${API}/admin/categories`)
+                    axios.get(`${API}/shops/active/all`)
                 ]);
                 if (!isMounted) return;
                 if (resFeed.status === 'fulfilled') setProducts(resFeed.value.data?.products || []);
                 if (resShops.status === 'fulfilled') setActiveShops(resShops.value.data?.shops || []);
-                if (resCats.status === 'fulfilled') setAdminCategories(resCats.value.data || []);
+
+                try {
+                    const catRes = await axios.get(`${API}/admin/categories`);
+                    if (isMounted) setAdminCategories(catRes.data || []);
+                } catch (catErr) {
+                    if (isMounted) setAdminCategories([]);
+                }
             } catch (err) {
                 console.error("Feed Error:", err);
             } finally {
